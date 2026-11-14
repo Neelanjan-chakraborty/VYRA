@@ -1,0 +1,323 @@
+@import 'tailwindcss';
+@import './tokens.css';
+
+@theme inline {
+  --font-display: var(--font-instrument-serif), 'Iowan Old Style', 'Times New Roman', serif;
+  --font-sans: var(--font-manrope), ui-sans-serif, system-ui, sans-serif;
+
+  --color-ink: var(--vyra-ink);
+  --color-ink-raised: var(--vyra-ink-raised);
+  --color-ivory: var(--vyra-ivory);
+  --color-paper: var(--vyra-paper);
+  --color-cherry: var(--vyra-cherry);
+  --color-oxblood: var(--vyra-oxblood);
+
+  /* Resolved per section by the .theme-* classes below. */
+  --color-bg: var(--bg);
+  --color-fg: var(--fg);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-accent: var(--accent);
+
+  --ease-standard: var(--vyra-ease-standard);
+  --ease-enter: var(--vyra-ease-enter);
+
+  --breakpoint-xs: 26rem;
+}
+
+/* Section themes. A section sets one of these; everything inside reads the variables. */
+.theme-ink {
+  --bg: var(--vyra-ink);
+  --fg: var(--vyra-ivory);
+  --muted: var(--vyra-grey);
+  --line: var(--vyra-hairline);
+  --accent: var(--vyra-cherry-bright);
+}
+.theme-ivory {
+  --bg: var(--vyra-ivory);
+  --fg: var(--vyra-ink);
+  --muted: var(--vyra-ink-soft);
+  --line: color-mix(in srgb, var(--vyra-ink) 16%, transparent);
+  --accent: var(--vyra-oxblood-text);
+}
+.theme-oxblood {
+  --bg: var(--vyra-oxblood);
+  --fg: var(--vyra-ivory);
+  --muted: color-mix(in srgb, var(--vyra-ivory) 78%, var(--vyra-oxblood));
+  --line: color-mix(in srgb, var(--vyra-ivory) 22%, transparent);
+  --accent: var(--vyra-ivory);
+}
+.theme-cherry {
+  --bg: var(--vyra-cherry);
+  --fg: var(--vyra-ivory);
+  --muted: var(--vyra-ivory);
+  --line: color-mix(in srgb, var(--vyra-ivory) 40%, transparent);
+  --accent: var(--vyra-ivory);
+}
+.theme-ink,
+.theme-ivory,
+.theme-oxblood,
+.theme-cherry {
+  background-color: var(--bg);
+  color: var(--fg);
+}
+
+@layer base {
+  html {
+    background-color: var(--vyra-ink);
+    -webkit-text-size-adjust: 100%;
+    scroll-padding-top: 5rem;
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 1rem;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    overflow-x: clip;
+  }
+  ::selection {
+    background: var(--vyra-cherry);
+    color: var(--vyra-ivory);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent, var(--vyra-cherry-bright));
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+  p,
+  li {
+    text-wrap: pretty;
+  }
+}
+
+/* Type. Display is Instrument Serif; interface text is Manrope — the same pair as the app. */
+@utility t-mega {
+  font-family: var(--font-display);
+  font-size: clamp(3.5rem, 14.6vw, 5.25rem);
+  line-height: 0.86;
+  letter-spacing: -0.035em;
+  font-weight: 400;
+  @media (min-width: 40rem) {
+    font-size: clamp(5.25rem, 11.6vw, 13.5rem);
+  }
+}
+@utility t-display {
+  font-family: var(--font-display);
+  font-size: clamp(2.75rem, 8.4vw, 7.25rem);
+  line-height: 0.92;
+  letter-spacing: -0.03em;
+  font-weight: 400;
+}
+@utility t-headline {
+  font-family: var(--font-display);
+  font-size: clamp(2.125rem, 4.6vw, 4rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-weight: 400;
+}
+@utility t-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.625rem, 2.5vw, 2.25rem);
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  font-weight: 400;
+}
+@utility t-lede {
+  font-size: clamp(1.0625rem, 1.45vw, 1.3125rem);
+  line-height: 1.5;
+  letter-spacing: -0.006em;
+}
+@utility t-eyebrow {
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+@utility t-small {
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  letter-spacing: 0.006em;
+}
+
+/* Page gutter and the 12-column editorial grid. */
+@utility shell {
+  width: 100%;
+  max-width: 100rem;
+  margin-inline: auto;
+  padding-inline: clamp(1.25rem, 4.2vw, 4.5rem);
+}
+@utility grid-12 {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  column-gap: clamp(0.75rem, 1.8vw, 2rem);
+}
+
+@layer components {
+  /* Film grain: one fixed layer, no blend mode, so it costs a single composite. */
+  .grain::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 60;
+    pointer-events: none;
+    opacity: 0.055;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 .9 0'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  /* Links inside running text. */
+  .prose-link {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.22em;
+    text-decoration-color: var(--accent);
+    transition: color var(--vyra-duration-fast) var(--vyra-ease-standard);
+  }
+  .prose-link:hover {
+    color: var(--accent);
+  }
+
+  /* The arrow link used for "read more" moves. */
+  .arrow-link {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.6em;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    border-bottom: 1px solid var(--fg);
+    padding-bottom: 0.35em;
+    min-height: 2.75rem;
+    align-items: center;
+  }
+  .arrow-link .arrow {
+    transition: transform var(--vyra-duration-base) var(--vyra-ease-standard);
+  }
+  .arrow-link:hover .arrow {
+    transform: translateX(0.35em);
+  }
+
+  /* Buttons: squared, not pills. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.75em;
+    min-height: 3.25rem;
+    padding: 0.75rem 1.6rem;
+    font-weight: 600;
+    font-size: 0.9375rem;
+    letter-spacing: 0.01em;
+    border-radius: var(--vyra-radius-s);
+    transition:
+      background-color var(--vyra-duration-base) var(--vyra-ease-standard),
+      color var(--vyra-duration-base) var(--vyra-ease-standard),
+      border-color var(--vyra-duration-base) var(--vyra-ease-standard);
+  }
+  .btn-primary {
+    background: var(--vyra-cherry);
+    color: var(--vyra-ivory);
+  }
+  .btn-primary:hover {
+    background: var(--vyra-ivory);
+    color: var(--vyra-ink);
+  }
+  .theme-ivory .btn-primary:hover {
+    background: var(--vyra-ink);
+    color: var(--vyra-ivory);
+  }
+  .theme-cherry .btn-primary {
+    background: var(--vyra-ink);
+  }
+  .btn-ghost {
+    border: 1px solid var(--line);
+    color: var(--fg);
+  }
+  .btn-ghost:hover {
+    border-color: var(--fg);
+  }
+
+  /* Screenshot frame: a plain bezel, not a mock handset. */
+  .shot {
+    position: relative;
+    border-radius: clamp(1.1rem, 2.2vw, 2rem);
+    overflow: hidden;
+    background: var(--vyra-ink);
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--vyra-ivory) 14%, transparent),
+      0 2.5rem 5rem -1.5rem rgb(0 0 0 / 0.6);
+  }
+  .theme-ivory .shot {
+    box-shadow:
+      0 0 0 1px color-mix(in srgb, var(--vyra-ink) 30%, transparent),
+      0 2.5rem 4.5rem -1.75rem rgb(16 15 19 / 0.5);
+  }
+  .shot img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+}
+
+/* Marquee: pure CSS, paused for reduced motion. */
+@keyframes marquee {
+  to {
+    transform: translateX(-50%);
+  }
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marquee 48s linear infinite;
+}
+
+/* The orbiting point in the hero mark. */
+@keyframes orbit {
+  to {
+    offset-distance: 100%;
+  }
+}
+.orbit-dot {
+  offset-rotate: 0deg;
+  animation: orbit 26s linear infinite;
+}
+@keyframes draw {
+  from {
+    stroke-dashoffset: 1;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+.orbit-draw {
+  stroke-dasharray: 1;
+  animation: draw 2.4s var(--vyra-ease-standard) both;
+}
+
+/* Bars in the engine read-out grow from zero once, on load of their section. */
+.bar-fill {
+  transform-origin: left center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track,
+  .orbit-dot,
+  .orbit-draw {
+    animation: none;
+  }
+  .orbit-draw {
+    stroke-dasharray: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    transition-duration: 0.01ms !important;
+  }
+}
