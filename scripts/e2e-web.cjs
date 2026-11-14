@@ -163,6 +163,8 @@ async function main() {
     await page.getByText('Tell us what to call you').waitFor(); // name is required
     await page.getByLabel('Name', { exact: true }).fill('Asha');
     await page.getByLabel('City (optional)').fill('Bengaluru');
+    await page.getByRole('radio', { name: 'Woman' }).click();
+    await page.getByRole('switch', { name: 'Show gender on my profile', checked: false }).waitFor();
     await page
       .getByLabel('A few lines about you (optional)')
       .fill('Designer. Reads on trains. Will argue about filter coffee.');
@@ -296,6 +298,14 @@ async function main() {
   await step('onboarding: preferences', async () => {
     await heading('Who should we look for?').waitFor();
     await button('Increase Oldest').click();
+    await page.getByRole('checkbox', { name: 'Men', exact: true }).click();
+    // Choosing a gender reveals the "describe their gender differently" option, on by default.
+    await page
+      .getByRole('switch', {
+        name: 'Also show people who describe their gender differently',
+        checked: true,
+      })
+      .waitFor();
     await page.getByRole('radio', { name: 'Within 25 km' }).click();
     await snap('onboarding-preferences');
     await button('Finish').click();

@@ -75,3 +75,21 @@ describe('assistant questionnaire', () => {
     expect(buildQuestionnairePrompt('deepseek')).toMatch(/If you know nothing about me/);
   });
 });
+
+describe('gender identity', () => {
+  it('accepts every supported identity and rejects anything else', async () => {
+    const { genderIdentitySchema, GENDER_IDENTITIES, categoryListSchema } =
+      await import('./compatibility.js');
+    for (const identity of GENDER_IDENTITIES)
+      expect(genderIdentitySchema.safeParse(identity).success).toBe(true);
+    expect(genderIdentitySchema.safeParse('female').success).toBe(false);
+    // Only concrete identities can be searched for.
+    expect(categoryListSchema.safeParse(['WOMAN', 'NON_BINARY']).success).toBe(true);
+    expect(categoryListSchema.safeParse(['PREFER_NOT_TO_SAY']).success).toBe(false);
+    expect(categoryListSchema.safeParse(['MAN', 'MAN']).success).toBe(false);
+  });
+
+  it('the persona catalogue cannot hold a gender', () => {
+    for (const key of PERSONA_ATTRIBUTE_KEYS) expect(key.toLowerCase()).not.toContain('gender');
+  });
+});

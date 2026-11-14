@@ -158,8 +158,14 @@ model UserProfile {
   userId         String   @id @map("user_id") @db.Uuid
   displayName    String   @map("display_name") @db.VarChar(60)
   bio            String?  @db.VarChar(600)
-  /// Free-form, user-described.
-  gender         String?  @db.VarChar(40)
+  /// null = not answered. Never inferred.
+  genderIdentity        GenderIdentity?  @map("gender_identity")
+  /// Kept only with SELF_DESCRIBE (CHECK constraint).
+  genderSelfDescription String?          @map("gender_self_description") @db.VarChar(40)
+  /// Show the gender on the profile. Private unless turned on.
+  genderVisible         Boolean          @default(false) @map("gender_visible")
+  /// SELF_DESCRIBE only: searches to appear in (WOMAN, MAN, NON_BINARY).
+  discoverableAs        GenderIdentity[] @default([]) @map("discoverable_as")
   pronouns       String?  @db.VarChar(40)
   occupation     String?  @db.VarChar(80)
   city           String?  @db.VarChar(80)
@@ -178,6 +184,14 @@ model UserProfile {
 
   @@index([isDiscoverable, countryCode])
   @@map("user_profiles")
+}
+
+enum GenderIdentity {
+  WOMAN
+  MAN
+  NON_BINARY
+  SELF_DESCRIBE
+  PREFER_NOT_TO_SAY
 }
 
 enum PhotoModerationStatus {
@@ -285,8 +299,10 @@ model DiscoveryPreferences {
   maxAge          Int      @default(40) @map("max_age")
   /// Null means no distance limit.
   maxDistanceKm   Int?     @map("max_distance_km")
-  /// Genders the user wants to see; empty means everyone.
-  interestedIn    String[] @default([]) @map("interested_in")
+  /// Identities the user wants to see (WOMAN, MAN, NON_BINARY); empty = everyone.
+  showGenders            GenderIdentity[] @default([]) @map("show_genders")
+  /// Also show self-described (without chosen searches), undisclosed and unanswered.
+  includeUnlistedGenders Boolean          @default(true) @map("include_unlisted_genders")
   /// Hard deal-breakers as structured rules, validated by @vyra/validation.
   dealBreakers    Json     @default("[]") @map("deal_breakers")
   showAstrology   Boolean  @default(false) @map("show_astrology")

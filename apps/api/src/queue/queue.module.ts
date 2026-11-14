@@ -28,7 +28,11 @@ export function redisConnection(url: string): ConnectionOptions {
   imports: [
     BullModule.forRootAsync({
       inject: [ENV],
-      useFactory: (env: Env) => ({ connection: redisConnection(env.REDIS_URL), prefix: 'vyra' }),
+      // Tests get their own prefix so a dev server's workers never take test jobs.
+      useFactory: (env: Env) => ({
+        connection: redisConnection(env.REDIS_URL),
+        prefix: env.NODE_ENV === 'test' ? 'vyra-test' : 'vyra',
+      }),
     }),
     BullModule.registerQueue({ name: PERSONA_QUEUE }, { name: PHOTO_MODERATION_QUEUE }),
   ],

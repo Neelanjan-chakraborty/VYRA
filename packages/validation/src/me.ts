@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { dealBreakerListSchema } from './compatibility.js';
+import {
+  categoryListSchema,
+  dealBreakerListSchema,
+  genderIdentitySchema,
+} from './compatibility.js';
 import { relationshipIntentSchema } from './domain.js';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
@@ -24,7 +28,14 @@ export const profileUpdateSchema = z
   .object({
     displayName: trimmed(PROFILE_LIMITS.displayName),
     bio: clearable(PROFILE_LIMITS.bio),
-    gender: clearable(PROFILE_LIMITS.short),
+    /** null clears the answer. */
+    genderIdentity: z.union([genderIdentitySchema, z.null()]),
+    /** Only kept with SELF_DESCRIBE. */
+    genderSelfDescription: clearable(PROFILE_LIMITS.short),
+    /** Show the gender on the profile. Off unless the person turns it on. */
+    genderVisible: z.boolean(),
+    /** SELF_DESCRIBE only: which searches to appear in. Empty = shown to people who include unlisted genders. */
+    discoverableAs: categoryListSchema,
     pronouns: clearable(PROFILE_LIMITS.short),
     occupation: clearable(PROFILE_LIMITS.occupation),
     city: clearable(PROFILE_LIMITS.city),
@@ -60,7 +71,10 @@ export const discoveryPreferencesSchema = z
     minAge: z.number().int().min(18).max(120),
     maxAge: z.number().int().min(18).max(120),
     maxDistanceKm: z.union([z.number().int().min(1).max(20_000), z.null()]),
-    interestedIn: z.array(z.string().trim().min(1).max(40)).max(10),
+    /** Identities the person wants to see; empty means everyone. */
+    showGenders: categoryListSchema,
+    /** Also show people who self-describe without choosing searches, prefer not to say, or haven't answered. */
+    includeUnlistedGenders: z.boolean().default(true),
     showAstrology: z.boolean(),
     dealBreakers: dealBreakerListSchema.default([]),
   })
@@ -139,7 +153,10 @@ export const meSchema = z.object({
     .object({
       displayName: z.string(),
       bio: z.string().nullable(),
-      gender: z.string().nullable(),
+      genderIdentity: genderIdentitySchema.nullable(),
+      genderSelfDescription: z.string().nullable(),
+      genderVisible: z.boolean(),
+      discoverableAs: categoryListSchema,
       pronouns: z.string().nullable(),
       occupation: z.string().nullable(),
       city: z.string().nullable(),

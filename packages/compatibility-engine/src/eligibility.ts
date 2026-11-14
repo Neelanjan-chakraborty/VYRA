@@ -9,10 +9,26 @@ function acceptsAge(viewer: Person, other: Person): boolean {
   return other.age >= viewer.preferences.minAge && other.age <= viewer.preferences.maxAge;
 }
 
-function acceptsGender(viewer: Person, other: Person): boolean {
-  const wanted = viewer.preferences.interestedIn;
-  // A preference is only satisfied by a known, matching category: we never guess.
-  return wanted.length === 0 || (other.gender !== null && wanted.includes(other.gender));
+/**
+ * Whether `viewer`'s "show me" choice includes `other`:
+ * - showing everyone includes everyone;
+ * - Woman / Man / Non-binary must be in the chosen list;
+ * - Self-describe with chosen searches is included if any chosen search matches;
+ * - Self-describe without chosen searches, prefer not to say, or not answered is
+ *   included unless the viewer turned off "people who describe their gender
+ *   differently or prefer not to say" (on by default).
+ * Nothing is ever inferred, so no one is dropped for being hard to categorise.
+ */
+export function acceptsGender(viewer: Person, other: Person): boolean {
+  const wanted = viewer.preferences.showGenders;
+  if (wanted.length === 0) return true;
+  const identity = other.gender;
+  if (identity === 'WOMAN' || identity === 'MAN' || identity === 'NON_BINARY')
+    return wanted.includes(identity);
+  if (identity === 'SELF_DESCRIBE' && other.discoverableAs.length > 0) {
+    return other.discoverableAs.some((category) => wanted.includes(category));
+  }
+  return viewer.preferences.includeUnlistedGenders;
 }
 
 function withinDistance(viewer: Person, other: Person): boolean {

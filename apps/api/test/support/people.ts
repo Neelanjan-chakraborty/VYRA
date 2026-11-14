@@ -1,5 +1,7 @@
 import type {
   DealBreaker,
+  GenderCategory,
+  GenderIdentity,
   PersonaAttributeKey,
   PersonaAttributeValue,
   RelationshipIntent,
@@ -12,11 +14,15 @@ let imageSeed = 1000;
 
 export interface SyntheticPerson {
   readonly age?: number;
-  readonly gender?: string;
+  readonly gender?: GenderIdentity | null;
+  readonly genderSelfDescription?: string;
+  readonly genderVisible?: boolean;
+  readonly discoverableAs?: readonly GenderCategory[];
   readonly intents?: RelationshipIntent[];
   readonly minAge?: number;
   readonly maxAge?: number;
-  readonly interestedIn?: readonly string[];
+  readonly showGenders?: readonly GenderCategory[];
+  readonly includeUnlistedGenders?: boolean;
   readonly dealBreakers?: DealBreaker[];
   readonly traits?: Partial<Record<PersonaAttributeKey, PersonaAttributeValue>>;
   readonly interests?: string[];
@@ -43,7 +49,13 @@ export async function createPerson(
   await http()
     .patch('/v1/me/profile')
     .set(user.auth)
-    .send({ displayName: 'Synthetic', gender: spec.gender ?? null })
+    .send({
+      displayName: 'Synthetic',
+      genderIdentity: spec.gender ?? null,
+      genderVisible: spec.genderVisible ?? false,
+      ...(spec.genderSelfDescription ? { genderSelfDescription: spec.genderSelfDescription } : {}),
+      ...(spec.discoverableAs ? { discoverableAs: [...spec.discoverableAs] } : {}),
+    })
     .expect(200);
   imageSeed += 1;
   const photo = await http()
@@ -68,7 +80,8 @@ export async function createPerson(
       minAge: spec.minAge ?? 18,
       maxAge: spec.maxAge ?? 99,
       maxDistanceKm: null,
-      interestedIn: [...(spec.interestedIn ?? [])],
+      showGenders: [...(spec.showGenders ?? [])],
+      includeUnlistedGenders: spec.includeUnlistedGenders ?? true,
       showAstrology: false,
       dealBreakers: spec.dealBreakers ?? [],
     })

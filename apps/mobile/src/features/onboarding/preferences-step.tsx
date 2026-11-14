@@ -1,4 +1,5 @@
 import { space } from '@vyra/design-system';
+import { GENDER_CATEGORIES, SHOW_GENDER_LABELS, type GenderCategory } from '@vyra/validation';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
@@ -8,11 +9,11 @@ import { ErrorNotice } from '@/components/ui/notice';
 import { SelectRow } from '@/components/ui/select-row';
 import { Stepper } from '@/components/ui/stepper';
 import { Tag } from '@/components/ui/tag';
+import { Toggle } from '@/components/ui/toggle';
 import { useCompleteOnboarding, useMe, useSetPreferences } from '@/features/profile/profile-api';
 import { errorMessage } from '@/lib/api';
 import { type StepMode, useStepChrome } from './step-chrome';
 
-const GENDERS = ['Women', 'Men', 'Non-binary people'] as const;
 const DISTANCES: readonly { label: string; km: number | null }[] = [
   { label: 'Within 10 km', km: 10 },
   { label: 'Within 25 km', km: 25 },
@@ -31,11 +32,14 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
   const [minAge, setMinAge] = useState(current?.minAge ?? Math.max(18, ownAge - 4));
   const [maxAge, setMaxAge] = useState(current?.maxAge ?? ownAge + 6);
   const [distance, setDistance] = useState<number | null>(current ? current.maxDistanceKm : 50);
-  const [interestedIn, setInterestedIn] = useState<readonly string[]>(current?.interestedIn ?? []);
+  const [showGenders, setShowGenders] = useState<readonly GenderCategory[]>(
+    current?.showGenders ?? [],
+  );
+  const [includeUnlisted, setIncludeUnlisted] = useState(current?.includeUnlistedGenders ?? true);
 
-  function toggleGender(gender: string) {
-    setInterestedIn((list) =>
-      list.includes(gender) ? list.filter((g) => g !== gender) : [...list, gender],
+  function toggleGender(category: GenderCategory) {
+    setShowGenders((list) =>
+      list.includes(category) ? list.filter((g) => g !== category) : [...list, category],
     );
   }
 
@@ -45,7 +49,8 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
         minAge,
         maxAge,
         maxDistanceKm: distance,
-        interestedIn: [...interestedIn],
+        showGenders: [...showGenders],
+        includeUnlistedGenders: includeUnlisted,
         showAstrology: current?.showAstrology ?? false,
         dealBreakers: current?.dealBreakers ?? [],
       },
@@ -90,18 +95,35 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
         Show me
       </Text>
       <View style={styles.tags}>
-        {GENDERS.map((gender) => (
+        <Tag
+          label="Everyone"
+          selected={showGenders.length === 0}
+          onPress={() => setShowGenders([])}
+        />
+        {GENDER_CATEGORIES.map((category) => (
           <Tag
-            key={gender}
-            label={gender}
-            selected={interestedIn.includes(gender)}
-            onPress={() => toggleGender(gender)}
+            key={category}
+            label={SHOW_GENDER_LABELS[category]}
+            selected={showGenders.includes(category)}
+            onPress={() => toggleGender(category)}
           />
         ))}
       </View>
-      <Text variant="caption" tone="textSecondary" style={styles.note}>
-        Leave all unselected to see everyone.
-      </Text>
+      {showGenders.length > 0 ? (
+        <View style={styles.unlisted}>
+          <View style={styles.unlistedCopy}>
+            <Text variant="bodyStrong">Also show people who describe their gender differently</Text>
+            <Text variant="caption" tone="textSecondary">
+              Includes people who self-describe, prefer not to say, or haven’t answered.
+            </Text>
+          </View>
+          <Toggle
+            label="Also show people who describe their gender differently"
+            value={includeUnlisted}
+            onChange={setIncludeUnlisted}
+          />
+        </View>
+      ) : null}
 
       <Text variant="eyebrow" tone="textSecondary" style={styles.heading}>
         Distance
@@ -126,4 +148,6 @@ const styles = StyleSheet.create({
   ages: { flexDirection: 'row', gap: space.xl },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
   note: { marginTop: space.s },
+  unlisted: { flexDirection: 'row', alignItems: 'center', gap: space.l, marginTop: space.l },
+  unlistedCopy: { flex: 1, gap: space.xxs },
 });

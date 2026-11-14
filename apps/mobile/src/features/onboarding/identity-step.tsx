@@ -6,6 +6,7 @@ import { ErrorNotice } from '@/components/ui/notice';
 import { TextField } from '@/components/ui/text-field';
 import { useMe, useUpdateProfile } from '@/features/profile/profile-api';
 import { ApiRequestError, errorMessage } from '@/lib/api';
+import { GenderField, type GenderValue } from './gender-field';
 import { type StepMode, useStepChrome } from './step-chrome';
 
 export function IdentityStep({ mode }: { readonly mode: StepMode }) {
@@ -14,21 +15,32 @@ export function IdentityStep({ mode }: { readonly mode: StepMode }) {
   const save = useUpdateProfile();
   const [displayName, setDisplayName] = useState(profile?.displayName ?? '');
   const [pronouns, setPronouns] = useState(profile?.pronouns ?? '');
-  const [gender, setGender] = useState(profile?.gender ?? '');
+  const [gender, setGender] = useState<GenderValue>({
+    identity: profile?.genderIdentity ?? null,
+    selfDescription: profile?.genderSelfDescription ?? '',
+    discoverableAs: profile?.discoverableAs ?? [],
+    visible: profile?.genderVisible ?? false,
+  });
   const [city, setCity] = useState(profile?.city ?? '');
   const [occupation, setOccupation] = useState(profile?.occupation ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   function submit() {
-    const parsed = profileUpdateSchema.safeParse({
+    const selfDescribing = gender.identity === 'SELF_DESCRIBE';
+    const update = {
       displayName,
       pronouns,
-      gender,
       city,
       occupation,
       bio,
-    });
+      genderIdentity: gender.identity,
+      genderSelfDescription: selfDescribing ? gender.selfDescription : null,
+      discoverableAs: selfDescribing ? [...gender.discoverableAs] : [],
+      genderVisible:
+        gender.identity !== null && gender.identity !== 'PREFER_NOT_TO_SAY' && gender.visible,
+    };
+    const parsed = profileUpdateSchema.safeParse(update);
     if (!parsed.success) {
       setErrors(
         Object.fromEntries(
@@ -41,10 +53,7 @@ export function IdentityStep({ mode }: { readonly mode: StepMode }) {
       return;
     }
     setErrors({});
-    save.mutate(
-      { displayName, pronouns, gender, city, occupation, bio },
-      { onSuccess: chrome.advance },
-    );
+    save.mutate(update, { onSuccess: chrome.advance });
   }
 
   const serverField = (name: string) =>
@@ -84,13 +93,10 @@ export function IdentityStep({ mode }: { readonly mode: StepMode }) {
         maxLength={PROFILE_LIMITS.short}
         autoCapitalize="none"
       />
-      <TextField
-        label="Gender (optional)"
+      <GenderField
         value={gender}
-        onChangeText={setGender}
-        error={errors.gender}
-        hint="In your own words."
-        maxLength={PROFILE_LIMITS.short}
+        onChange={setGender}
+        error={errors.genderSelfDescription ?? serverField('genderIdentity')}
       />
       <TextField
         label="City (optional)"

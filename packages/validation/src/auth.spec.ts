@@ -86,7 +86,7 @@ describe('profile and preferences', () => {
     ).toBe(false);
   });
   it('rejects under-18 and inverted age ranges', () => {
-    const base = { maxDistanceKm: null, interestedIn: [], showAstrology: false };
+    const base = { maxDistanceKm: null, showGenders: [], showAstrology: false };
     expect(discoveryPreferencesSchema.safeParse({ ...base, minAge: 17, maxAge: 30 }).success).toBe(
       false,
     );

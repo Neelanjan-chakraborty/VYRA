@@ -160,7 +160,7 @@ describe('Profile, photos and account (e2e)', () => {
         minAge: 24,
         maxAge: 32,
         maxDistanceKm: 50,
-        interestedIn: ['women'],
+        showGenders: ['WOMAN'],
         showAstrology: false,
       };
       const response = await http()
@@ -170,6 +170,7 @@ describe('Profile, photos and account (e2e)', () => {
         .expect(200);
       expect(meSchema.parse(response.body).discoveryPreferences).toEqual({
         ...prefs,
+        includeUnlistedGenders: true,
         dealBreakers: [],
       });
       await http()

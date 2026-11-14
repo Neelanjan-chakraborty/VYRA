@@ -2,6 +2,7 @@ import type {
   CompatibilityDimension,
   DealBreaker,
   GenderCategory,
+  GenderIdentity,
   PersonaAttributeKey,
   PersonaAttributeValue,
   RelationshipIntent,
@@ -16,14 +17,19 @@ export interface Trait {
 export interface Person {
   readonly id: string;
   readonly age: number;
-  readonly gender: GenderCategory | null;
+  /** As the person stated it; null = not answered. Never inferred. */
+  readonly gender: GenderIdentity | null;
+  /** SELF_DESCRIBE only: the searches they chose to appear in. */
+  readonly discoverableAs: readonly GenderCategory[];
   readonly intents: readonly RelationshipIntent[];
   readonly preferences: {
     readonly minAge: number;
     readonly maxAge: number;
     readonly maxDistanceKm: number | null;
-    /** Empty means everyone. */
-    readonly interestedIn: readonly GenderCategory[];
+    /** Identities they want to see; empty means everyone. */
+    readonly showGenders: readonly GenderCategory[];
+    /** Whether to also see people whose identity isn't one of the listed categories. */
+    readonly includeUnlistedGenders: boolean;
     readonly dealBreakers: readonly DealBreaker[];
   };
   readonly location: { readonly latitude: number; readonly longitude: number } | null;

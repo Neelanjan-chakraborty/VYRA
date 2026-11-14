@@ -5,7 +5,7 @@ import {
   DEFAULT_COMPATIBILITY_WEIGHTS,
 } from '@vyra/validation';
 import { describe, expect, it } from 'vitest';
-import { ineligibility } from './eligibility.js';
+import { acceptsGender, ineligibility } from './eligibility.js';
 import { INTERESTS, OPPOSITE, person, RICH, traits } from './fixtures.js';
 import { rankScore, rankWithDiversity } from './rank.js';
 import { highlights, score } from './score.js';
@@ -13,6 +13,15 @@ import { highlights, score } from './score.js';
 const W = DEFAULT_COMPATIBILITY_WEIGHTS;
 const run = (a: ReturnType<typeof person>, b: ReturnType<typeof person>) =>
   score(a, b, W, 'test-weights');
+
+const viewerShowing = (
+  showGenders: ('WOMAN' | 'MAN' | 'NON_BINARY')[],
+  includeUnlistedGenders = true,
+) => person('viewer', { gender: 'WOMAN', preferences: { showGenders, includeUnlistedGenders } });
+const candidate = (
+  gender: (typeof IDENTITIES)[number],
+  discoverableAs: ('WOMAN' | 'MAN' | 'NON_BINARY')[] = [],
+) => person('c', { gender, discoverableAs });
 
 describe('eligibility gates', () => {
   it('never pairs someone with themselves', () => {
@@ -30,19 +39,59 @@ describe('eligibility gates', () => {
     expect(ineligibility(a, person('b', { age: 35 }))).toBeNull();
   });
 
-  it('respects gender preferences and never guesses an unknown gender', () => {
-    const wantsWomen = person('a', { gender: 'man', preferences: { interestedIn: ['woman'] } });
-    expect(ineligibility(wantsWomen, person('b', { gender: 'woman' }))).toBeNull();
-    expect(ineligibility(wantsWomen, person('b', { gender: 'man' }))).toBe('gender_preference');
-    expect(ineligibility(wantsWomen, person('b', { gender: null }))).toBe('gender_preference');
-    // b only wants women, a is a man: fails in the other direction.
-    expect(
-      ineligibility(
-        wantsWomen,
-        person('b', { gender: 'woman', preferences: { interestedIn: ['woman'] } }),
-      ),
-    ).toBe('gender_preference');
-    expect(ineligibility(person('a'), person('b'))).toBeNull();
+  describe('gender', () => {
+    const IDENTITIES = [
+      'WOMAN',
+      'MAN',
+      'NON_BINARY',
+      'SELF_DESCRIBE',
+      'PREFER_NOT_TO_SAY',
+      null,
+    ] as const;
+    it.each(IDENTITIES)('showing everyone includes %s', (identity) => {
+      expect(acceptsGender(viewerShowing([]), candidate(identity))).toBe(true);
+      expect(acceptsGender(viewerShowing([], false), candidate(identity))).toBe(true);
+    });
+
+    it('listed identities must be chosen', () => {
+      const v = viewerShowing(['MAN']);
+      expect(acceptsGender(v, candidate('MAN'))).toBe(true);
+      expect(acceptsGender(v, candidate('WOMAN'))).toBe(false);
+      expect(acceptsGender(v, candidate('NON_BINARY'))).toBe(false);
+      expect(acceptsGender(viewerShowing(['MAN', 'NON_BINARY']), candidate('NON_BINARY'))).toBe(
+        true,
+      );
+    });
+
+    it.each(['SELF_DESCRIBE', 'PREFER_NOT_TO_SAY', null] as const)(
+      '%s is included by default, and excluded only if the viewer turns that off',
+      (identity) => {
+        expect(acceptsGender(viewerShowing(['MAN']), candidate(identity))).toBe(true);
+        expect(acceptsGender(viewerShowing(['MAN'], false), candidate(identity))).toBe(false);
+      },
+    );
+
+    it('self-describing people appear in the searches they chose', () => {
+      const chose = candidate('SELF_DESCRIBE', ['MAN', 'NON_BINARY']);
+      expect(acceptsGender(viewerShowing(['NON_BINARY'], false), chose)).toBe(true);
+      expect(acceptsGender(viewerShowing(['WOMAN']), chose)).toBe(false);
+    });
+
+    it('is checked in both directions', () => {
+      const a = person('a', { gender: 'WOMAN', preferences: { showGenders: ['MAN'] } });
+      expect(
+        ineligibility(a, person('b', { gender: 'MAN', preferences: { showGenders: ['MAN'] } })),
+      ).toBe('gender_preference');
+      expect(
+        ineligibility(a, person('b', { gender: 'MAN', preferences: { showGenders: ['WOMAN'] } })),
+      ).toBeNull();
+      expect(
+        ineligibility(
+          a,
+          person('b', { gender: 'PREFER_NOT_TO_SAY', preferences: { showGenders: [] } }),
+        ),
+      ).toBeNull();
+    });
   });
 
   it('applies distance only when both locations and a limit are known', () => {

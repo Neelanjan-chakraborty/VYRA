@@ -8,6 +8,7 @@ import {
   ageInYears,
   dealBreakerListSchema,
   type DiscoveryPreferences,
+  type GenderCategory,
   type Interest,
   type Me,
   type RelationshipIntent,
@@ -33,6 +34,10 @@ const KIND_TO_DB = {
 const KIND_FROM_DB = Object.fromEntries(
   Object.entries(KIND_TO_DB).map(([api, db]) => [db, api]),
 ) as Record<RelationshipIntentKind, RelationshipIntent>;
+
+function isCategory(identity: string): identity is GenderCategory {
+  return identity === 'WOMAN' || identity === 'MAN' || identity === 'NON_BINARY';
+}
 
 export function maskEmail(email: string): string {
   const [local = '', domain = ''] = email.split('@');
@@ -83,7 +88,10 @@ export class MeService {
       profile: profile && {
         displayName: profile.displayName,
         bio: profile.bio,
-        gender: profile.gender,
+        genderIdentity: profile.genderIdentity,
+        genderSelfDescription: profile.genderSelfDescription,
+        genderVisible: profile.genderVisible,
+        discoverableAs: profile.discoverableAs.filter(isCategory),
         pronouns: profile.pronouns,
         occupation: profile.occupation,
         city: profile.city,
@@ -100,7 +108,8 @@ export class MeService {
         minAge: prefs.minAge,
         maxAge: prefs.maxAge,
         maxDistanceKm: prefs.maxDistanceKm,
-        interestedIn: prefs.interestedIn,
+        showGenders: prefs.showGenders.filter(isCategory),
+        includeUnlistedGenders: prefs.includeUnlistedGenders,
         showAstrology: prefs.showAstrology,
         dealBreakers: dealBreakerListSchema.catch([]).parse(prefs.dealBreakers),
       },
@@ -119,6 +128,25 @@ export class MeService {
       throw new ConflictException('Finish setting up your profile first.');
     }
     const existing = await this.prisma.userProfile.findUnique({ where: { userId } });
+    // A self-description and chosen searches only exist alongside "Self-describe".
+    const identity =
+      update.genderIdentity !== undefined
+        ? update.genderIdentity
+        : (existing?.genderIdentity ?? null);
+    if (identity !== 'SELF_DESCRIBE') {
+      if (update.genderSelfDescription || (update.discoverableAs?.length ?? 0) > 0) {
+        throw new UnprocessableEntityException({
+          message: 'Some of the information provided is not valid.',
+          details: [
+            {
+              path: 'genderIdentity',
+              message: 'Choose “Self-describe” to describe your gender in your own words',
+            },
+          ],
+        });
+      }
+      update = { ...update, genderSelfDescription: null, discoverableAs: [] };
+    }
     if (existing) {
       await this.prisma.userProfile.update({ where: { userId }, data: update });
     } else {

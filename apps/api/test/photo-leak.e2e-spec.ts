@@ -48,8 +48,8 @@ describe('Photo moderation and leak-proofing (e2e)', () => {
   });
 
   const nextImage = () => makeImage((seed += 1));
-  const viewerSpec = { gender: 'woman', interestedIn: ['Men'] } as const;
-  const subjectSpec = { gender: 'man', interestedIn: ['Women'] } as const;
+  const viewerSpec = { gender: 'WOMAN', showGenders: ['MAN'] } as const;
+  const subjectSpec = { gender: 'MAN', showGenders: ['WOMAN'] } as const;
 
   /** Everything a viewer can receive about `subject`, plus every URL in it. */
   async function publicSurface(viewer: TestUser, subject: Person) {

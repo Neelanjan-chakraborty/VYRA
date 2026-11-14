@@ -49,15 +49,15 @@ describe('Compatibility and recommendations (e2e)', () => {
     beforeAll(async () => {
       viewer = await createPerson(app, {
         age: 28,
-        gender: 'woman',
-        interestedIn: ['Men'],
+        gender: 'WOMAN',
+        showGenders: ['MAN'],
         minAge: 24,
         maxAge: 34,
         traits: SOCIAL_PLANNER,
         interests: INTERESTS,
         dealBreakers: [{ kind: 'attribute', attribute: 'weekendRhythm', exclude: ['productive'] }],
       });
-      const man = { gender: 'man', interestedIn: ['Women'] };
+      const man = { gender: 'MAN', showGenders: ['WOMAN'] } as const;
       twin = await createPerson(app, {
         ...man,
         age: 29,
@@ -99,8 +99,8 @@ describe('Compatibility and recommendations (e2e)', () => {
       await prisma.blockedUser.create({ data: { blockerId: blocked.id, blockedId: viewer.id } });
       // Someone the viewer is not interested in.
       await createPerson(app, {
-        gender: 'woman',
-        interestedIn: ['Women'],
+        gender: 'WOMAN',
+        showGenders: ['WOMAN'],
         age: 29,
         traits: SOCIAL_PLANNER,
       });
@@ -256,7 +256,7 @@ describe('Compatibility and recommendations (e2e)', () => {
         minAge: 20,
         maxAge: 30,
         maxDistanceKm: null,
-        interestedIn: [],
+        showGenders: [],
         showAstrology: false,
         dealBreakers: [{ kind: 'attribute', attribute: 'religion', exclude: ['x'] }],
       })

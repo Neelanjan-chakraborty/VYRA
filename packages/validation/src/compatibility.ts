@@ -1,23 +1,42 @@
 import { z } from 'zod';
 import { COMPATIBILITY_DIMENSIONS, COMPATIBILITY_SCENARIOS } from './domain.js';
 
-/** Gender categories used for matching preferences. Free-text gender maps onto these, or none. */
-export const GENDER_CATEGORIES = ['woman', 'man', 'nonbinary'] as const;
+/**
+ * How someone describes their gender. Asked once, never inferred from names,
+ * photos, personas or conversations.
+ */
+export const GENDER_IDENTITIES = [
+  'WOMAN',
+  'MAN',
+  'NON_BINARY',
+  'SELF_DESCRIBE',
+  'PREFER_NOT_TO_SAY',
+] as const;
+export const genderIdentitySchema = z.enum(GENDER_IDENTITIES);
+export type GenderIdentity = z.infer<typeof genderIdentitySchema>;
+
+/** The identities someone can ask to see. Self-described and undisclosed are handled by `includeUnlistedGenders`. */
+export const GENDER_CATEGORIES = ['WOMAN', 'MAN', 'NON_BINARY'] as const;
 export const genderCategorySchema = z.enum(GENDER_CATEGORIES);
 export type GenderCategory = z.infer<typeof genderCategorySchema>;
 
-/**
- * Maps a free-text gender, or an "interested in" choice like "Women", to a
- * category. Anything unrecognised returns null rather than a guess.
- */
-export function genderCategory(text: string | null | undefined): GenderCategory | null {
-  const value = (text ?? '').trim().toLowerCase();
-  if (/^(women|woman|female|f|girl|lady)$/.test(value)) return 'woman';
-  if (/^(men|man|male|m|guy)$/.test(value)) return 'man';
-  if (/^(non-?binary( people| person)?|nb|enby|genderqueer|genderfluid|agender)$/.test(value))
-    return 'nonbinary';
-  return null;
-}
+export const GENDER_LABELS: Readonly<Record<GenderIdentity, string>> = {
+  WOMAN: 'Woman',
+  MAN: 'Man',
+  NON_BINARY: 'Non-binary',
+  SELF_DESCRIBE: 'Self-describe',
+  PREFER_NOT_TO_SAY: 'Prefer not to say',
+};
+export const SHOW_GENDER_LABELS: Readonly<Record<GenderCategory, string>> = {
+  WOMAN: 'Women',
+  MAN: 'Men',
+  NON_BINARY: 'Non-binary people',
+};
+
+export const categoryListSchema = z
+  .array(genderCategorySchema)
+  .max(GENDER_CATEGORIES.length)
+  .refine((list) => new Set(list).size === list.length, 'Duplicate choice');
 
 /**
  * A hard rule: never suggest someone whose attribute has one of these values.
@@ -130,7 +149,7 @@ export const publicProfileSchema = z.object({
   city: z.string().nullable(),
   bio: z.string().nullable(),
   occupation: z.string().nullable(),
-  /** Only present when the person chose to show it. */
+  /** Only present when the person chose to show it. Never a guess. */
   gender: z.string().nullable(),
   photos: z.array(publicPhotoSchema),
   interests: z.array(z.string()),

@@ -108,7 +108,7 @@ export class CompatibilityService {
       city: target.city,
       bio: target.bio,
       occupation: target.occupation,
-      gender: null,
+      gender: target.visibleGender,
       photos: photos.map((p) => ({
         id: p.id,
         url: this.media.sign(p.storageKey, 'public'),
