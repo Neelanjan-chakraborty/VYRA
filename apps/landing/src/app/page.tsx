@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EngineReadout } from '@/components/engine-readout';
+import { Answer } from '@/components/answer';
 import { ClosingCta } from '@/components/closing-cta';
 import { EnterCta } from '@/components/enter-cta';
 import { JsonLd } from '@/components/json-ld';
@@ -11,6 +12,8 @@ import { PhoneShot } from '@/components/phone-shot';
 import { Reveal } from '@/components/reveal';
 import { SectionLabel } from '@/components/section-label';
 import { type Status, StatusTag } from '@/components/status-tag';
+import { FurtherReading } from '@/components/further-reading';
+import { entity } from '@/lib/entity';
 import { webPageJsonLd } from '@/lib/json-ld';
 import { pageMetadata, pages } from '@/lib/routes';
 import { screens } from '@/lib/screens';
@@ -129,6 +132,30 @@ export default function HomePage() {
               'Values',
             ]}
           />
+        </div>
+      </section>
+
+      {/* ───────────── What is VYRA? ───────────── */}
+      <section
+        id="what-is-vyra"
+        data-section="what-is-vyra"
+        className="theme-ink border-b border-line"
+      >
+        <div className="shell py-16 sm:py-24">
+          <Answer question="What is VYRA?">
+            <p>{entity.answer}</p>
+            <p className="font-sans text-base leading-relaxed tracking-normal text-muted">
+              It is built for adults who want to meet people through compatibility instead of a
+              swipe deck, and it is launching in India first. AI helps each person describe how they
+              communicate and live; the person approves that description; and VYRA compares approved
+              descriptions using fixed rules it can explain. VYRA is in development and is not yet
+              available to download.{' '}
+              <Link href="/about" className="prose-link text-fg">
+                What VYRA is and is not
+              </Link>
+              .
+            </p>
+          </Answer>
         </div>
       </section>
 
@@ -440,6 +467,8 @@ export default function HomePage() {
           </div>
         </div>
       </section>
+
+      <FurtherReading slugs={['relationship-compatibility', 'ai-in-relationship-discovery']} />
 
       <ClosingCta
         location="home_closing"

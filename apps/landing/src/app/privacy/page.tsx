@@ -13,7 +13,7 @@ export default function PrivacyPage() {
     <>
       <PageHero
         page={pages.privacy}
-        index="08"
+        index="09"
         title={
           <>
             Privacy <em className="text-accent">policy.</em>

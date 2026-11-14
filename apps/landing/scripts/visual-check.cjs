@@ -23,6 +23,8 @@ const PAGES = [
   ['ai-persona', '/ai-persona'],
   ['compatibility', '/compatibility'],
   ['safety', '/safety'],
+  ['learn', '/learn'],
+  ['learn-article', '/learn/relationship-compatibility'],
   ['about', '/about'],
   ['contact', '/contact'],
   ['privacy', '/privacy'],

@@ -18,9 +18,10 @@ import { parse } from 'node-html-parser';
 const args = process.argv.slice(2);
 const reportAt = args.indexOf('--report');
 const reportPath = reportAt === -1 ? null : args[reportAt + 1];
-const base = (
-  args.find((a, i) => !a.startsWith('--') && i !== reportAt + 1) ?? 'http://localhost:3100'
-).replace(/\/$/, '');
+const positional = args.filter(
+  (arg, i) => !arg.startsWith('--') && (reportAt === -1 || i !== reportAt + 1),
+);
+const base = (positional[0] ?? 'http://localhost:3100').replace(/\/$/, '');
 const origin = (process.env.SITE_URL ?? '').replace(/\/$/, '');
 const expectPreview = process.env.EXPECT === 'preview';
 if (!origin && !expectPreview) {
@@ -36,6 +37,15 @@ const PAGES = [
   { path: '/ai-persona', index: true },
   { path: '/compatibility', index: true },
   { path: '/safety', index: true },
+  { path: '/learn', index: true },
+  ...[
+    'relationship-compatibility',
+    'personality-and-relationships',
+    'communication-styles',
+    'ai-in-relationship-discovery',
+    'dating-beyond-swiping',
+    'online-dating-safety',
+  ].map((slug) => ({ path: `/learn/${slug}`, index: true, article: true })),
   { path: '/about', index: true },
   // Indexable only once NEXT_PUBLIC_CONTACT_EMAIL / VYRA_LEGAL_STATUS=published are set.
   { path: '/contact', index: process.env.EXPECT_CONTACT_INDEXED === 'true' },
@@ -51,7 +61,37 @@ const REDIRECTS = [
   ['/home', '/'],
   ['/privacy-policy', '/privacy'],
 ];
-const MISSING = ['/no-such-page', '/features/no-such-feature', '/app', '/admin'];
+// Unknown pages, and every address a private application might live at: none may exist here.
+const MISSING = [
+  '/no-such-page',
+  '/features/no-such-feature',
+  '/learn/no-such-article',
+  '/app',
+  '/admin',
+  '/dashboard',
+  '/login',
+  '/account',
+  '/api/users',
+];
+
+/** Claims the site must never make: superlatives, guarantees, and numbers it does not have. */
+const FORBIDDEN_CLAIMS = [
+  /\b(world|india)[’']s (first|best|leading|largest|no\.? ?1)\b/i,
+  /\bthe best (dating|relationship|matchmaking)\b/i,
+  /\bmost accurate\b/i,
+  /#1\b/,
+  /(?<!\b(?:not|no|never|cannot|without|or indexing) )\bguarantee[sd]?\b/i,
+  /\b(scientifically|clinically) proven\b/i,
+  /\bfind your (soulmate|perfect match)\b/i,
+  /\b\d[\d,.]*\s*(million|lakh|crore|k\+?)?\s+(users|members|downloads|sign-?ups|matches made)\b/i,
+  /\b(download (it )?(now|today)|available (now )?on the (app|play) store|get it on google play)\b/i,
+  /\b(trusted by|as seen in|award[- ]winning|rated \d)/i,
+];
+/** Descriptions of VYRA that contradict its one category. */
+const WRONG_CATEGORY =
+  /VYRA is (an? )?(AI chatbot|chatbot|social network|matchmaking engine|AI companion|AI girlfriend|AI boyfriend)/i;
+const ENTITY_DESCRIPTION =
+  'VYRA is an AI-assisted relationship discovery platform designed to help people understand personality, communication, interests and relationship compatibility.';
 
 const results = [];
 const check = (group, name, ok, detail = '') => {
@@ -63,6 +103,8 @@ const meta = (root, selector) => root.querySelector(selector)?.getAttribute('con
 
 const titles = new Map();
 const descriptions = new Map();
+const paragraphs = new Map();
+const externalLinks = new Set();
 const internalLinks = new Map();
 const assets = new Set();
 
@@ -288,24 +330,29 @@ for (const page of PAGES) {
   );
   check(
     group,
-    'has a WebPage entry',
-    types.some((type) => ['WebPage', 'AboutPage', 'ContactPage'].includes(type)),
+    'has a WebPage or Article entry',
+    types.some((type) =>
+      ['WebPage', 'AboutPage', 'ContactPage', 'CollectionPage', 'Article'].includes(type),
+    ),
   );
   if (page.path !== '/') {
     const crumbs = parsed.find((item) => item['@type'] === 'BreadcrumbList');
     const items = crumbs?.itemListElement ?? [];
+    const visibleCrumbs = root
+      .querySelectorAll('nav[aria-label="Breadcrumb"] li')
+      .filter((li) => li.getAttribute('aria-hidden') !== 'true');
     check(
       group,
       'BreadcrumbList matches the visible breadcrumb',
-      items.length === 2 &&
-        items.every((item, i) => item.position === i + 1 && item.name) &&
-        Boolean(root.querySelector('nav[aria-label="Breadcrumb"]')),
+      items.length === visibleCrumbs.length &&
+        items.length === (page.article ? 3 : 2) &&
+        items.every((item, i) => item.position === i + 1 && item.name),
     );
     if (!expectPreview)
       check(
         group,
         'breadcrumb ends at the canonical URL',
-        items[1]?.item === canonicalFor(page.path),
+        items.at(-1)?.item === canonicalFor(page.path),
       );
   }
   const text = JSON.stringify(parsed);
@@ -321,7 +368,123 @@ for (const page of PAGES) {
   );
   if (!expectPreview)
     check(group, 'JSON-LD URLs are on the production origin', !/localhost|127\.0\.0\.1/.test(text));
-  const organization = parsed.find((item) => item['@type'] === 'Organization');
+  // Entity consistency: one description of VYRA, everywhere.
+  const organizations = parsed.filter((item) => item['@type'] === 'Organization');
+  check(
+    group,
+    'exactly one Organization entity, with the canonical description',
+    organizations.length === 1 && organizations[0].description === ENTITY_DESCRIPTION,
+  );
+  check(
+    group,
+    'Organization and WebSite use stable @id values',
+    organizations[0]?.['@id']?.endsWith('/#organization') &&
+      parsed.find((item) => item['@type'] === 'WebSite')?.['@id']?.endsWith('/#website'),
+  );
+  check(
+    group,
+    'Organization has no unverified facts (founder, address, rating, awards)',
+    !/"(founder|foundingDate|address|award|aggregateRating|numberOfEmployees|legalName|taxID)"/.test(
+      JSON.stringify(organizations),
+    ),
+  );
+  const mainText = (main?.text ?? '').replace(/\s+/g, ' ');
+  check(
+    group,
+    'never describes VYRA as a different kind of product',
+    !WRONG_CATEGORY.test(mainText),
+  );
+  const claim = FORBIDDEN_CLAIMS.map((pattern) => pattern.exec(mainText)?.[0]).find(Boolean);
+  check(group, 'makes no superlative, guarantee or user-number claim', !claim, claim ?? '');
+
+  // Paragraphs, for the duplicate-content check below.
+  // Teasers in <aside> and reference lists are navigation and citations, not body copy.
+  for (const p of main?.querySelectorAll('p') ?? []) {
+    if (p.closest('aside') || p.closest('[data-references]')) continue;
+    const copy = p.text.replace(/\s+/g, ' ').trim();
+    if (copy.length < 140) continue;
+    if (!paragraphs.has(copy)) paragraphs.set(copy, new Set());
+    paragraphs.get(copy).add(page.path);
+  }
+
+  if (page.article) {
+    const article = parsed.find((item) => item['@type'] === 'Article');
+    check(group, 'has Article structured data', Boolean(article));
+    check(
+      group,
+      'Article headline equals the visible h1',
+      article?.headline === h1[0]?.text.trim(),
+      article?.headline,
+    );
+    const dates = [article?.datePublished, article?.dateModified];
+    check(
+      group,
+      'Article has valid published and modified dates, not in the future',
+      dates.every(
+        (d) => d && !Number.isNaN(Date.parse(d)) && Date.parse(d) <= Date.now() + 864e5,
+      ) && Date.parse(dates[1]) >= Date.parse(dates[0]),
+    );
+    const times = root.querySelectorAll('time').map((t) => t.getAttribute('datetime'));
+    check(
+      group,
+      'the same dates are visible on the page',
+      times.includes(article?.datePublished) && times.includes(article?.dateModified),
+    );
+    check(
+      group,
+      'author and publisher are the Organization, not an invented person',
+      article?.author?.['@id']?.endsWith('/#organization') &&
+        article?.publisher?.['@id']?.endsWith('/#organization') &&
+        !types.includes('Person'),
+    );
+    check(
+      group,
+      'the page says who wrote it and that it is not expert-reviewed',
+      /Written by/.test(mainText) && /Not reviewed by/.test(mainText),
+    );
+    check(
+      group,
+      'the direct answer comes before the first section',
+      html.indexOf('The short answer') > -1 &&
+        html.indexOf('The short answer') < html.indexOf('id="s1"'),
+    );
+    const answer = root.querySelector('header p.t-title')?.text.trim() ?? '';
+    const answerWords = answer.split(/\s+/).length;
+    check(
+      group,
+      'the direct answer is 35–80 words and stands alone',
+      answerWords >= 35 && answerWords <= 80 && !/^(it|this|that|they)\b/i.test(answer),
+      `${answerWords} words`,
+    );
+    const refs = root.querySelectorAll('a[rel~="external"]').map((a) => a.getAttribute('href'));
+    check(
+      group,
+      'has at least two references with links',
+      refs.length >= 2,
+      `${refs.length} references`,
+    );
+    check(
+      group,
+      'Article citations are exactly the visible references',
+      JSON.stringify(article?.citation ?? []) === JSON.stringify(refs),
+    );
+    for (const ref of refs) externalLinks.add(ref);
+    check(group, 'og:type is article', meta(root, 'meta[property="og:type"]') === 'article');
+    check(
+      group,
+      'links to VYRA product pages and to related articles',
+      root.querySelectorAll('article a[href^="/"]').length >= 3 &&
+        root.querySelectorAll('aside a[href^="/learn/"]').length >= 2,
+    );
+    check(
+      group,
+      'has a questions section and a limits statement',
+      /Questions people also ask/.test(mainText) &&
+        /limit|cannot|not known|no good evidence/i.test(mainText),
+    );
+  }
+
+  const organization = organizations[0];
   check(
     group,
     'the page visibly names what the Organization markup names',
@@ -338,6 +501,83 @@ check(
   duplicates(titles).join(' | '),
 );
 check('site', 'every meta description is unique', duplicates(descriptions).length === 0);
+
+// Entity description is where people will look for it.
+{
+  const homeHtml = parse(await (await get('/')).text());
+  const aboutHtml = parse(await (await get('/about')).text());
+  check(
+    'entity',
+    'home meta description opens with the canonical category',
+    (meta(homeHtml, 'meta[name="description"]') ?? '').startsWith(
+      'VYRA is an AI-assisted relationship discovery platform',
+    ),
+  );
+  check(
+    'entity',
+    'home answers “What is VYRA?” in visible text',
+    /What is VYRA\?/.test(homeHtml.querySelector('main').text) &&
+      homeHtml
+        .querySelector('main')
+        .text.includes('VYRA is an AI-assisted relationship discovery platform'),
+  );
+  check(
+    'entity',
+    'about page states the canonical description word for word',
+    aboutHtml.querySelector('main').text.replace(/\s+/g, ' ').includes(ENTITY_DESCRIPTION),
+  );
+  check(
+    'entity',
+    'about page states what VYRA is not and its status',
+    /What VYRA is not/.test(aboutHtml.querySelector('main').text) &&
+      /In development/.test(aboutHtml.querySelector('main').text),
+  );
+  check(
+    'entity',
+    'footer carries the canonical description on every page',
+    homeHtml.querySelector('footer').text.replace(/\s+/g, ' ').includes(ENTITY_DESCRIPTION),
+  );
+}
+
+// Duplicate content: no long paragraph may appear on three or more pages.
+const repeated = [...paragraphs].filter(([, where]) => where.size >= 3);
+check(
+  'content',
+  'no paragraph is repeated across three or more pages',
+  repeated.length === 0,
+  repeated.map(([text, where]) => `${[...where].join(', ')}: ${text.slice(0, 60)}…`).join(' | '),
+);
+const twice = [...paragraphs].filter(([, where]) => where.size === 2).length;
+check(
+  'content',
+  'paragraphs shared by two pages are rare (definitions only)',
+  twice <= 10,
+  `${twice} shared paragraphs`,
+);
+
+// External references resolve. Opt-in: it depends on other people's servers.
+if (process.env.CHECK_EXTERNAL === '1') {
+  for (const url of externalLinks) {
+    let status = 0;
+    try {
+      const response = await fetch(url, {
+        redirect: 'follow',
+        headers: { 'user-agent': 'Mozilla/5.0 (link check)' },
+        signal: AbortSignal.timeout(20000),
+      });
+      status = response.status;
+    } catch {
+      status = 0;
+    }
+    // Publishers often refuse automated requests (403); only a missing page is a failure.
+    check(
+      'references',
+      `${url} is not a dead link`,
+      status !== 404 && status !== 410,
+      `status ${status || 'unreachable from here'}`,
+    );
+  }
+}
 
 // Internal links resolve, including fragments.
 for (const [path, fragments] of internalLinks) {
@@ -415,7 +655,12 @@ if (expectPreview) {
     'allows the site',
     /User-Agent: \*/i.test(robotsText) && /Allow: \/\s*$/m.test(robotsText),
   );
-  check('robots.txt', 'does not disallow the whole site', !/Disallow: \/\s*$/m.test(robotsText));
+  // Only the general group: a training-crawler group may legitimately disallow everything.
+  check(
+    'robots.txt',
+    'the general rule does not disallow the whole site',
+    !/Disallow: \/\s*$/m.test(robotsText.split(/\n\s*\n/)[0]),
+  );
   check(
     'robots.txt',
     'does not block CSS, JavaScript or images',
@@ -426,7 +671,120 @@ if (expectPreview) {
     'references the production sitemap',
     robotsText.includes(`Sitemap: ${origin}/sitemap.xml`),
   );
+
+  // Per-crawler policy, read the way a crawler reads it: its own group if named, else `*`.
+  const groups = [];
+  let current = null;
+  for (const raw of robotsText.split('\n')) {
+    const [field, ...rest] = raw.trim().split(':');
+    const value = rest.join(':').trim();
+    if (/^user-agent$/i.test(field)) {
+      if (!current || current.rules.length > 0) {
+        current = { agents: [], rules: [] };
+        groups.push(current);
+      }
+      current.agents.push(value.toLowerCase());
+    } else if (/^(allow|disallow)$/i.test(field) && current) {
+      current.rules.push([field.toLowerCase(), value]);
+    }
+  }
+  const allowed = (agent, path) => {
+    const group =
+      groups.find((g) => g.agents.includes(agent.toLowerCase())) ??
+      groups.find((g) => g.agents.includes('*'));
+    const matches = (group?.rules ?? [])
+      .filter(([, prefix]) => prefix && path.startsWith(prefix))
+      .toSorted((a, b) => b[1].length - a[1].length);
+    return matches.length === 0 || matches[0][0] === 'allow';
+  };
+  const named = (agent) => groups.some((g) => g.agents.includes(agent.toLowerCase()));
+  for (const agent of [
+    'Googlebot',
+    'Bingbot',
+    'OAI-SearchBot',
+    'PerplexityBot',
+    'Claude-SearchBot',
+    'ChatGPT-User',
+    'Perplexity-User',
+    'Claude-User',
+  ]) {
+    check(
+      'robots.txt',
+      `${agent} is named and may read public pages and assets, but not /api/`,
+      named(agent) &&
+        allowed(agent, '/') &&
+        allowed(agent, '/learn/relationship-compatibility') &&
+        allowed(agent, '/_next/static/x.css') &&
+        !allowed(agent, '/api/x'),
+    );
+  }
+  const training = process.env.EXPECT_TRAINING ?? 'unset';
+  for (const agent of ['GPTBot', 'ClaudeBot', 'Google-Extended', 'CCBot']) {
+    if (training === 'unset')
+      check('robots.txt', `${agent}: no decision recorded, so it is not named`, !named(agent));
+    else
+      check(
+        'robots.txt',
+        `${agent} is explicitly ${training}ed`,
+        named(agent) && allowed(agent, '/') === (training === 'allow'),
+      );
+  }
+  check(
+    'robots.txt',
+    'OAI-SearchBot and GPTBot are never in the same group',
+    !groups.some((g) => g.agents.includes('oai-searchbot') && g.agents.includes('gptbot')),
+  );
 }
+
+// llms.txt
+const llms = await get('/llms.txt');
+if (expectPreview) {
+  check('llms.txt', 'is not served on a preview', llms.status === 404);
+} else {
+  const llmsText = await llms.text();
+  check(
+    'llms.txt',
+    'is served as plain text',
+    llms.status === 200 && (llms.headers.get('content-type') ?? '').includes('text/plain'),
+  );
+  check('llms.txt', 'is concise (under 8 KB)', llmsText.length < 8192, `${llmsText.length} bytes`);
+  check(
+    'llms.txt',
+    'opens with the name and the canonical description',
+    llmsText.startsWith('# VYRA') && llmsText.includes(ENTITY_DESCRIPTION),
+  );
+  check('llms.txt', 'states that VYRA is in development', /In development/.test(llmsText));
+  const llmsLinks = [...llmsText.matchAll(/\]\((https?:[^)]+)\)/g)].map((m) => m[1]);
+  check(
+    'llms.txt',
+    'links only to the production origin',
+    llmsLinks.length > 5 &&
+      llmsLinks.every((url) => url === origin || url.startsWith(`${origin}/`)),
+  );
+  const indexableUrls = new Set(PAGES.filter((p) => p.index).map((p) => canonicalFor(p.path)));
+  check(
+    'llms.txt',
+    'lists only indexable pages',
+    llmsLinks.every((url) => indexableUrls.has(url)),
+    llmsLinks.filter((url) => !indexableUrls.has(url)).join(' '),
+  );
+  check(
+    'llms.txt',
+    'lists every indexable page',
+    [...indexableUrls].every((url) => llmsLinks.includes(url)),
+  );
+  check(
+    'llms.txt',
+    'contains no private, internal or secret material',
+    !/localhost|api[_-]?key|secret|token|password|\/api\/|prisma|postgres/i.test(llmsText),
+  );
+}
+const expectKey = process.env.EXPECT_INDEXNOW === 'true';
+check(
+  'indexnow',
+  `key file is ${expectKey ? 'served' : 'absent until a key is configured'}`,
+  (await get('/indexnow-key.txt')).status === (expectKey ? 200 : 404),
+);
 
 // sitemap.xml
 const sitemapResponse = await get('/sitemap.xml');

@@ -1,5 +1,5 @@
 import type { MetadataRoute } from 'next';
-import { indexablePages } from '@/lib/routes';
+import { indexableArticlePages, indexablePages } from '@/lib/routes';
 import { absoluteUrl, locales, site } from '@/lib/site';
 
 /**
@@ -9,7 +9,7 @@ import { absoluteUrl, locales, site } from '@/lib/site';
  */
 export default function sitemap(): MetadataRoute.Sitemap {
   if (!site.indexable) return [];
-  return indexablePages.map((page) => ({
+  return [...indexablePages, ...indexableArticlePages].map((page) => ({
     url: absoluteUrl(page.path),
     lastModified: page.updated,
     alternates: {

@@ -14,8 +14,14 @@ pnpm --filter @vyra/landing visual:check # browser check + screenshots (needs Pl
 
 ## Pages
 
-`/`, `/features`, `/how-it-works`, `/ai-persona`, `/compatibility`, `/safety`, `/about`,
-`/contact`, `/privacy`, `/terms`, plus a real 404. All are prerendered as static HTML.
+`/`, `/features`, `/how-it-works`, `/ai-persona`, `/compatibility`, `/safety`, `/learn` and six
+articles under it, `/about`, `/contact`, `/privacy`, `/terms`, plus a real 404. All are
+prerendered as static HTML. Also served: `/robots.txt`, `/sitemap.xml`, `/llms.txt`, `/og.png`
+and, when a key is set, `/indexnow-key.txt`.
+
+`src/lib/entity.ts` is the one description of VYRA; metadata, structured data, the footer, the
+About page and `llms.txt` read it. `src/content/learn.ts` holds the articles and the rules for
+adding one. See `docs/seo/geo-implementation.md`.
 
 `src/lib/routes.ts` is the single list of pages. Titles, descriptions, canonical URLs,
 hreflang, Open Graph, the sitemap, navigation and breadcrumbs are all generated from it. To add
@@ -54,9 +60,14 @@ page says so.
 
 ## Deploying
 
-Any Node host that runs Next.js works; nothing is host-specific. On Vercel or Netlify set the
-project root to `apps/landing` (both detect pnpm workspaces and Next.js) and add the variables
-above for the production context only, so previews stay non-indexable. Self-hosting:
+**Vercel.** The repository root has a `vercel.json` that declares one service, this app, served
+at `/`. Import the repository, leave the root directory as the repository root, and deploy. The
+first deploy works with no variables and is not indexable. To go live, add
+`NEXT_PUBLIC_SITE_URL` (and the others above) for the Production environment only, attach the
+domain, and redeploy. If Vercel's project settings are used in place of `vercel.json`, set the
+root directory to `apps/landing`.
+
+Any other Node host that runs Next.js also works; nothing in the app is host-specific. Self-hosting:
 `pnpm install --frozen-lockfile && pnpm --filter @vyra/landing build`, then
 `pnpm --filter @vyra/landing start` behind a TLS proxy, Node 22.18 or newer.
 

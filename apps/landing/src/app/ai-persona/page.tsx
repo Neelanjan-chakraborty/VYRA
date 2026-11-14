@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Chapter } from '@/components/chapter';
 import { ClosingCta } from '@/components/closing-cta';
 import { Faq } from '@/components/faq';
+import { FurtherReading } from '@/components/further-reading';
 import { PageHero } from '@/components/page-hero';
 import { Reveal } from '@/components/reveal';
 import { ShotFigure } from '@/components/shot-figure';
@@ -322,6 +323,11 @@ export default function AiPersonaPage() {
           ]}
         />
       </Chapter>
+
+      <FurtherReading
+        slugs={['ai-in-relationship-discovery', 'personality-and-relationships']}
+        theme="theme-ivory"
+      />
 
       <ClosingCta
         location="ai_persona_closing"

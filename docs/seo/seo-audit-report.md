@@ -1,5 +1,12 @@
 # SEO audit report — VYRA website (`apps/landing`)
 
+> **Superseded in part.** This is the first audit (508 checks, ten pages). The site has since
+> gained the Learn library, an entity definition, a per-crawler robots policy and `llms.txt`,
+> and the audit now runs 1051 checks. Current results are in `aeo-geo-audit-report.md`. Two
+> statements below are no longer true: the home title and description have changed, and a
+> production build without `NEXT_PUBLIC_SITE_URL` now deploys as a non-indexable preview
+> instead of failing.
+
 Run: 14 November 2026, in the cloud development container, against a production build
 (`next build` + `next start`) of Next.js 16.4.6.
 

@@ -1,10 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Chapter } from '@/components/chapter';
+import { Answer } from '@/components/answer';
 import { ClosingCta } from '@/components/closing-cta';
 import { OrbitField } from '@/components/orbit-field';
 import { PageHero } from '@/components/page-hero';
 import { Reveal } from '@/components/reveal';
+import { entity } from '@/lib/entity';
 import { pageMetadata, pages } from '@/lib/routes';
 
 export const metadata: Metadata = pageMetadata('about');
@@ -45,7 +47,7 @@ export default function AboutPage() {
     <>
       <PageHero
         page={pages.about}
-        index="06"
+        index="07"
         title={
           <>
             Dating apps got good at attention.{' '}
@@ -54,12 +56,70 @@ export default function AboutPage() {
         }
         lede={
           <p>
-            VYRA is a relationship discovery platform: it tries to work out who you might genuinely
-            connect with, and to tell you why, before it shows you anyone. It is in development, and
-            this site is written to be straight about what exists and what does not.
+            {entity.description} It tries to work out who a person might genuinely connect with, and
+            to say why, before it shows them anyone. VYRA is in development, and this site is
+            written to be straight about what exists and what does not.
           </p>
         }
       />
+
+      <section id="what-is-vyra" data-section="what-is-vyra" className="theme-ivory">
+        <div className="shell py-16 sm:py-24">
+          <Answer question="What is VYRA?">
+            <p>{entity.answer}</p>
+          </Answer>
+          <dl className="mt-14 border-t border-line">
+            {[
+              ['Category', entity.category],
+              ['Positioning', `${entity.positioning}. “${entity.tagline}”`],
+              ['Who it is for', entity.audience],
+              ['Where', entity.market],
+              ['Status', entity.status],
+            ].map(([term, detail]) => (
+              <div key={term} className="grid-12 gap-y-1 border-b border-line py-4">
+                <dt className="t-eyebrow col-span-12 pt-1 text-muted md:col-span-3">{term}</dt>
+                <dd className="col-span-12 md:col-span-9">{detail}</dd>
+              </div>
+            ))}
+          </dl>
+
+          <div className="grid-12 mt-16 gap-y-12">
+            <div className="col-span-12 lg:col-span-7">
+              <h2 className="t-headline">What VYRA does</h2>
+              <ul className="mt-6 border-t border-line">
+                {entity.capabilities.map((capability) => (
+                  <li key={capability.name} className="border-b border-line py-5">
+                    <h3 className="t-title">
+                      <Link href={capability.path} className="hover:text-accent">
+                        {capability.name}
+                      </Link>
+                    </h3>
+                    <p className="t-eyebrow mt-2 text-accent">{capability.status}</p>
+                    <p className="mt-2 text-muted">{capability.summary}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="col-span-12 lg:col-span-4 lg:col-start-9">
+              <h2 className="t-headline">What VYRA is not</h2>
+              <ul className="mt-6 border-t border-line">
+                {entity.isNot.map((item) => (
+                  <li key={item} className="border-b border-line py-4">
+                    Not {item}.
+                  </li>
+                ))}
+              </ul>
+              <h3 className="t-title mt-10">Is VYRA an AI dating app?</h3>
+              <p className="mt-3 text-muted">
+                People would use VYRA to meet potential partners, so it belongs to the same broad
+                space as dating apps. The accurate description is narrower: an {entity.category}. AI
+                helps a person describe themselves. It does not chat as a companion, write messages,
+                or decide who is compatible with whom.
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <Chapter
         id="why"

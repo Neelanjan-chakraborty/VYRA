@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Chapter } from '@/components/chapter';
 import { ClosingCta } from '@/components/closing-cta';
 import { Faq } from '@/components/faq';
+import { FurtherReading } from '@/components/further-reading';
 import { PageHero } from '@/components/page-hero';
 import { PhoneShot } from '@/components/phone-shot';
 import { Reveal } from '@/components/reveal';
@@ -267,6 +268,11 @@ export default function HowItWorksPage() {
           ]}
         />
       </Chapter>
+
+      <FurtherReading
+        slugs={['dating-beyond-swiping', 'ai-in-relationship-discovery']}
+        theme="theme-ink"
+      />
 
       <ClosingCta
         location="how_it_works_closing"

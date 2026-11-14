@@ -3,5 +3,5 @@ export const socialImage = {
   url: '/og.png',
   width: 1200,
   height: 630,
-  alt: 'VYRA — Chemistry, decoded. Dating built on compatibility, not swiping.',
+  alt: 'VYRA — Chemistry, decoded. Relationship discovery built on compatibility.',
 } as const;

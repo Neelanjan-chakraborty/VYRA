@@ -85,7 +85,7 @@ export async function GET() {
           decoded.
         </div>
         <div style={{ display: 'flex', marginTop: 36, fontSize: 34, color: GREY }}>
-          Dating built on compatibility, not swiping.
+          Relationship discovery, built on compatibility.
         </div>
       </div>
     </div>,

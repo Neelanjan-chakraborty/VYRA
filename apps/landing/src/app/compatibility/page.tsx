@@ -4,6 +4,7 @@ import { Chapter } from '@/components/chapter';
 import { ClosingCta } from '@/components/closing-cta';
 import { EngineReadout } from '@/components/engine-readout';
 import { Faq } from '@/components/faq';
+import { FurtherReading } from '@/components/further-reading';
 import { PageHero } from '@/components/page-hero';
 import { Reveal } from '@/components/reveal';
 import { StatusTag } from '@/components/status-tag';
@@ -360,6 +361,11 @@ export default function CompatibilityPage() {
           ]}
         />
       </Chapter>
+
+      <FurtherReading
+        slugs={['relationship-compatibility', 'communication-styles']}
+        theme="theme-ink"
+      />
 
       <ClosingCta
         location="compatibility_closing"

@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Chapter } from '@/components/chapter';
 import { ClosingCta } from '@/components/closing-cta';
+import { FurtherReading } from '@/components/further-reading';
 import { PageHero } from '@/components/page-hero';
 import { Reveal } from '@/components/reveal';
 import { ShotFigure } from '@/components/shot-figure';
@@ -259,6 +260,11 @@ export default function SafetyPage() {
           ))}
         </ul>
       </Chapter>
+
+      <FurtherReading
+        slugs={['online-dating-safety', 'ai-in-relationship-discovery']}
+        theme="theme-ink"
+      />
 
       <ClosingCta
         location="safety_closing"

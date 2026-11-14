@@ -21,7 +21,7 @@ export default function ContactPage() {
     <>
       <PageHero
         page={pages.contact}
-        index="07"
+        index="08"
         title={
           <>
             Get in <em className="text-accent">touch.</em>

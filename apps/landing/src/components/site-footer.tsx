@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { entity } from '@/lib/entity';
 import { pages, primaryNav } from '@/lib/routes';
 import { site } from '@/lib/site';
 import { LogoMark } from './logo';
@@ -18,8 +19,7 @@ export function SiteFooter() {
               Chemistry, <em className="text-accent">decoded.</em>
             </p>
             <p className="mt-6 max-w-sm text-muted">
-              VYRA is in development and is not yet available to download. This site describes what
-              is built today and says where something is still to come.
+              {entity.description} It is in development and is not yet available to download.
             </p>
           </div>
           <nav

@@ -32,8 +32,9 @@ location, must-haves).
 works, AI persona, compatibility, safety, about, contact, and draft privacy and terms. Real app
 screenshots (`docs/design-reference`), real engine output, full technical SEO (metadata,
 canonicals, hreflang, sitemap, robots, JSON-LD) driven by one route registry, consent-gated
-GA4, and an automated audit (`docs/seo/seo-audit-report.md`: 508/508 checks, Lighthouse 100 in
-the lab). Not deployed: there is no production domain, contact address or reviewed legal text
+GA4, a Learn library of six sourced articles, a per-crawler robots policy, `llms.txt`,
+IndexNow, crawler logging, and an automated audit (`docs/seo/aeo-geo-audit-report.md`:
+1051/1051 checks, Lighthouse 99–100 in the lab). A root `vercel.json` deploys it on Vercel. Not deployed: there is no production domain, contact address or reviewed legal text
 yet, so it builds as a non-indexable preview until those are set (`apps/landing/README.md`).
 
 **New in Milestone 4 — compatibility.** `@vyra/compatibility-engine` scores any two people

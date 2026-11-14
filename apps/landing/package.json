@@ -12,7 +12,8 @@
     "tokens": "node scripts/sync-tokens.mjs",
     "engine-sample": "node scripts/engine-sample.mjs",
     "seo:audit": "node scripts/seo-audit.mjs",
-    "visual:check": "node scripts/visual-check.cjs"
+    "visual:check": "node scripts/visual-check.cjs",
+    "indexnow": "node scripts/indexnow.mjs"
   },
   "dependencies": {
     "motion": "^14.14.0",

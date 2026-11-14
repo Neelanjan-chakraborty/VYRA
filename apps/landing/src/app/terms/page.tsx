@@ -12,7 +12,7 @@ export default function TermsPage() {
     <>
       <PageHero
         page={pages.terms}
-        index="09"
+        index="10"
         title={
           <>
             Terms of <em className="text-accent">service.</em>

@@ -33,5 +33,5 @@ screens are shown as they are, violet buttons included, not recoloured.
 ## `website/` — review screenshots of the marketing site
 
 Production build, 14 November 2026. Full-page captures of the home and features pages at
-desktop (1440) and mobile (390), the first screen of each, the mobile menu, and two further
-inner pages. Regenerate with `pnpm --filter @vyra/landing visual:check`.
+desktop (1440) and mobile (390), the first screen of each, the mobile menu, the About page,
+the Learn hub and an article, and two further inner pages. Regenerate with `pnpm --filter @vyra/landing visual:check`.

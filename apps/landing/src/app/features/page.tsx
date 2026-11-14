@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { Chapter } from '@/components/chapter';
 import { ClosingCta } from '@/components/closing-cta';
 import { EngineReadout } from '@/components/engine-readout';
+import { FurtherReading } from '@/components/further-reading';
 import { PageHero } from '@/components/page-hero';
 import { Reveal } from '@/components/reveal';
 import { ShotFigure } from '@/components/shot-figure';
@@ -323,6 +324,11 @@ export default function FeaturesPage() {
           ))}
         </ol>
       </Chapter>
+
+      <FurtherReading
+        slugs={['dating-beyond-swiping', 'relationship-compatibility']}
+        theme="theme-ivory"
+      />
 
       <ClosingCta
         location="features_closing"

@@ -1,4 +1,5 @@
 import { type PageDef, pages } from './routes';
+import { entity } from './entity';
 import { absoluteUrl, defaultLocale, site } from './site';
 
 const ORGANIZATION_ID = `${site.url}/#organization`;
@@ -20,9 +21,11 @@ export function organizationJsonLd() {
     '@id': ORGANIZATION_ID,
     name: site.name,
     url: site.url,
-    logo: absoluteUrl('/logo.png'),
-    slogan: site.tagline,
-    description: site.description,
+    logo: absoluteUrl(entity.logoPath),
+    slogan: entity.tagline,
+    description: entity.description,
+    // Verified official profiles only (NEXT_PUBLIC_SAME_AS). Empty until some exist.
+    ...(site.sameAs.length > 0 ? { sameAs: site.sameAs } : {}),
     ...(site.contactEmail ? { email: site.contactEmail } : {}),
   };
 }
@@ -66,30 +69,45 @@ export function breadcrumbJsonLd(page: PageDef) {
   };
 }
 
-/**
- * For future editorial pages (`/journal/...`). Unused until an article exists;
- * kept here so the first one is marked up the same way as everything else.
- */
+/** An educational article. The author is the organisation: no individual byline is verified. */
 export function articleJsonLd(article: {
   readonly path: string;
   readonly headline: string;
   readonly description: string;
   readonly datePublished: string;
   readonly dateModified: string;
-  readonly image: string;
+  readonly citations: readonly string[];
 }) {
   return {
     '@context': 'https://schema.org',
     '@type': 'Article',
+    '@id': `${absoluteUrl(article.path)}#article`,
     headline: article.headline,
     description: article.description,
     datePublished: article.datePublished,
     dateModified: article.dateModified,
-    image: absoluteUrl(article.image),
+    image: absoluteUrl('/og.png'),
     inLanguage: defaultLocale.code,
     mainEntityOfPage: absoluteUrl(article.path),
+    isPartOf: { '@id': WEBSITE_ID },
     author: { '@id': ORGANIZATION_ID },
     publisher: { '@id': ORGANIZATION_ID },
+    citation: article.citations,
+  };
+}
+
+export function breadcrumbTrailJsonLd(
+  trail: readonly { readonly name: string; readonly path: string }[],
+) {
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: trail.map((item, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: item.name,
+      item: absoluteUrl(item.path),
+    })),
   };
 }
 

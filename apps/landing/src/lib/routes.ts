@@ -1,4 +1,5 @@
 import type { Metadata, Route } from 'next';
+import { articles } from '@/content/learn';
 import { absoluteUrl, defaultLocale, locales, site } from './site';
 import { socialImage } from './social-image';
 
@@ -14,7 +15,7 @@ export interface PageDef {
   readonly updated: string;
   /** False keeps the page out of the sitemap and marks it noindex. */
   readonly index: boolean;
-  readonly schemaType?: 'WebPage' | 'AboutPage' | 'ContactPage';
+  readonly schemaType?: 'WebPage' | 'AboutPage' | 'ContactPage' | 'CollectionPage';
 }
 
 /**
@@ -25,11 +26,11 @@ export const pages = {
   home: {
     path: '/',
     label: 'Home',
-    title: 'VYRA — Dating built on compatibility, not swiping',
+    title: 'VYRA — Relationship discovery built on compatibility',
     absoluteTitle: true,
     description:
-      'Chemistry isn’t a guessing game. VYRA is an AI dating app that suggests people by ' +
-      'personality, communication and shared interests, and explains every suggestion.',
+      'VYRA is an AI-assisted relationship discovery platform. It helps people understand ' +
+      'personality, communication and compatibility, and explains every suggestion.',
     updated: '2026-11-14',
     index: true,
   },
@@ -73,6 +74,17 @@ export const pages = {
     updated: '2026-11-14',
     index: true,
   },
+  learn: {
+    path: '/learn',
+    label: 'Learn',
+    title: 'Learn: compatibility, communication and AI in dating',
+    description:
+      'Plain, sourced answers about relationship compatibility, personality, communication, ' +
+      'AI in relationship discovery, alternatives to swiping and online dating safety.',
+    updated: '2026-11-14',
+    index: true,
+    schemaType: 'CollectionPage',
+  },
   safety: {
     path: '/safety',
     label: 'Safety',
@@ -88,8 +100,8 @@ export const pages = {
     label: 'About',
     title: 'About VYRA: why we are building it',
     description:
-      'VYRA is a relationship discovery platform that is open about its limits: understand ' +
-      'people first, explain every suggestion, and leave the decisions to them.',
+      'What VYRA is, who it is for and what it will not do: an AI-assisted relationship ' +
+      'discovery platform, in development, built to explain itself and admit its limits.',
     updated: '2026-11-14',
     index: true,
     schemaType: 'AboutPage',
@@ -137,11 +149,29 @@ export const primaryNav: readonly PageDef[] = [
   pages.aiPersona,
   pages.compatibility,
   pages.safety,
+  pages.learn,
 ];
+
+/** Learn articles as pages, for the sitemap, llms.txt and metadata. */
+export const articlePages: readonly PageDef[] = articles.map((article) => ({
+  path: `/learn/${article.slug}` as Route,
+  label: article.question,
+  title: article.metaTitle,
+  description: article.description,
+  updated: article.updated,
+  index: true,
+}));
+export const indexableArticlePages = articlePages.filter((page) => page.index);
 
 /** Next.js metadata for a page: title, description, canonical, hreflang, Open Graph, robots. */
 export function pageMetadata(key: PageKey): Metadata {
-  const page: PageDef = pages[key];
+  return metadataFor(pages[key]);
+}
+
+export function metadataFor(
+  page: PageDef,
+  article?: { readonly published: string; readonly updated: string },
+): Metadata {
   const url = absoluteUrl(page.path);
   const socialTitle = page.absoluteTitle ? page.title : `${page.title} — ${site.name}`;
   return {
@@ -158,7 +188,13 @@ export function pageMetadata(key: PageKey): Metadata {
       },
     },
     openGraph: {
-      type: 'website',
+      ...(article
+        ? {
+            type: 'article' as const,
+            publishedTime: article.published,
+            modifiedTime: article.updated,
+          }
+        : { type: 'website' as const }),
       siteName: site.name,
       locale: defaultLocale.openGraph,
       url,
