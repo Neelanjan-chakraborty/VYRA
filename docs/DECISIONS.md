@@ -177,11 +177,12 @@ Orbit remain Milestone 5.
 
 ## Open (need the product owner)
 
-| #   | Question                                              | Needed by     | Default if unanswered                                             |
-| --- | ----------------------------------------------------- | ------------- | ----------------------------------------------------------------- |
-| O-1 | SMS and e-mail OTP vendors                            | Milestone 2   | Interface + local fake that logs nothing sensitive; no real sends |
-| O-2 | Object-storage vendor                                 | Milestone 2   | S3-compatible interface + local disk adapter for development      |
-| O-3 | LLM provider for persona generation                   | Milestone 3   | Gemini (a key was planned); mock in tests                         |
-| O-4 | Hosting provider and region                           | Milestone 8   | Undecided                                                         |
-| O-5 | Payment provider and plans                            | Milestone 8   | Store billing interfaces only                                     |
-| O-6 | Legal review of age verification and DPDP obligations | Before launch | Date-of-birth self-declaration only                               |
+| #   | Question                                               | Needed by     | Default if unanswered                                                    |
+| --- | ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------ |
+| O-1 | SMS and e-mail OTP vendors                             | Milestone 2   | Interface + local fake that logs nothing sensitive; no real sends        |
+| O-2 | Object-storage vendor                                  | Milestone 2   | S3-compatible interface + local disk adapter for development             |
+| O-3 | LLM provider for persona generation                    | Milestone 3   | Gemini (a key was planned); mock in tests                                |
+| O-4 | Hosting provider and region                            | Milestone 8   | Undecided                                                                |
+| O-5 | Payment provider and plans                             | Milestone 8   | Store billing interfaces only                                            |
+| O-6 | Legal review of age verification and DPDP obligations  | Before launch | Date-of-birth self-declaration only                                      |
+| O-7 | Website production domain, contact address, legal text | Before launch | Site stays a non-indexable preview; legal and contact pages stay noindex |

@@ -34,10 +34,16 @@
       }
     ]
   },
-  "ignorePatterns": ["**/dist/**", "**/.expo/**", "apps/api/src/generated/**", "**/coverage/**"],
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.expo/**",
+    "apps/api/src/generated/**",
+    "**/coverage/**",
+    "**/.next/**"
+  ],
   "overrides": [
     {
-      "files": ["scripts/**"],
+      "files": ["scripts/**", "apps/landing/scripts/**"],
       "rules": {
         "no-console": "off"
       }

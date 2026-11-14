@@ -1,0 +1,6 @@
+.next/
+out/
+next-env.d.ts
+seo-audit-output/
+visual-check-output/
+.lighthouse/
