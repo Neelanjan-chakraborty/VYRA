@@ -204,6 +204,8 @@ export class MeService {
     await this.auth.revokeAllSessions(userId);
     await this.photos.purge(userId);
     await this.prisma.$transaction([
+      // Persona versions, evidence and embeddings cascade from the persona row.
+      this.prisma.persona.deleteMany({ where: { userId } }),
       this.prisma.userProfile.deleteMany({ where: { userId } }),
       this.prisma.relationshipIntent.deleteMany({ where: { userId } }),
       this.prisma.discoveryPreferences.deleteMany({ where: { userId } }),

@@ -7,11 +7,15 @@ import { createValidationPipe } from './common/validation.js';
 import { ConfigModule, ENV } from './config/config.module.js';
 import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AiModule } from './modules/ai/ai.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { ConsentsModule } from './modules/consents/consents.module.js';
 import { MeModule } from './modules/me/me.module.js';
+import { PersonaModule } from './modules/persona/persona.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
+import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
 
 @Module({
@@ -29,11 +33,15 @@ import { RedisModule } from './redis/redis.module.js';
         skipIf: () => env.NODE_ENV === 'test',
       }),
     }),
+    QueueModule,
+    AiModule,
     AuditModule,
     StorageModule,
     AuthModule,
     HealthModule,
     MeModule,
+    ConsentsModule,
+    PersonaModule,
   ],
   providers: [
     // Order matters: rate limiting runs before authentication (AuthModule's guard).

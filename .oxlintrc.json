@@ -26,6 +26,12 @@
       {
         "allow": ["StatusBar"]
       }
+    ],
+    "no-underscore-dangle": [
+      "warn",
+      {
+        "allow": ["_max", "_min", "_count", "_sum", "_avg"]
+      }
     ]
   },
   "ignorePatterns": ["**/dist/**", "**/.expo/**", "apps/api/src/generated/**", "**/coverage/**"],

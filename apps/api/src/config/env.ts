@@ -43,8 +43,29 @@ export const envSchema = z
     STORAGE_LOCAL_DIR: z.string().min(1).default('./.storage'),
     /** Public origin of this API, used to build media URLs. */
     PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+
+    /** Required only when AI_PROVIDER=gemini. */
+    GEMINI_API_KEY: z.string().min(1).optional(),
+    GEMINI_MODEL: z.string().min(1).default('gemini-3.8-flash'),
+    GEMINI_EMBEDDING_MODEL: z.string().min(1).default('gemini-embedding-001'),
+    /** "false" stops this process running queue workers (see src/worker.ts). */
+    RUN_QUEUE_WORKERS: z.enum(['true', 'false']).default('true'),
   })
   .superRefine((env, ctx) => {
+    if (env.AI_PROVIDER === 'gemini' && !env.GEMINI_API_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['GEMINI_API_KEY'],
+        message: 'required when AI_PROVIDER=gemini',
+      });
+    }
+    if (env.AI_PROVIDER === 'openai') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AI_PROVIDER'],
+        message: 'the openai provider is not implemented yet',
+      });
+    }
     if (env.NODE_ENV !== 'production') return;
     // Development stand-ins must never run in production. Until real SMS/e-mail
     // and object-storage adapters exist, a production boot fails here on purpose.

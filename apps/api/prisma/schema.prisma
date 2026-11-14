@@ -295,6 +295,11 @@ model Persona {
   userId           String   @unique @map("user_id") @db.Uuid
   /// The approved version currently used for matching.
   currentVersionId String?  @unique @map("current_version_id") @db.Uuid
+  /// idle | queued | generating | ready | failed (CHECK constraint).
+  generationStatus      String    @default("idle") @map("generation_status") @db.VarChar(20)
+  /// Machine-readable reason for the last failed generation. Never content.
+  generationFailureCode String?   @map("generation_failure_code") @db.VarChar(60)
+  generationRequestedAt DateTime? @map("generation_requested_at") @db.Timestamptz(3)
   createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -353,6 +358,8 @@ enum EvidenceSourceType {
   INTEREST_SELECTION
   INTEGRATION
   USER_CORRECTION
+  /// A reply the person pasted back from their own AI assistant.
+  ASSISTANT_REFLECTION
 }
 
 /// Why an attribute holds its value. Stores a short derived summary only —
@@ -365,6 +372,8 @@ model PersonaEvidence {
   sourceType       EvidenceSourceType @map("source_type")
   confidence       Float
   summary          String             @db.VarChar(400)
+  /// Further detail on the source, e.g. which assistant answered ("chatgpt").
+  sourceDetail     String?            @map("source_detail") @db.VarChar(40)
   importId         String?            @map("import_id") @db.Uuid
   createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
 

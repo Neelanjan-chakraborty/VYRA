@@ -67,4 +67,15 @@ describe('parseEnv', () => {
       /OTP_DELIVERY[\s\S]*STORAGE_DRIVER/,
     );
   });
+
+  it('needs a Gemini key only when Gemini is the provider', () => {
+    expect(() => parseEnv({ ...valid, AI_PROVIDER: 'gemini' })).toThrow(/GEMINI_API_KEY/);
+    expect(parseEnv({ ...valid, AI_PROVIDER: 'gemini', GEMINI_API_KEY: 'k' }).GEMINI_MODEL).toBe(
+      'gemini-3.8-flash',
+    );
+  });
+
+  it('refuses the unimplemented openai provider', () => {
+    expect(() => parseEnv({ ...valid, AI_PROVIDER: 'openai' })).toThrow(/not implemented/);
+  });
 });
