@@ -42,7 +42,7 @@ pnpm --filter @vyra/landing dev   # website on :3100; `seo:audit` and `visual:ch
   duplicated in an app. No `any`.
 - Database changes: follow the `database-migrations` skill. Never edit an applied migration.
 - Website copy must match what is built: real screenshots only, and every capability labelled
-  built / engine built / in development / planned. Never add a domain, address, statistic,
+  built / first version / in development / planned. Never add a domain, address, statistic,
   testimonial or legal claim that has not been supplied.
 - UI work: follow the `vyra-design-system` skill. Tokens only, no raw hex or font sizes in screens.
 - Persona and anything sent to a model: follow the `persona-engineering` skill.

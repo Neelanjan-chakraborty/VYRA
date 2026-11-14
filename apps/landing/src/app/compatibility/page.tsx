@@ -53,7 +53,7 @@ const gates: readonly (readonly [string, string])[] = [
     'Someone looking only for something serious is not shown to someone looking only for something casual.',
   ],
   [
-    'Your deal-breakers',
+    'Your must-haves',
     'Rules you set yourself, applied only when the other person’s trait is known with reasonable confidence.',
   ],
   ['Blocks', 'If either person has blocked the other, the pair does not exist.'],
@@ -244,7 +244,7 @@ export default function CompatibilityPage() {
       >
         <EngineReadout showScenarios />
         <div className="mt-8">
-          <StatusTag status="engine" />
+          <StatusTag status="partial" />
         </div>
       </Chapter>
 

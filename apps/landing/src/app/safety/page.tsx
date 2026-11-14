@@ -63,7 +63,7 @@ const upcoming: readonly { name: string; status: Status; text: string }[] = [
   {
     name: 'Blocking and reporting',
     status: 'building',
-    text: 'Arriving with the screens that show people to each other. Blocks already exclude a pair from matching in the engine.',
+    text: 'Reporting exists in the service but has no screen yet; blocking is not built. Blocks already exclude a pair from matching in the engine.',
   },
   {
     name: 'Messaging between mutual connections only',

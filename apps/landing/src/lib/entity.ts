@@ -37,16 +37,17 @@ export const entity = {
     },
     {
       name: 'Compatibility estimate',
-      status: 'Engine built; in-app screen in development',
+      status: 'Built; shown in the app in words with reasons',
       summary:
         'Estimated alignment between two people across six weighted dimensions and ten everyday scenarios, calculated by fixed rules with the reasons shown. It is not a prediction of relationship success.',
       path: '/compatibility',
     },
     {
       name: 'Discovery',
-      status: 'Ranking built; Orbit and Discover screens in development',
+      status:
+        'First version built: a ranked Discover list and profile preview. Orbit, and the Connect, Save and Pass actions, are in development',
       summary:
-        'Suggestions ranked by estimated alignment and confidence, read as full profiles with the actions Connect, Save and Pass. There is no swipe deck.',
+        'Suggestions ranked by estimated alignment and confidence, read as full profiles. There is no swipe deck.',
       path: '/features',
     },
     {

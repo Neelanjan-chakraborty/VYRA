@@ -88,9 +88,9 @@ export function EngineReadout({ showScenarios = false }: { readonly showScenario
       ) : null}
       <figcaption className="t-small mt-6 max-w-2xl text-muted">
         Output of VYRA’s compatibility engine ({sample.engineVersion}) for two invented test
-        profiles, shown as data. The screen that presents this in the app is still in development.
-        These figures are estimated alignment under weights that are product hypotheses, not a
-        prediction of how any relationship will go.
+        profiles, shown as data. In the app the same result appears in words with its reasons, not
+        as numbers. These figures are estimated alignment under weights that are product hypotheses,
+        not a prediction of how any relationship will go.
       </figcaption>
     </figure>
   );

@@ -75,10 +75,19 @@ const steps: readonly Step[] = [
     title: 'Set where you are and who to look for',
     body: [
       'Location is optional and deliberately vague: an area of about two kilometres, or simply a city you pick. Other people only ever see a band such as “About 10 km away”.',
-      'Finally, an age range, who you want to see, and a distance. These are limits, not rankings.',
+      'Then an age range, who you want to see, and a distance. These are limits, not rankings.',
     ],
     optional: true,
     screen: screens.preferences,
+  },
+  {
+    title: 'Say what matters most',
+    body: [
+      'For pace of life, weekends, communication style and values, choose must-have, preference or open. A must-have removes people known not to match. A preference only changes the order. Open has no effect.',
+      'A must-have never removes someone simply because VYRA does not know the answer for them, and your choices are private.',
+    ],
+    optional: true,
+    screen: screens.matters,
   },
 ];
 
@@ -95,7 +104,7 @@ export default function HowItWorksPage() {
         }
         lede={
           <p>
-            Getting started with VYRA takes seven short steps. Four of them can be skipped, and
+            Getting started with VYRA takes eight short steps. Five of them can be skipped, and
             nothing you give is used for matching until you have seen what VYRA made of it. Every
             screen on this page is from the real app.
           </p>
@@ -178,10 +187,11 @@ export default function HowItWorksPage() {
       >
         <div className="grid-12 gap-y-8">
           <Reveal className="col-span-12 md:col-span-6 lg:col-span-5">
-            <StatusTag status="engine" />
+            <StatusTag status="partial" />
             <p className="mt-4 text-muted">
-              This matching is built and tested. The Orbit and Discover screens that will show the
-              suggestions are in development, so today the journey ends at your own profile.
+              The Discover tab already lists suggestions in this order and opens a profile preview
+              with the reasons. The Orbit view and the actions to connect, save or pass are in
+              development.
             </p>
           </Reveal>
           <div className="col-span-12 flex flex-wrap gap-x-10 gap-y-4 md:col-span-6 lg:col-start-8">
@@ -236,9 +246,9 @@ export default function HowItWorksPage() {
               answer: (
                 <p>
                   Sign-in, the age check and consent, the full onboarding, photo upload with
-                  moderation, the AI persona and its review, approximate location, discovery
-                  preferences, and account deletion. The compatibility engine and the recommendation
-                  service are complete behind the scenes.
+                  moderation, the AI persona and its review, approximate location, must-haves and
+                  preferences, account deletion, and a first version of Discover: a ranked list of
+                  suggestions with reasons, and a profile preview.
                 </p>
               ),
             },
@@ -246,8 +256,7 @@ export default function HowItWorksPage() {
               question: 'What is still being built?',
               answer: (
                 <p>
-                  The screens that show people to each other (Orbit and Discover), connection
-                  requests, and messaging. The{' '}
+                  The Orbit view, connection requests (Connect, Save and Pass), and messaging. The{' '}
                   <Link className="prose-link" href="/features#next">
                     features page
                   </Link>{' '}
@@ -278,7 +287,7 @@ export default function HowItWorksPage() {
         location="how_it_works_closing"
         title={
           <>
-            Seven steps.
+            Eight steps.
             <br />
             <em>No guesswork.</em>
           </>

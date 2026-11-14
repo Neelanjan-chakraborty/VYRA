@@ -194,7 +194,7 @@ export default function HomePage() {
               {[
                 [
                   'No swipe deck',
-                  'Profiles are read in full. The actions are Connect, Save and Pass.',
+                  'Profiles are read in full, one at a time, each with the reasons it was suggested.',
                 ],
                 ['No black box', 'Every suggestion arrives with its reasons, in plain language.'],
                 ['No streaks', 'Nothing in VYRA is tuned to keep you scrolling.'],
@@ -291,7 +291,7 @@ export default function HomePage() {
               </h2>
               <p className="t-lede mt-8 text-muted">
                 Compatibility in VYRA is arithmetic you can inspect, not a verdict from a model.
-                Hard limits come first: age, intention and your own deal-breakers. Then six weighted
+                Hard limits come first: age, intention and your own must-haves. Then six weighted
                 dimensions, each with the reasons it scored the way it did.
               </p>
               <p className="mt-6 text-muted">
@@ -305,7 +305,7 @@ export default function HomePage() {
                     →
                   </span>
                 </Link>
-                <StatusTag status="engine" />
+                <StatusTag status="partial" />
               </div>
             </Reveal>
             <Reveal delay={0.1} className="col-span-12 lg:col-span-6 lg:col-start-7">
@@ -325,13 +325,13 @@ export default function HomePage() {
                 travel={-50}
                 className="absolute left-[3%] top-[14%] w-[48%] rotate-[-5deg] lg:w-[54%]"
               >
-                <PhoneShot {...screens.discoverEmpty} sizes="(min-width: 1024px) 22vw, 50vw" />
+                <PhoneShot {...screens.orbitEmpty} sizes="(min-width: 1024px) 22vw, 50vw" />
               </Parallax>
               <Parallax
                 travel={60}
                 className="absolute right-0 top-0 w-[54%] rotate-[3deg] lg:w-[60%]"
               >
-                <PhoneShot {...screens.orbitEmpty} sizes="(min-width: 1024px) 24vw, 54vw" />
+                <PhoneShot {...screens.discover} sizes="(min-width: 1024px) 24vw, 54vw" />
               </Parallax>
             </div>
             <div className="col-span-12 lg:col-span-6 lg:col-start-7">
@@ -343,24 +343,26 @@ export default function HomePage() {
                   Two ways in. <strong className="font-semibold text-fg">Orbit</strong> places
                   people around you by estimated alignment: the closer someone sits to your centre,
                   the more you appear to have in common.{' '}
-                  <strong className="font-semibold text-fg">Discover</strong> opens one full profile
-                  at a time, with what you share and where you differ.
+                  <strong className="font-semibold text-fg">Discover</strong> lists people in order
+                  of estimated alignment and opens one full profile at a time, with the reasons you
+                  were suggested to each other.
                 </p>
               </Reveal>
               <Reveal delay={0.1}>
                 <p className="mt-8 border-l-2 border-accent pl-5 text-muted">
-                  These two screens are shown exactly as they are in today’s build: empty. The
-                  ranking behind them is built and tested; the screens that present it are being
-                  made now. We would rather show you an honest empty state than a mock-up.
+                  Both screens are shown exactly as they are in today’s build. Discover has its
+                  first version: a ranked list and a profile preview, here with an invented sample
+                  person. Orbit is still an empty state, and the Connect, Save and Pass actions are
+                  not built yet. We would rather show you that than a mock-up.
                 </p>
                 <div className="mt-10 flex flex-wrap items-center gap-x-8 gap-y-3">
                   <Link href="/features#discovery" className="arrow-link">
-                    What discovery will look like{' '}
+                    How discovery works in VYRA{' '}
                     <span className="arrow" aria-hidden="true">
                       →
                     </span>
                   </Link>
-                  <StatusTag status="engine" />
+                  <StatusTag status="partial" />
                 </div>
               </Reveal>
             </div>

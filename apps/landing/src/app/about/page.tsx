@@ -222,8 +222,8 @@ export default function AboutPage() {
           <>
             <p>
               VYRA is being built for India first, for adults, with the rest of the world in mind.
-              Sign-in, onboarding, the AI persona and the compatibility engine are complete. The
-              screens that introduce people to each other, and messaging, are not.
+              Sign-in, onboarding, the AI persona, the compatibility engine and a first version of
+              Discover are built. Orbit, connection requests and messaging are not.
             </p>
             <p>
               There are no user numbers, ratings or testimonials on this site because there are no

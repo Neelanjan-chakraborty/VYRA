@@ -49,7 +49,7 @@ export const pages = {
     label: 'How it works',
     title: 'How VYRA works, from sign-up to first suggestion',
     description:
-      'Seven short steps: sign in with a one-time code, describe yourself, review the persona ' +
+      'Eight short steps: sign in with a one-time code, describe yourself, review the persona ' +
       'VYRA drafts and say who you want to meet. Nothing is used until you approve.',
     updated: '2026-11-14',
     index: true,

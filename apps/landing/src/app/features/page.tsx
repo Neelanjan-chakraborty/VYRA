@@ -73,7 +73,7 @@ export default function FeaturesPage() {
                 <StatusTag status="built" />
               </li>
               <li>
-                <StatusTag status="engine" />
+                <StatusTag status="partial" />
               </li>
               <li>
                 <StatusTag status="planned" />
@@ -173,10 +173,11 @@ export default function FeaturesPage() {
             <EngineReadout />
           </div>
           <Reveal className="col-span-12 lg:col-span-3 lg:col-start-10">
-            <StatusTag status="engine" />
+            <StatusTag status="partial" />
             <p className="mt-4 text-muted">
-              The engine and the ranking that uses it are built and tested. The screen that shows a
-              breakdown like this inside the app is being made.
+              In the app, a suggestion shows its estimated alignment in words, such as “strong”,
+              with its reasons. The per-dimension figures here are the engine’s own output; the app
+              does not display numbers.
             </p>
             <Link href="/compatibility" className="arrow-link mt-8">
               How it is calculated{' '}
@@ -202,7 +203,7 @@ export default function FeaturesPage() {
             <p>
               Orbit is a spatial view: people are placed around you by estimated alignment, closest
               to the centre when you have most in common. Discover is for reading, one full profile
-              at a time, with three deliberate actions: Connect, Save, Pass.
+              at a time. Three deliberate actions are planned: Connect, Save and Pass.
             </p>
             <p>
               Suggestions are ranked by alignment and by how sure VYRA is of it, so a confident
@@ -220,14 +221,15 @@ export default function FeaturesPage() {
           />
           <ShotFigure
             className="col-span-8 col-start-3 sm:col-span-5 sm:col-start-7 sm:mt-16 lg:col-span-3 lg:col-start-6"
-            screen={screens.discoverEmpty}
-            caption="Discover, as it is in today’s build: an empty state."
+            screen={screens.discover}
+            caption="Discover in today’s build, with an invented sample person and a placeholder photo."
           />
           <Reveal className="col-span-12 lg:col-span-3 lg:col-start-10">
-            <StatusTag status="engine" />
+            <StatusTag status="partial" />
             <p className="mt-4 text-muted">
-              The recommendation service is built and tested end to end. These two screens do not
-              show people yet, so we show them empty rather than draw what they might become.
+              Discover has its first version: a ranked list and a profile preview. Orbit is still an
+              empty state, and Connect, Save and Pass are not built yet, so Orbit is shown empty and
+              nothing here is drawn from imagination.
             </p>
             <p className="mt-4 text-muted">
               Photos reach other people’s screens only after moderation has approved them.
@@ -248,7 +250,7 @@ export default function FeaturesPage() {
         }
         intro={
           <p>
-            Seven steps, most of them optional. You can be looking for more than one thing, describe
+            Eight steps, most of them optional. You can be looking for more than one thing, describe
             your gender in your own terms, and skip any data source you would rather not use.
           </p>
         }

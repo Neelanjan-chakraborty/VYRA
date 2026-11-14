@@ -3,7 +3,9 @@ import askAiPick from '@/assets/screens/10-ask-ai-pick.png';
 import connectionsEmpty from '@/assets/screens/20-connections-empty.png';
 import consent from '@/assets/screens/04-consent.png';
 import deleteConfirm from '@/assets/screens/25-delete-confirm.png';
-import discoverEmpty from '@/assets/screens/19-discover-empty.png';
+import discover from '@/assets/screens/19-discover-list.png';
+import matters from '@/assets/screens/26-onboarding-matters.png';
+import person from '@/assets/screens/27-person-profile.png';
 import identity from '@/assets/screens/05-onboarding-identity.png';
 import intention from '@/assets/screens/08-onboarding-intention.png';
 import interests from '@/assets/screens/07-onboarding-interests.png';
@@ -84,9 +86,17 @@ export const screens = {
     src: orbitEmpty,
     alt: 'VYRA Orbit tab in its current empty state: “Your orbit is still empty”, with three orbit paths around a centre point.',
   },
-  discoverEmpty: {
-    src: discoverEmpty,
-    alt: 'VYRA Discover tab in its current empty state: “Read people, don’t flick past them. Nothing to read yet.”',
+  discover: {
+    src: discover,
+    alt: 'VYRA Discover tab listing one sample person, Ravi, 29, Bengaluru, under 5 km away, marked “Strong estimated alignment” with three reasons, beside a plain colour placeholder photo.',
+  },
+  person: {
+    src: person,
+    alt: 'VYRA profile preview for a sample person, Ravi: age, city and distance band, a placeholder photo, a short bio, and “Strong estimated alignment” followed by its reasons.',
+  },
+  matters: {
+    src: matters,
+    alt: 'VYRA onboarding, “What matters to you?”: pace of life, weekends, communication style and values, each set to must-have, preference or open.',
   },
   connectionsEmpty: {
     src: connectionsEmpty,

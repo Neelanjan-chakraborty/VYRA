@@ -1,7 +1,8 @@
-export type Status = 'built' | 'engine' | 'building' | 'planned';
+export type Status = 'built' | 'partial' | 'engine' | 'building' | 'planned';
 
 const LABELS: Record<Status, string> = {
   built: 'In the app today',
+  partial: 'First version in the app',
   engine: 'Engine built · screen in development',
   building: 'In development',
   planned: 'Planned',

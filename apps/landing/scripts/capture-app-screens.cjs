@@ -49,6 +49,109 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+const API = 'http://localhost:4000/v1';
+const answer = (value, why) => ({ value, confidence: 'high', why });
+
+async function call(pathname, body, token, method = 'POST') {
+  const response = await fetch(API + pathname, {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(`${method} ${pathname}: ${response.status}`);
+  return response.status === 204 ? null : response.json();
+}
+
+/**
+ * A second invented person, built through the public API: a profile, a plain
+ * colour field as the photo (checked by the real moderation pipeline), and an
+ * approved persona. Deleted through the API when the capture finishes.
+ */
+async function createSyntheticPerson(name) {
+  const email = `${name.toLowerCase()}-${Date.now()}@example.test`;
+  const code = await call('/auth/otp/request', { channel: 'email', destination: email });
+  const verified = await call('/auth/otp/verify', {
+    channel: 'email',
+    destination: email,
+    challengeId: code.challengeId,
+    code: code.devCode,
+  });
+  const { accessToken: token } = await call('/auth/register', {
+    registrationToken: verified.registrationToken,
+    dateOfBirth: '1997-03-03',
+    acceptedTermsVersion: '2026-11',
+    acceptedPrivacyVersion: '2026-11',
+  });
+  await call(
+    '/me/profile',
+    {
+      displayName: name,
+      genderIdentity: 'MAN',
+      bio: 'Cooks badly, walks well. Asks too many questions.',
+    },
+    token,
+    'PATCH',
+  );
+  const browser = await chromium.launch();
+  const scratch = await browser.newPage({ viewport: { width: 600, height: 750 } });
+  await scratch.setContent(
+    '<body style="margin:0;background:linear-gradient(200deg,#4b5d6b,#211d26)"></body>',
+  );
+  const png = await scratch.screenshot();
+  await browser.close();
+  const form = new FormData();
+  form.append('file', new Blob([png], { type: 'image/png' }), 'p.png');
+  await fetch(`${API}/me/photos`, {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+    body: form,
+  });
+  await call('/me/relationship-intents', { intents: [{ kind: 'serious' }] }, token, 'PUT');
+  await call(
+    '/me/discovery-preferences',
+    { minAge: 22, maxAge: 40, maxDistanceKm: null, showGenders: ['WOMAN'], showAstrology: false },
+    token,
+    'PUT',
+  );
+  await call(
+    '/me/location',
+    { source: 'manual', countryCode: 'IN', placeId: 'gn:1277333' },
+    token,
+    'PUT',
+  );
+  await call('/me/consents/AI_IMPORT_PROCESSING', { granted: true }, token, 'PUT');
+  await call(
+    '/me/persona/assistant-reflection',
+    {
+      assistant: 'chatgpt',
+      reply: JSON.stringify({
+        vyra_questionnaire: '1',
+        answers: {
+          socialEnergy: answer(3, 'Happy in company and alone'),
+          emotionalExpressiveness: answer(4, 'Says what he feels'),
+          conflictApproach: answer(5, 'Prefers to sort things out quickly'),
+          affectionExpression: answer(4, 'Openly affectionate'),
+          communicationStyle: answer('expansive', 'Explains things in detail'),
+          lifestylePace: answer('balanced', 'Some nights out, some in'),
+          values: answer(['honesty', 'kindness', 'growth'], 'Talks about these often'),
+        },
+      }),
+    },
+    token,
+  );
+  await call('/me/persona/draft/approve', null, token);
+  for (let i = 0; i < 60; i += 1) {
+    const me = await call('/me', null, token, 'GET');
+    if (me.photos[0]?.status !== 'PENDING') break;
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  await call('/me/onboarding/complete', null, token);
+  return { token };
+}
+
 async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({
@@ -221,12 +324,32 @@ async function main() {
   await page.getByRole('checkbox', { name: 'Men', exact: true }).click();
   await page.getByRole('radio', { name: 'Within 25 km' }).click();
   await snap('17-onboarding-preferences');
+  await button('Continue').click();
+
+  await heading('What matters to you?').waitFor();
+  await page.getByRole('radio', { name: 'Pace of life: Preference' }).click();
+  await page.getByRole('checkbox', { name: 'A mix of in and out' }).click();
+  await page.getByRole('radio', { name: 'Values (at least one shared): Must-have' }).click();
+  await page.getByRole('checkbox', { name: 'Honesty' }).click();
+  await page.getByRole('checkbox', { name: 'Kindness' }).click();
+  await snap('26-onboarding-matters');
   await button('Finish').click();
 
   await page.getByRole('tab', { name: 'Orbit', selected: true }).waitFor({ timeout: 15000 });
   await snap('18-orbit-empty');
+  // A second synthetic person, so that Discover has someone real to show.
+  const ravi = await createSyntheticPerson('Ravi');
+  await page.getByRole('tab', { name: 'Discover' }).click();
+  const card = page.getByRole('link', { name: /^Ravi,/ });
+  await card.waitFor({ timeout: 20000 });
+  await snap('19-discover-list');
+  await card.click();
+  await heading('Ravi').waitFor();
+  await page.getByText('Estimated alignment', { exact: true }).waitFor();
+  await snap('27-person-profile');
+  await button('Back').click();
+
   for (const [tab, file] of [
-    ['Discover', '19-discover-empty'],
     ['Connections', '20-connections-empty'],
     ['Messages', '21-messages-empty'],
     ['You', '22-you'],
@@ -252,6 +375,7 @@ async function main() {
   await button('Delete everything').click();
   await heading('Chemistry, decoded.').waitFor({ timeout: 15000 });
 
+  await call('/me', { confirm: 'DELETE' }, ravi.token, 'DELETE');
   await browser.close();
   fs.rmSync(photoPath, { force: true });
   console.log(`Captured to ${out}`);

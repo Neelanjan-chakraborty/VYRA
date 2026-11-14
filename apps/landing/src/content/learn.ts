@@ -728,8 +728,8 @@ export const articles: readonly Article[] = [
     vyra: {
       heading: 'Where VYRA sits',
       paragraphs: [
-        'VYRA is a compatibility-led discovery platform with no swipe deck. Profiles are meant to be read in full, with three deliberate actions: Connect, Save and Pass. Each suggestion comes with its reasons.',
-        'VYRA is in development: the ranking is built, while the screens that show people to each other are still being made. VYRA does not claim that its approach leads to better relationships, because there is no outcome data yet to support such a claim.',
+        'VYRA is a compatibility-led discovery platform with no swipe deck. Profiles are meant to be read in full, and each suggestion comes with its reasons.',
+        'VYRA is in development: a first Discover list and profile preview are built, while the Orbit view and the actions to connect, save or pass are still being made. VYRA does not claim that its approach leads to better relationships, because there is no outcome data yet to support such a claim.',
       ],
     },
     faq: [
@@ -868,7 +868,7 @@ export const articles: readonly Article[] = [
       heading: 'What VYRA does, and does not yet do',
       paragraphs: [
         'In the current build, VYRA checks date of birth at sign-up and refuses anyone under 18, moderates every photo before anyone else can see it, removes location data from uploaded photos, stores only a rough area and shows others a distance band, asks consent separately for each kind of AI processing, and lets a person delete their account in the app.',
-        'VYRA is in development. Blocking and reporting screens, and messaging limited to mutual connections, are not built yet. The age check is a self-declared date of birth, not identity verification.',
+        'VYRA is in development. Blocking, a reporting screen, and messaging limited to mutual connections are not built yet. The age check is a self-declared date of birth, not identity verification.',
       ],
     },
     faq: [

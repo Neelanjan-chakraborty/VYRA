@@ -91,7 +91,7 @@ from GA4 enhanced measurement.
   empty and labelled.
 - `src/content/engine-sample.json` is real output of `@vyra/compatibility-engine` for two
   invented profiles (`pnpm --filter @vyra/landing engine-sample`). Do not edit it by hand.
-- Every capability carries a status: in the app today, engine built, in development, planned.
+- Every capability carries a status: in the app today, first version in the app, in development, planned.
   Keep them current with `docs/IMPLEMENTATION_STATUS.md`.
 
 ## Design

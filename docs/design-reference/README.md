@@ -8,7 +8,7 @@ or retouched.
 
 **No personal data.** The account is synthetic: the name "Asha", an `example.test` address, an
 invented bio, and a plain colour gradient in place of a portrait. The script deletes the account
-through the app when it finishes. The code-entry screen is not captured because the development
+through the app when it finishes, and deletes the second invented person through the API. The code-entry screen is not captured because the development
 build prints the one-time code on it.
 
 | File                                        | Screen                                                                    | State in the build                       |
@@ -23,8 +23,9 @@ build prints the one-time code on it.
 | `22-you`, `23`–`24` (`persona-*`)           | You tab, persona suggestions, approved persona                            | Built                                    |
 | `25-delete-confirm`                         | Delete account                                                            | Built                                    |
 
-There is no compatibility screen in the app yet, so there is no screenshot of one. The website
-shows the compatibility engine's real output as data instead
+The app shows estimated alignment in words with reasons (see `27-person-profile`); it has no
+per-dimension breakdown screen. For that, the website shows the compatibility engine's real
+output as data
 (`apps/landing/src/content/engine-sample.json`, written by `scripts/engine-sample.mjs`).
 
 The app's accent is violet. The website uses cherry and oxblood (DECISIONS D-041), so the
