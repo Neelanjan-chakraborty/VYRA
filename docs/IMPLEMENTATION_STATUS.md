@@ -1,17 +1,30 @@
 # Implementation status
 
-Last updated: 14 November 2026, end of Milestone 4.
+Last updated: 14 November 2026, after the product-gap resolution (moderation, gender,
+location, must-haves).
 
 ## Summary
 
-| Milestone                     | Status                                         |
-| ----------------------------- | ---------------------------------------------- |
-| 0 — Audit and plan            | Done                                           |
-| 1 — Foundation                | Done                                           |
-| 2 — Design and authentication | Done, with the gaps listed below               |
-| 3 — AI Persona                | Done with the mock provider; Gemini unverified |
-| 4 — Compatibility             | Done (API only; screens come with Milestone 5) |
-| 5–8                           | Not started                                    |
+| Milestone                     | Status                                           |
+| ----------------------------- | ------------------------------------------------ |
+| 0 — Audit and plan            | Done                                             |
+| 1 — Foundation                | Done                                             |
+| 2 — Design and authentication | Done, with the gaps listed below                 |
+| 3 — AI Persona                | Done with the mock provider; Gemini unverified   |
+| 4 — Compatibility             | Done                                             |
+| Gap resolution (4 items)      | Done — see below                                 |
+| 5 — Discovery                 | Started: first Discover list and profile preview |
+| 6–8                           | Not started                                      |
+
+## Product gap resolution — complete versus still needed
+
+| Gap                      | Working end to end (verified)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | Needs credentials or operations                                                                                                                                                              |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **1. Photo moderation**  | Upload/replace checks (declared type vs bytes, size, dimensions); states PENDING → APPROVED / REJECTED / REVIEW_REQUIRED; real open-source classifier (nsfwjs) runs in the worker and approved a real upload in the browser run in ~4 s; appeal once; moderator queue and decisions (API); reports with hide-after-2; full history in `moderation_events` and `audit_logs`; scoped, re-checked media URLs; no unapproved photo in any recommendation, profile preview, compatibility response or URL (leak suite); Checking / In review / Declined in the app; neutral placeholder on Discover and profiles | Someone with the `MODERATOR` role to work the queue (no admin UI yet — API only). The classifier covers nudity/sexual content only; violence, minors and identity rely on reports and people |
+| **2. Gender identity**   | Woman / Man / Non-binary / Self-describe (own words + searches to appear in) / Prefer not to say / unanswered; private unless shown; "show me" with an on-by-default option for people who describe their gender differently; migration converted existing data; rule enforced both ways; onboarding and Settings screens                                                                                                                                                                                                                                                                                   | —                                                                                                                                                                                            |
+| **3. Location**          | Approximate device location (coarse permission only) or a city from 539 GeoNames places; ~2 km grid; never returned; bands only; removal clears all; distance only when both have a location; inactive filter explained in Discover and preferences; denied permission falls back to manual; bounding-box prefilter                                                                                                                                                                                                                                                                                         | Native permission prompts not seen on a device (web geolocation only). No places outside India yet — other countries are labels without distance                                             |
+| **4. Must-haves**        | Must-have / Preference / Open for intentions, pace, weekends, communication style, values; must-haves never fire on unknown values; preferences only re-rank; private; impact notice when they remove ≥ half; onboarding and Settings editor with clear-all                                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                                                                                            |
+| **Discover (first cut)** | Ranked list and profile preview with photo or placeholder, distance band, estimated alignment in words, reasons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Connect / save / pass, Orbit: Milestone 5                                                                                                                                                    |
 
 ## What works today
 
@@ -76,15 +89,31 @@ delete their account.
 
 ## Verification (run 14 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                                              |
-| --------------------------------- | ----------------------------------------------------------------------------------- |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                                                |
-| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                   |
-| `pnpm test`                       | Pass — 111 tests (validation 34, design-system 11, compatibility-engine 20, api 46) |
-| `pnpm test:e2e`                   | Pass — 100 tests against real PostgreSQL, Redis and the queue                       |
-| `prisma migrate diff --exit-code` | Pass — no drift, 3 migrations                                                       |
-| `expo export --platform web`      | Pass                                                                                |
-| `pnpm e2e:web`                    | Pass — 21 steps, 25 screenshots                                                     |
+| Check                             | Result                                                                                                                                           |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                             |
+| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                |
+| `pnpm test`                       | Pass — 146 tests (validation 45, design-system 11, compatibility-engine 36, api 54 incl. the real nsfwjs model)                                  |
+| `pnpm test:e2e`                   | Pass — 154 tests in 10 suites against real PostgreSQL, Redis and the queue                                                                       |
+| `prisma migrate diff --exit-code` | Pass — no drift, 8 migrations                                                                                                                    |
+| `expo export --platform web`      | Pass                                                                                                                                             |
+| `pnpm e2e:web`                    | Pass — 33 screenshots; real moderation, gender, location (manual, device, denied, removed), must-haves, Discover placeholder then approved photo |
+
+Regression matrix asked for in the gap directive, and where each is proven:
+
+| Case                                           | Where                                                                               |
+| ---------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Every gender option; not disclosing            | `gender.e2e-spec.ts`, engine `gender` tests                                         |
+| No location permission                         | `e2e-web` (denied → manual), `location.e2e-spec.ts` (no location → filter inactive) |
+| Manually selected location                     | `location.e2e-spec.ts`, `e2e-web`                                                   |
+| No photos; pending, in-review, rejected photos | `photo-leak.e2e-spec.ts`, `e2e-web`                                                 |
+| Several must-haves; none                       | `criteria.e2e-spec.ts`, engine must-have tests                                      |
+| Preferences changed after onboarding           | gender, location and criteria suites                                                |
+| No unapproved photo exposed                    | `photo-leak.e2e-spec.ts` (every state × every endpoint × every URL form)            |
+| No unsupported distance filter                 | `location.e2e-spec.ts`                                                              |
+| Gender filter doesn't wrongly exclude          | `gender.e2e-spec.ts`                                                                |
+| Must-haves enforced consistently               | `criteria.e2e-spec.ts` (both directions, profile 404)                               |
+| Existing auth, onboarding, discovery           | `auth`, `me`, `persona`, `compatibility` suites and `e2e-web`                       |
 
 New in Milestone 4: the engine's synthetic-people tests (see `docs/COMPATIBILITY_ENGINE.md`
 §9) and an API suite that builds eleven synthetic people through the public API and checks
@@ -124,8 +153,8 @@ GitHub Actions workflow; Docker Compose; screen readers on a device.
 - The country code on the phone field is a pre-filled `+91`, not a country picker.
 - Refresh on web uses `sessionStorage` (QA target only).
 - A Gemini API key is still not saved in the environment; the app runs on the mock provider.
-- E2E suites share the development database; `compatibility.e2e-spec.ts` hides earlier test
-  people at start so its ranking assertions are exact.
+- E2E suites share the development database; several hide earlier test people at start. Test
+  queues use their own Redis prefix, so a running dev server no longer takes test jobs.
 - Fixed in Milestone 3: on web, tab screens grew with their content so the page scrolled
   under the tab bar. Tab screens now scroll inside their own frame.
 - A removed attribute can be suggested again by the next generation (backlog).
@@ -143,6 +172,5 @@ pnpm build
 pnpm check && pnpm test:e2e
 ```
 
-Then start Milestone 5 (`docs/IMPLEMENTATION_BACKLOG.md`): photo moderation first (it gates
-showing photos to others), then save/pass/connect APIs, then the Discover, Orbit and
-compatibility screens on top of the Milestone 4 endpoints.
+Then continue Milestone 5 (`docs/IMPLEMENTATION_BACKLOG.md`): save / pass / connect APIs, the
+connection lifecycle, Orbit, and the full compatibility screen.

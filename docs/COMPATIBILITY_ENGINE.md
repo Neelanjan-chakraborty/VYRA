@@ -1,7 +1,7 @@
 # Compatibility engine
 
 Status: **implemented** (Milestone 4) in `packages/compatibility-engine`, engine version
-`compat-1`. Pure TypeScript: no I/O, no framework, no AI. The API loads data, the engine
+`compat-2`. Pure TypeScript: no I/O, no framework, no AI. The API loads data, the engine
 decides.
 
 An LLM is never asked whether two people are compatible. Outputs are **estimated
@@ -13,15 +13,30 @@ drafts never influence matching.
 
 Checked in **both** directions; failing any one means the pair is never scored or shown.
 
-| Gate          | Rule                                                                                                                                                                                                                               |
-| ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Self          | never                                                                                                                                                                                                                              |
-| Age           | each person's age is inside the other's `minAge…maxAge`                                                                                                                                                                            |
-| Gender        | each person's "interested in" is empty, or contains the other's gender category. Free-text gender maps to `woman` / `man` / `nonbinary` (`genderCategory`); anything unrecognised matches **no** filter — the engine never guesses |
-| Distance      | only when both have a location and a limit is set                                                                                                                                                                                  |
-| Intention     | best fit between the two people's intentions ≥ 0.5. Serious ↔ casual is 0 (a deal-breaker); "exploring" or a second intention can bridge it                                                                                        |
-| Deal-breakers | the person's own rules (`{attribute, exclude[]}` on `lifestylePace`, `weekendRhythm`, `communicationStyle`); fire only on a value known with confidence ≥ 0.6                                                                      |
-| Blocked       | either has blocked the other (checked by the API)                                                                                                                                                                                  |
+| Gate       | Rule                                                                                                                                                                            |
+| ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Self       | never                                                                                                                                                                           |
+| Age        | each person's age is inside the other's `minAge…maxAge`                                                                                                                         |
+| Gender     | see **Gender rule** below; nothing is ever inferred                                                                                                                             |
+| Distance   | only when **both** people have a location and the person checking has a limit; a missing location never excludes anyone                                                         |
+| Intention  | best fit between the two people's intentions ≥ 0.5. Serious ↔ casual is 0 (a hard mismatch); "exploring" or a second intention can bridge it                                    |
+| Must-haves | each `must` criterion excludes only when the other's value is _known_ (stated, or inferred with confidence ≥ 0.6) and not accepted. Unknown is never a mismatch (`criteria.ts`) |
+| Blocked    | either has blocked the other (checked by the API)                                                                                                                               |
+
+**Gender rule** (`acceptsGender`). Identities are stated by the person: Woman, Man,
+Non-binary, Self-describe (with their own words and, optionally, which searches to appear
+in), Prefer not to say, or unanswered.
+
+| Viewer's "show me"  | Woman / Man / Non-binary | Self-describe with chosen searches | Self-describe without, prefer not to say, unanswered                                                        |
+| ------------------- | ------------------------ | ---------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| Everyone            | shown                    | shown                              | shown                                                                                                       |
+| Specific identities | shown if chosen          | shown if any chosen search matches | shown unless the viewer turned off "also show people who describe their gender differently" (on by default) |
+
+So nobody is excluded for being hard to categorise unless the viewer explicitly asks for that.
+
+**Criteria** (`criteria.ts`): for what someone is looking for, pace of life, weekends,
+communication style and values, each person chooses **Must-have** (gate above), **Preference**
+(soft score below) or **Open** (no effect). They are private to that person.
 
 ## 2. Features (`features.ts`)
 

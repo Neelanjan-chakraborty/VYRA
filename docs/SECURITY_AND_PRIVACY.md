@@ -4,7 +4,7 @@ VYRA holds intimate data. Security and privacy requirements are acceptance crite
 feature, not a later phase. Target regimes: India's DPDP Act 2023 first, GDPR-compatible by
 design for expansion.
 
-## In place now (Milestones 1–3)
+## In place now
 
 | Control                                       | Where                                                           |
 | --------------------------------------------- | --------------------------------------------------------------- |
@@ -63,8 +63,12 @@ design for expansion.
   agreement to version `2026-11`, but there is nothing yet for a person to read. Required
   before any real user signs up.
 - **Age verification is self-declared** date of birth only (O-6).
-- **Photo moderation** is not implemented: uploads are stored with status `PENDING` and nothing
-  reviews them. Must exist before photos are shown to other people (Milestone 5).
+- **Moderation coverage**: the automated classifier detects nudity and sexual content only —
+  not violence, weapons, minors, impersonation, hate symbols or text. Those rely on reports and
+  human review. Someone must be given the `MODERATOR` role and work the queue; there is no
+  admin console yet (API only).
+- **Owner-scoped photo URLs** work for anyone who obtains one within its 10-minute lifetime;
+  they are only ever sent to the owner.
 - **Rate-limit state is per process** (in memory). It needs the Redis store before running
   more than one API instance.
 - **The web build keeps the refresh token in `sessionStorage`.** It is a development and QA

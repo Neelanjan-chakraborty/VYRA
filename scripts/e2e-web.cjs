@@ -522,6 +522,16 @@ async function main() {
   await step('location from settings: device, then removal', async () => {
     await page.getByRole('link', { name: /^Where you are/ }).click();
     await heading('Where are you?').waitFor();
+    // Permission denied: VYRA explains and offers the manual choice instead.
+    await context.clearPermissions();
+    await button('Use my approximate location').click();
+    await page.getByText(/Location permission is off/).waitFor();
+    await page.getByLabel('City', { exact: true }).waitFor();
+    await snap('settings-location-denied');
+    await button('Cancel').click();
+    await context.grantPermissions(['clipboard-read', 'clipboard-write', 'geolocation'], {
+      origin: ORIGIN,
+    });
     await button('Use my approximate location').click();
     await page.getByText('From your device, approximate.').waitFor();
     await page.getByText('Bengaluru, Karnataka', { exact: true }).waitFor();

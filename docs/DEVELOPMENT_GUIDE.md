@@ -54,6 +54,7 @@ API (`apps/api/.env`, validated at boot by `src/config/env.ts`):
 
 | `GEMINI_API_KEY` | — | Required only with `AI_PROVIDER=gemini` |
 | `GEMINI_MODEL` / `GEMINI_EMBEDDING_MODEL` | `gemini-3.8-flash` / `gemini-embedding-001` | Gemini models |
+| `PHOTO_MODERATION_PROVIDER` | `nsfwjs` | `nsfwjs` (open-source classifier, offline), `manual` (everything to a person) or `mock` (tests only; refused in production). E2E tests set `mock` |
 | `RUN_QUEUE_WORKERS` | `true` | `false` stops this process running queue jobs; run `node apps/api/dist/worker.js` instead |
 
 **Signing in during development:** no message is sent. The verification screen shows the code
@@ -86,4 +87,7 @@ physical device use the machine's LAN address and add the Expo web origin to `CO
   is stale. Delete that folder (the dev server regenerates it).
 - **`pnpm e2e:web` fails with 429** — it requests four codes and the API allows five a minute
   per address. Wait a minute between runs.
+- **Refreshing the place list**: `node scripts/build-places.mjs` (downloads GeoNames, needs
+  `unzip`), then commit `packages/validation/src/places-data.ts`.
+- **Becoming a moderator locally**: `psql … -c "update users set role='MODERATOR' where email='…'"`.
 - **Health shows a dependency down** — start the services (`pnpm services:start` or compose).

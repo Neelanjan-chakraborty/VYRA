@@ -15,6 +15,9 @@ API: `apps/api/src/modules/compatibility/`.
 - Missing data must never raise a score. Keep the shrink-to-neutral step and the
   INSUFFICIENT → no number rule (the database CHECK enforces the latter).
 - Gates run in both directions. Never guess a gender, intention or trait to pass a gate.
+- Must-haves fire only on known values; preferences only adjust the score; "open" does nothing.
+- A missing location never excludes anyone; unlisted gender identities are included by default.
+- Never put a photo in a non-owner response unless it is APPROVED (use `PeopleService`).
 - Only approved persona versions feed the engine.
 - Ineligible pairs are a plain 404 to the viewer; never reveal which gate failed.
 - Results are "estimated alignment". No predictive or scientific claims in code, copy or docs.

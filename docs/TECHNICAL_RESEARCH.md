@@ -80,6 +80,19 @@ Both are to be re-verified against current vendor documentation when the import 
 - **Verification**: Chromium + Playwright are installed, so the Expo web export can be
   screenshotted. There is no iOS simulator or Android emulator.
 
+## Photo moderation and place data (14 Nov 2026)
+
+- **nsfwjs 4.4.0** (MIT) with `@tensorflow/tfjs` 4.22 (pure JS). The npm package bundles the
+  MobileNetV2 model, so it loads offline (~1.5 s) and classifies a photo in ~1–2 s on CPU.
+  Classes: Drawing, Hentai, Neutral, Porn, Sexy. Verified here on generated images and on a real
+  upload through the worker.
+- **GeoNames** `cities15000` + `admin1CodesASCII` (CC BY 4.0) for place names and centres.
+  `scripts/build-places.mjs` regenerates the list.
+- **expo-location 58.0.x**: config plugin options `locationWhenInUsePermission`,
+  `isIosBackgroundLocationEnabled`, `isAndroidBackgroundLocationEnabled`,
+  `isAndroidForegroundServiceEnabled`; Android `blockedPermissions` removes
+  `ACCESS_FINE_LOCATION`; iOS `NSLocationDefaultAccuracyReduced` defaults to approximate.
+
 ## Sources
 
 - npm registry metadata for every package above (`npm view <pkg>`), 13 Nov 2026
