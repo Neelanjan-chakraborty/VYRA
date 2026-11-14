@@ -9,6 +9,7 @@ compatibility-first discovery, evidence-aware personas, user-controlled AI.
 - `apps/mobile` — Expo SDK 58 / React Native 0.88, Expo Router, TanStack Query.
 - `packages/validation` — Zod schemas and inferred types shared by API and clients.
 - `packages/design-system` — design tokens (colour, type, spacing, motion).
+- `packages/compatibility-engine` — pure, deterministic compatibility scoring (no I/O).
 - `docs/` — product, architecture, decisions, status. `infrastructure/docker` — local services.
 
 ## Commands
@@ -39,6 +40,7 @@ pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>   # browser run of t
 - Database changes: follow the `database-migrations` skill. Never edit an applied migration.
 - UI work: follow the `vyra-design-system` skill. Tokens only, no raw hex or font sizes in screens.
 - Persona and anything sent to a model: follow the `persona-engineering` skill.
+- Scoring, gates or ranking: follow the `compatibility-engine` skill.
 - AI output is untrusted data. Compatibility is computed deterministically, never by asking an
   LLM. Tests use the mock AI provider (`AI_PROVIDER=mock`).
 - Never log message bodies, imported content, tokens or OTPs.

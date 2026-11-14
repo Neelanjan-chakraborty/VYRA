@@ -118,6 +118,29 @@ and `RUN_QUEUE_WORKERS=false` split it out without code changes when load requir
 configurable). The embedding model is the stable one; `gemini-embedding-2` was preview-only
 when checked (14 Nov 2026).
 
+**D-034 · The compatibility engine is a separate pure package** (`@vyra/compatibility-engine`)
+so it can be tested exhaustively with synthetic people and reused by workers without Nest or
+Prisma.
+
+**D-035 · Sparse data is pulled towards neutral:** `overall = 0.5 + (raw − 0.5) ·
+dataCoverage`, and no number below 40 % weighted coverage. Agreement on a few known traits must
+not look like a strong match.
+
+**D-036 · Unknown gender matches no gender filter.** People with a gender VYRA cannot
+categorise are shown only to those with no gender filter. Guessing would be worse. Revisit
+with an explicit category choice in the profile.
+
+**D-037 · Serious ↔ casual is a hard gate; other intention differences are scored.**
+
+**D-038 · "Financial attitudes" is presented as "Priorities and planning"** and uses only
+planning style and stated values. VYRA holds no financial information and will not infer it.
+
+**D-039 · Scores are recomputed per request; the cache table is a record, not a read path.**
+Scoring a pair takes microseconds; caching would add invalidation risk for no gain yet.
+
+**D-040 · Photos appear on other people's screens only once approved by moderation.** Until
+moderation exists (Milestone 5) recommendations carry no photo.
+
 ## Open (need the product owner)
 
 | #   | Question                                              | Needed by     | Default if unanswered                                             |

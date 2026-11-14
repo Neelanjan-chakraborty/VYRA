@@ -3,7 +3,7 @@ import {
   interestListSchema,
   meSchema,
   photoSchema,
-  type DiscoveryPreferences,
+  type DiscoveryPreferencesInput,
   type Me,
   type ProfileUpdate,
   type RelationshipIntentsUpdate,
@@ -54,7 +54,7 @@ export function useSetIntents() {
 
 export function useSetPreferences() {
   return useMutation({
-    mutationFn: (prefs: DiscoveryPreferences) =>
+    mutationFn: (prefs: DiscoveryPreferencesInput) =>
       api('/me/discovery-preferences', { method: 'PUT', body: prefs, schema: meSchema }),
     onSuccess: setMe,
   });

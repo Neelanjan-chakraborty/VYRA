@@ -96,6 +96,16 @@ and deletion take effect at once.
 | DELETE | `/v1/me/persona/draft`                | Discard the draft                                                                                                                                                                                                                                                           |
 | DELETE | `/v1/me/persona`                      | `204`. Deletes every version, evidence and embedding                                                                                                                                                                                                                        |
 
+### Compatibility and discovery 🔒
+
+| Method | Path                                     | Description                                                                                                                                                                                                                                            |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/v1/discovery/recommendations?limit=20` | Up to 50 ranked people (`recommendationListSchema`): name, age, city, approved photo, `overall` (null when insufficient), `confidence`, `sufficiency`, highlights, shared interests, plus engine and weights versions. Viewer still onboarding → `409` |
+| GET    | `/v1/compatibility/:userId`              | Full result for one person (`compatibilityViewSchema`): overall, six dimensions with features and explanations, ten scenarios. Anyone the viewer may not see — hidden, blocked, outside either person's limits, deleted, self — is `404 Not found.`    |
+
+`PUT /v1/me/discovery-preferences` also accepts `dealBreakers`: up to 5
+`{kind:"attribute", attribute:"lifestylePace"|"weekendRhythm"|"communicationStyle", exclude:[…]}`.
+
 ## Planned
 
 Endpoint groups arrive with their milestones (see IMPLEMENTATION_BACKLOG.md): `persona`, `imports`, `discovery`, `compatibility`, `connections`,

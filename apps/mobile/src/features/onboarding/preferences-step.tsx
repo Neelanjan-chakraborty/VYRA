@@ -47,6 +47,7 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
         maxDistanceKm: distance,
         interestedIn: [...interestedIn],
         showAstrology: current?.showAstrology ?? false,
+        dealBreakers: current?.dealBreakers ?? [],
       },
       {
         onSuccess: () => {

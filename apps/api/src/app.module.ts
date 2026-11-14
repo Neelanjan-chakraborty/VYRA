@@ -10,6 +10,7 @@ import { DatabaseModule } from './database/database.module.js';
 import { AiModule } from './modules/ai/ai.module.js';
 import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { CompatibilityModule } from './modules/compatibility/compatibility.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ConsentsModule } from './modules/consents/consents.module.js';
 import { MeModule } from './modules/me/me.module.js';
@@ -42,6 +43,7 @@ import { RedisModule } from './redis/redis.module.js';
     MeModule,
     ConsentsModule,
     PersonaModule,
+    CompatibilityModule,
   ],
   providers: [
     // Order matters: rate limiting runs before authentication (AuthModule's guard).

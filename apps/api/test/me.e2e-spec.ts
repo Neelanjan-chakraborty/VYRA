@@ -168,7 +168,10 @@ describe('Profile, photos and account (e2e)', () => {
         .set(user.auth)
         .send(prefs)
         .expect(200);
-      expect(meSchema.parse(response.body).discoveryPreferences).toEqual(prefs);
+      expect(meSchema.parse(response.body).discoveryPreferences).toEqual({
+        ...prefs,
+        dealBreakers: [],
+      });
       await http()
         .put('/v1/me/discovery-preferences')
         .set(user.auth)

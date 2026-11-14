@@ -32,13 +32,19 @@ Carried forward from Milestone 3:
 - Embedding backfill job for approved versions whose embedding failed to store.
 - Mobile component tests for the persona review and questionnaire screens.
 
-## Milestone 4 — Compatibility (next)
+## Milestone 4 — Compatibility ✅
 
-`@vyra/compatibility-engine` package: feature extraction, similarity functions, weighted
-confidence-aware score, sufficiency states, gates, ten scenarios, explanations · API service
-with cache in `compatibility_scores` · ranking service · synthetic-profile test suite.
+Carried forward from Milestone 4:
 
-## Milestone 5 — Discovery
+- Collect a coarse location (opt-in) so the distance gate does something.
+- Deal-breaker editing in the app (API accepts them; no screen yet).
+- Explicit gender category choice in the profile, so free text never hides anyone (D-036).
+- Reciprocal interest in ranking once connection requests exist.
+- Index review of the candidate query with realistic data volumes (Milestone 8).
+
+## Milestone 5 — Discovery (next)
+
+Start with photo moderation (photos are not shown to others until approved).
 
 Recommendation API · Orbit (gesture canvas + accessible list view) · Deep Discover profile
 reading · compatibility detail screen · save / pass / connect · discovery events · filters.

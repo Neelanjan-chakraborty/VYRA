@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   ageInYears,
+  dealBreakerListSchema,
   type DiscoveryPreferences,
   type Interest,
   type Me,
@@ -100,6 +101,7 @@ export class MeService {
         maxDistanceKm: prefs.maxDistanceKm,
         interestedIn: prefs.interestedIn,
         showAstrology: prefs.showAstrology,
+        dealBreakers: dealBreakerListSchema.catch([]).parse(prefs.dealBreakers),
       },
       interests: user.interests.map(({ interest }) => ({
         id: interest.id,

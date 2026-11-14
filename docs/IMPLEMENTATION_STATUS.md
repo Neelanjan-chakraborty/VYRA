@@ -1,19 +1,28 @@
 # Implementation status
 
-Last updated: 14 November 2026, end of Milestone 3.
+Last updated: 14 November 2026, end of Milestone 4.
 
 ## Summary
 
-| Milestone                     | Status                                            |
-| ----------------------------- | ------------------------------------------------- |
-| 0 — Audit and plan            | Done                                              |
-| 1 — Foundation                | Done                                              |
-| 2 — Design and authentication | Done, with the gaps listed below                  |
-| 3 — AI Persona                | Done with the mock provider; Gemini unverified    |
-| 4 — Compatibility             | Not started (weights, tables and design doc only) |
-| 5–8                           | Not started                                       |
+| Milestone                     | Status                                         |
+| ----------------------------- | ---------------------------------------------- |
+| 0 — Audit and plan            | Done                                           |
+| 1 — Foundation                | Done                                           |
+| 2 — Design and authentication | Done, with the gaps listed below               |
+| 3 — AI Persona                | Done with the mock provider; Gemini unverified |
+| 4 — Compatibility             | Done (API only; screens come with Milestone 5) |
+| 5–8                           | Not started                                    |
 
 ## What works today
+
+**New in Milestone 4 — compatibility.** `@vyra/compatibility-engine` scores any two people
+deterministically from approved personas, intentions, interests and preferences: hard gates
+in both directions (age, gender, distance, intention, personal deal-breakers, blocks), six
+weighted dimensions, ten scenarios, plain-language reasons, and an honest "not enough to say"
+when data is thin. The API serves `GET /v1/discovery/recommendations` (pgvector candidate pool,
+confidence-aware ranking with diversity) and `GET /v1/compatibility/:userId`, caches results by
+persona version and records impressions and views. Nothing in the app shows these yet — the
+Discover and Orbit screens are Milestone 5.
 
 **New in Milestone 3 — AI persona.** During onboarding (optional) or later under You → Your
 persona, a person can:
@@ -60,22 +69,28 @@ delete their account.
 - **Terms of Service and Privacy Policy documents do not exist**; the consent screen has
   nothing to link to.
 - Orbit, Discover, Connections and Messages are still empty states.
-- No compatibility scoring, discovery, messaging, archive import, admin console.
-- The approved persona is stored but nothing uses it yet; Milestone 4 will.
+- No discovery screens, connection requests, messaging, archive import, admin console.
+- Recommendations carry no photos until photo moderation exists (Milestone 5).
+- Locations are never collected yet, so the distance gate is inactive in practice.
 - Photo moderation does not exist; photos are not yet shown to anyone but their owner.
 
 ## Verification (run 14 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                        |
-| --------------------------------- | ------------------------------------------------------------- |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                          |
-| `pnpm build`, `pnpm typecheck`    | Pass                                                          |
-| `pnpm test`                       | Pass — 91 tests (validation 34, design-system 11, api 46)     |
-| `pnpm test:e2e`                   | Pass — 87 tests against real PostgreSQL, Redis and the queue  |
-| `prisma migrate diff --exit-code` | Pass — no drift, 3 migrations                                 |
-| `expo export --platform web`      | Pass                                                          |
-| `pnpm e2e:web`                    | Pass — 21 steps, 25 screenshots, no unexpected browser errors |
-| `node dist/worker.js`             | Starts and connects (standalone worker)                       |
+| Check                             | Result                                                                              |
+| --------------------------------- | ----------------------------------------------------------------------------------- |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                                                |
+| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                   |
+| `pnpm test`                       | Pass — 111 tests (validation 34, design-system 11, compatibility-engine 20, api 46) |
+| `pnpm test:e2e`                   | Pass — 100 tests against real PostgreSQL, Redis and the queue                       |
+| `prisma migrate diff --exit-code` | Pass — no drift, 3 migrations                                                       |
+| `expo export --platform web`      | Pass                                                                                |
+| `pnpm e2e:web`                    | Pass — 21 steps, 25 screenshots                                                     |
+
+New in Milestone 4: the engine's synthetic-people tests (see `docs/COMPATIBILITY_ENGINE.md`
+§9) and an API suite that builds eleven synthetic people through the public API and checks
+the exact recommendation order, every exclusion (intention, age both ways, hidden, blocked,
+deal-breaker, gender), honest insufficient results, symmetry, plain 404s for ineligible pairs,
+cache keying and replacement on a new persona version, and recorded events.
 
 New in Milestone 3, the API tests cover: consent required for each AI source; generation
 through the real queue; evidence stored without raw profile text or contact details;
@@ -109,7 +124,9 @@ GitHub Actions workflow; Docker Compose; screen readers on a device.
 - The country code on the phone field is a pre-filled `+91`, not a country picker.
 - Refresh on web uses `sessionStorage` (QA target only).
 - A Gemini API key is still not saved in the environment; the app runs on the mock provider.
-- Fixed in this milestone: on web, tab screens grew with their content so the page scrolled
+- E2E suites share the development database; `compatibility.e2e-spec.ts` hides earlier test
+  people at start so its ranking assertions are exact.
+- Fixed in Milestone 3: on web, tab screens grew with their content so the page scrolled
   under the tab bar. Tab screens now scroll inside their own frame.
 - A removed attribute can be suggested again by the next generation (backlog).
 - If storing an embedding fails, the persona is still approved without one (logged; no
@@ -126,6 +143,6 @@ pnpm build
 pnpm check && pnpm test:e2e
 ```
 
-Then start Milestone 4 (`docs/IMPLEMENTATION_BACKLOG.md`): the pure
-`@vyra/compatibility-engine` package with synthetic-profile tests, scoring approved persona
-versions only.
+Then start Milestone 5 (`docs/IMPLEMENTATION_BACKLOG.md`): photo moderation first (it gates
+showing photos to others), then save/pass/connect APIs, then the Discover, Orbit and
+compatibility screens on top of the Milestone 4 endpoints.

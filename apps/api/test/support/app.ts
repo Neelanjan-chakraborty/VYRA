@@ -53,7 +53,11 @@ export async function requestCode(app: TestApp, email: string) {
 }
 
 /** Registers a brand-new adult through the real HTTP flow. */
-export async function registerUser(app: TestApp, email = uniqueEmail()): Promise<TestUser> {
+export async function registerUser(
+  app: TestApp,
+  email = uniqueEmail(),
+  dateOfBirth = ADULT_DOB,
+): Promise<TestUser> {
   const { challengeId, devCode } = await requestCode(app, email);
   const verified = await request(app.getHttpServer())
     .post('/v1/auth/otp/verify')
@@ -63,7 +67,7 @@ export async function registerUser(app: TestApp, email = uniqueEmail()): Promise
     .post('/v1/auth/register')
     .send({
       registrationToken: verified.body.registrationToken,
-      dateOfBirth: ADULT_DOB,
+      dateOfBirth,
       acceptedTermsVersion: CURRENT_TERMS_VERSION,
       acceptedPrivacyVersion: CURRENT_PRIVACY_VERSION,
     })

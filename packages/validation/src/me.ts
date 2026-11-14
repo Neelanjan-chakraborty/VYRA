@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { dealBreakerListSchema } from './compatibility.js';
 import { relationshipIntentSchema } from './domain.js';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
@@ -61,12 +62,14 @@ export const discoveryPreferencesSchema = z
     maxDistanceKm: z.union([z.number().int().min(1).max(20_000), z.null()]),
     interestedIn: z.array(z.string().trim().min(1).max(40)).max(10),
     showAstrology: z.boolean(),
+    dealBreakers: dealBreakerListSchema.default([]),
   })
   .refine((prefs) => prefs.maxAge >= prefs.minAge, {
     message: 'Maximum age must not be below minimum age',
     path: ['maxAge'],
   });
 export type DiscoveryPreferences = z.infer<typeof discoveryPreferencesSchema>;
+export type DiscoveryPreferencesInput = z.input<typeof discoveryPreferencesSchema>;
 
 export const interestSchema = z.object({
   id: z.uuid(),
