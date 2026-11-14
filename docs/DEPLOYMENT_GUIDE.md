@@ -13,6 +13,7 @@ shape so later work converges on it. It becomes a runbook in Milestone 8.
 | Redis     | Managed Redis 7                                                   |
 | Storage   | S3-compatible private bucket (photos, import archives)            |
 | Mobile    | EAS Build → App Store / Play Store; EAS Update for OTA JS updates |
+| Website   | `apps/landing`, any Next.js host; independent of everything above |
 
 Primary region should be in India for the first market (latency and data-residency posture).
 

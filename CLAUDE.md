@@ -7,6 +7,8 @@ compatibility-first discovery, evidence-aware personas, user-controlled AI.
 
 - `apps/api` — NestJS 12 modular monolith (ESM), Prisma 7, PostgreSQL 16 + pgvector, Redis.
 - `apps/mobile` — Expo SDK 58 / React Native 0.88, Expo Router, TanStack Query.
+- `apps/landing` — marketing website: Next.js 16 App Router, Tailwind 4, Motion. Standalone; see
+  its README. Pages are registered in `src/lib/routes.ts`.
 - `packages/validation` — Zod schemas and inferred types shared by API and clients.
 - `packages/design-system` — design tokens (colour, type, spacing, motion).
 - `packages/compatibility-engine` — pure, deterministic compatibility scoring (no I/O).
@@ -24,6 +26,7 @@ pnpm test:e2e                # API end-to-end tests (needs the services)
 pnpm dev:api                 # API on :4000, OpenAPI at /docs
 pnpm dev:mobile              # Expo dev server
 pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>   # browser run of the account lifecycle
+pnpm --filter @vyra/landing dev   # website on :3100; `seo:audit` and `visual:check` verify a build
 ```
 
 ## Rules that are easy to get wrong
@@ -38,6 +41,9 @@ pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>   # browser run of t
 - Validation is Zod everywhere. Request/response shapes live in `packages/validation`, never
   duplicated in an app. No `any`.
 - Database changes: follow the `database-migrations` skill. Never edit an applied migration.
+- Website copy must match what is built: real screenshots only, and every capability labelled
+  built / engine built / in development / planned. Never add a domain, address, statistic,
+  testimonial or legal claim that has not been supplied.
 - UI work: follow the `vyra-design-system` skill. Tokens only, no raw hex or font sizes in screens.
 - Persona and anything sent to a model: follow the `persona-engineering` skill.
 - Scoring, gates or ranking: follow the `compatibility-engine` skill.

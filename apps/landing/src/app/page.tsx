@@ -100,7 +100,7 @@ export default function HomePage() {
             <div className="relative mt-14 h-[112vw] sm:h-[78vw] lg:absolute lg:-right-[1vw] lg:top-0 lg:mt-0 lg:h-auto lg:w-[41vw] lg:max-w-[43rem]">
               <Parallax
                 travel={70}
-                className="absolute left-[2%] top-[9%] w-[47%] -rotate-[7deg] lg:left-[9%] lg:top-[19vw] lg:w-[43%] 2xl:top-[19rem]"
+                className="absolute left-[2%] top-[9%] w-[47%] -rotate-[7deg] lg:left-[13%] lg:top-[19vw] lg:w-[43%] 2xl:top-[19rem]"
               >
                 <PhoneShot {...screens.interests} sizes="(min-width: 1024px) 20vw, 47vw" eager />
               </Parallax>

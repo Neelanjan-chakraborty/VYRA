@@ -141,13 +141,30 @@ Scoring a pair takes microseconds; caching would add invalidation risk for no ga
 **D-040 · Photos appear on other people's screens only once approved by moderation.** Until
 moderation exists (Milestone 5) recommendations carry no photo.
 
+**D-041 · The marketing website is a separate Next.js app, `apps/landing`,** not an Expo web
+screen. It has no runtime dependency on the API or on workspace packages, so it deploys on its
+own. Shared tokens are copied in by a script (`pnpm --filter @vyra/landing tokens`). Its accent
+is cherry and oxblood where the app's is violet: requested by the product owner for the site;
+the app is unchanged, and app screenshots on the site are shown with their violet as it is.
+
+**D-042 · The website shows only real product visuals.** Screens are captured from the app with
+a synthetic account; screens that are empty states are shown empty. Compatibility has no screen
+yet, so the site prints the engine's actual output for two invented profiles instead of a
+mock-up. Every capability is labelled built, engine built, in development or planned.
+
+**D-043 · The website has no hard-coded domain, contact address or legal text.** Canonical
+URLs come from `NEXT_PUBLIC_SITE_URL` (a production build fails without it); only a deployment
+marked production is indexable. `/privacy` and `/terms` are clearly marked drafts and `/contact`
+has no address, so all three are noindex until the real details are supplied.
+
 ## Open (need the product owner)
 
-| #   | Question                                              | Needed by     | Default if unanswered                                             |
-| --- | ----------------------------------------------------- | ------------- | ----------------------------------------------------------------- |
-| O-1 | SMS and e-mail OTP vendors                            | Milestone 2   | Interface + local fake that logs nothing sensitive; no real sends |
-| O-2 | Object-storage vendor                                 | Milestone 2   | S3-compatible interface + local disk adapter for development      |
-| O-3 | LLM provider for persona generation                   | Milestone 3   | Gemini (a key was planned); mock in tests                         |
-| O-4 | Hosting provider and region                           | Milestone 8   | Undecided                                                         |
-| O-5 | Payment provider and plans                            | Milestone 8   | Store billing interfaces only                                     |
-| O-6 | Legal review of age verification and DPDP obligations | Before launch | Date-of-birth self-declaration only                               |
+| #   | Question                                               | Needed by     | Default if unanswered                                                    |
+| --- | ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------ |
+| O-1 | SMS and e-mail OTP vendors                             | Milestone 2   | Interface + local fake that logs nothing sensitive; no real sends        |
+| O-2 | Object-storage vendor                                  | Milestone 2   | S3-compatible interface + local disk adapter for development             |
+| O-3 | LLM provider for persona generation                    | Milestone 3   | Gemini (a key was planned); mock in tests                                |
+| O-4 | Hosting provider and region                            | Milestone 8   | Undecided                                                                |
+| O-5 | Payment provider and plans                             | Milestone 8   | Store billing interfaces only                                            |
+| O-6 | Legal review of age verification and DPDP obligations  | Before launch | Date-of-birth self-declaration only                                      |
+| O-7 | Website production domain, contact address, legal text | Before launch | Site stays a non-indexable preview; legal and contact pages stay noindex |

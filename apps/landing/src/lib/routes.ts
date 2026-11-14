@@ -1,5 +1,6 @@
 import type { Metadata, Route } from 'next';
 import { absoluteUrl, defaultLocale, locales, site } from './site';
+import { socialImage } from './social-image';
 
 export interface PageDef {
   readonly path: Route;
@@ -48,7 +49,7 @@ export const pages = {
     title: 'How VYRA works, from sign-up to first suggestion',
     description:
       'Seven short steps: sign in with a one-time code, describe yourself, review the persona ' +
-      'VYRA drafts, and say who you want to meet. Nothing is used until you approve it.',
+      'VYRA drafts and say who you want to meet. Nothing is used until you approve.',
     updated: '2026-11-14',
     index: true,
   },
@@ -58,7 +59,7 @@ export const pages = {
     title: 'AI persona: a description of you that you approve',
     description:
       'VYRA drafts a persona from your profile or from the AI assistant you already use. You ' +
-      'see what was stated, what was inferred and why, and can edit or delete all of it.',
+      'see what was stated, what was inferred and why, and can edit or delete it.',
     updated: '2026-11-14',
     index: true,
   },
@@ -68,7 +69,7 @@ export const pages = {
     title: 'Relationship compatibility, calculated and explained',
     description:
       'How VYRA estimates compatibility: hard limits first, then six weighted dimensions and ' +
-      'ten everyday scenarios, each with its reasons. No AI guesswork and no predictions.',
+      'ten everyday scenarios, each with its reasons. No AI guesswork, no predictions.',
     updated: '2026-11-14',
     index: true,
   },
@@ -87,8 +88,8 @@ export const pages = {
     label: 'About',
     title: 'About VYRA: why we are building it',
     description:
-      'VYRA is a relationship discovery platform being built in the open about its limits: ' +
-      'understand people first, explain every suggestion, and leave the decisions to them.',
+      'VYRA is a relationship discovery platform that is open about its limits: understand ' +
+      'people first, explain every suggestion, and leave the decisions to them.',
     updated: '2026-11-14',
     index: true,
     schemaType: 'AboutPage',
@@ -163,8 +164,14 @@ export function pageMetadata(key: PageKey): Metadata {
       url,
       title: socialTitle,
       description: page.description,
+      images: [socialImage],
     },
-    twitter: { card: 'summary_large_image', title: socialTitle, description: page.description },
+    twitter: {
+      card: 'summary_large_image',
+      title: socialTitle,
+      description: page.description,
+      images: [socialImage],
+    },
     // A non-indexable deployment is handled once, in the root layout.
     ...(page.index ? {} : { robots: { index: false, follow: true } }),
   };

@@ -8,7 +8,7 @@
  *   pnpm --filter @vyra/landing tokens
  *
  * The website's accent is its own: cherry and oxblood rather than the app's
- * violet (see docs/DECISIONS.md D-043). Every pairing used for text is checked
+ * violet (see docs/DECISIONS.md D-041). Every pairing used for text is checked
  * here against WCAG AA with the shared contrast function; the script fails if
  * one does not pass.
  */

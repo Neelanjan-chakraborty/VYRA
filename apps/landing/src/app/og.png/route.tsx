@@ -2,9 +2,12 @@ import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { ImageResponse } from 'next/og';
 
-export const alt = 'VYRA — Chemistry, decoded.';
-export const size = { width: 1200, height: 630 };
-export const contentType = 'image/png';
+import { socialImage } from '@/lib/social-image';
+
+// Drawn once at build time and served as a static file.
+export const dynamic = 'force-static';
+
+const size = { width: socialImage.width, height: socialImage.height };
 
 const INK = '#100F13';
 const IVORY = '#F5F0EA';
@@ -13,7 +16,7 @@ const CHERRY_BRIGHT = '#FF5468';
 const GREY = '#938D98';
 
 /** The sharing card, drawn at build time from the brand's own type. */
-export default async function OpengraphImage() {
+export async function GET() {
   const fonts = join(process.cwd(), 'src/assets/fonts');
   const [regular, italic] = await Promise.all([
     readFile(join(fonts, 'InstrumentSerif_400Regular.ttf')),
@@ -62,7 +65,7 @@ export default async function OpengraphImage() {
         />
         <circle cx="560" cy="560" r="7" fill={IVORY} />
         <circle cx="560" cy="560" r="20" fill="none" stroke={CHERRY} strokeWidth="2" />
-        <circle cx="151" cy="447" r="12" fill={CHERRY} />
+        <circle cx="460" cy="793" r="12" fill={CHERRY} />
       </svg>
       <div style={{ display: 'flex', fontSize: 44, letterSpacing: 5 }}>VYRA</div>
       <div style={{ display: 'flex', flexDirection: 'column' }}>
