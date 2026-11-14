@@ -40,7 +40,8 @@ function Navigator() {
       <Stack.Protected guard={phase === 'active'}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="settings" />
-        <Stack.Screen name="person/[id]" />
+        <Stack.Screen name="person/[id]/index" />
+        <Stack.Screen name="person/[id]/compatibility" />
       </Stack.Protected>
     </Stack>
   );

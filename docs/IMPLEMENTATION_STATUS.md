@@ -1,20 +1,19 @@
 # Implementation status
 
-Last updated: 14 November 2026, after the product-gap resolution (moderation, gender,
-location, must-haves).
+Last updated: 14 November 2026, after Milestone 5 (discovery and the connection lifecycle).
 
 ## Summary
 
-| Milestone                     | Status                                           |
-| ----------------------------- | ------------------------------------------------ |
-| 0 — Audit and plan            | Done                                             |
-| 1 — Foundation                | Done                                             |
-| 2 — Design and authentication | Done, with the gaps listed below                 |
-| 3 — AI Persona                | Done with the mock provider; Gemini unverified   |
-| 4 — Compatibility             | Done                                             |
-| Gap resolution (4 items)      | Done — see below                                 |
-| 5 — Discovery                 | Started: first Discover list and profile preview |
-| 6–8                           | Not started                                      |
+| Milestone                     | Status                                         |
+| ----------------------------- | ---------------------------------------------- |
+| 0 — Audit and plan            | Done                                           |
+| 1 — Foundation                | Done                                           |
+| 2 — Design and authentication | Done, with the gaps listed below               |
+| 3 — AI Persona                | Done with the mock provider; Gemini unverified |
+| 4 — Compatibility             | Done                                           |
+| Gap resolution (4 items)      | Done — see below                               |
+| 5 — Discovery                 | Done                                           |
+| 6–8                           | Not started                                    |
 
 ## Product gap resolution — complete versus still needed
 
@@ -24,9 +23,31 @@ location, must-haves).
 | **2. Gender identity**   | Woman / Man / Non-binary / Self-describe (own words + searches to appear in) / Prefer not to say / unanswered; private unless shown; "show me" with an on-by-default option for people who describe their gender differently; migration converted existing data; rule enforced both ways; onboarding and Settings screens                                                                                                                                                                                                                                                                                   | —                                                                                                                                                                                            |
 | **3. Location**          | Approximate device location (coarse permission only) or a city from 539 GeoNames places; ~2 km grid; never returned; bands only; removal clears all; distance only when both have a location; inactive filter explained in Discover and preferences; denied permission falls back to manual; bounding-box prefilter                                                                                                                                                                                                                                                                                         | Native permission prompts not seen on a device (web geolocation only). No places outside India yet — other countries are labels without distance                                             |
 | **4. Must-haves**        | Must-have / Preference / Open for intentions, pace, weekends, communication style, values; must-haves never fire on unknown values; preferences only re-rank; private; impact notice when they remove ≥ half; onboarding and Settings editor with clear-all                                                                                                                                                                                                                                                                                                                                                 | —                                                                                                                                                                                            |
-| **Discover (first cut)** | Ranked list and profile preview with photo or placeholder, distance band, estimated alignment in words, reasons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Connect / save / pass, Orbit: Milestone 5                                                                                                                                                    |
+| **Discover (first cut)** | Ranked list and profile preview with photo or placeholder, distance band, estimated alignment in words, reasons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Superseded by Milestone 5 below                                                                                                                                                              |
 
 ## What works today
+
+**New in Milestone 5 — discovery.** People can now act on what they see:
+
+- **Orbit** (home tab): everyone recommended sits around you, closer the stronger the
+  estimated alignment, with a dashed outer ring for "not enough to say yet". Pan and pinch,
+  or use Zoom in / Zoom out / Re-centre; tap anyone to read their profile; "Show as a list"
+  opens Discover. Positions are deterministic and unit-tested.
+- **Discover**: counted filters (All, Strong, Shared interests, Nearby when distance exists)
+  and Pass / Save on each card.
+- **Deep Discover profile**: lead photo or placeholder, bio, "Why you might connect", "Where
+  you differ", shared interests highlighted, and an action bar that follows where you stand —
+  Pass / Save / Connect (with an optional note), Request sent · Withdraw, Accept / Decline,
+  or Connected — plus Report and Block with confirmation.
+- **Compatibility screen**: overall and confidence in words, six labelled dimension bars
+  (no bar when there's nothing to say), ten everyday scenarios, shared interests, and the
+  "estimate, not a prediction" caveat.
+- **Connections**: Requests / Sent / Mutual / Saved with accept, decline, withdraw, end
+  (confirmed) and unsave; notes shown only to their sender and recipient; no counters.
+- **Blocked people** under You, with Unblock.
+- The API behind it: save, pass (30 days), requests with notes, mutual auto-match, accept /
+  decline (30-day cool-down) / withdraw, end, block / unblock, one visibility rule that keeps
+  existing ties visible, and recommendations that leave out anyone already in Connections.
 
 **Marketing website (`apps/landing`).** A standalone Next.js 16 site: home, features, how it
 works, AI persona, compatibility, safety, about, contact, and draft privacy and terms. Real app
@@ -89,23 +110,25 @@ delete their account.
 - **Photos are stored on local disk.** Production refuses to start in this mode.
 - **Terms of Service and Privacy Policy documents do not exist**; the consent screen has
   nothing to link to.
-- Orbit, Discover, Connections and Messages are still empty states.
-- No discovery screens, connection requests, messaging, archive import, admin console.
-- Recommendations carry no photos until photo moderation exists (Milestone 5).
-- Locations are never collected yet, so the distance gate is inactive in practice.
-- Photo moderation does not exist; photos are not yet shown to anyone but their owner.
+- **Messaging** (Milestone 6): mutual connections are listed, but nobody can write yet.
+- No archive import, admin console (moderation is API-only), or request expiry job.
 
 ## Verification (run 14 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                                                                                                           |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                             |
-| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                |
-| `pnpm test`                       | Pass — 146 tests (validation 45, design-system 11, compatibility-engine 36, api 54 incl. the real nsfwjs model)                                  |
-| `pnpm test:e2e`                   | Pass — 154 tests in 10 suites against real PostgreSQL, Redis and the queue                                                                       |
-| `prisma migrate diff --exit-code` | Pass — no drift, 8 migrations                                                                                                                    |
-| `expo export --platform web`      | Pass                                                                                                                                             |
-| `pnpm e2e:web`                    | Pass — 33 screenshots; real moderation, gender, location (manual, device, denied, removed), must-haves, Discover placeholder then approved photo |
+| Check                             | Result                                                                                                                                                                                                                                                       |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                                         |
+| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                                            |
+| `pnpm test`                       | Pass — validation, design-system, compatibility-engine, api (incl. the real nsfwjs model) and mobile (Orbit layout, 4)                                                                                                                                       |
+| `pnpm test:e2e`                   | Pass — 168 tests in 11 suites against real PostgreSQL, Redis and the queue (new: `connections.e2e-spec.ts`, 14)                                                                                                                                              |
+| `prisma migrate diff --exit-code` | Pass — no drift, 8 migrations                                                                                                                                                                                                                                |
+| `expo export --platform web`      | Pass                                                                                                                                                                                                                                                         |
+| `pnpm e2e:web`                    | Pass — 42 screenshots, no browser errors; adds Orbit (tap, zoom, list), Discover filters, Deep Discover, compatibility screen, save → Saved, incoming request → accept → Mutual, connect with note → Sent → withdraw, pass, block → Blocked people → unblock |
+
+Found and fixed while verifying Milestone 5: Orbit drew people on top of each other when one
+alignment band was crowded (now spills outward and starts zoomed to fit; unit-tested); the
+shared `Button` ignored a custom accessible name, so Discover's Pass/Save didn't say whose
+card they were on; blocking re-fetched the blocked person's profile (a 404) while leaving it.
 
 Regression matrix asked for in the gap directive, and where each is proven:
 
@@ -154,7 +177,13 @@ GitHub Actions workflow; Docker Compose; screen readers on a device.
 ## Known issues and caveats
 
 - Rate-limit counters are in process memory; fine for one instance only.
-- `pnpm e2e:web` needs a minute between runs (it uses four of the five codes per minute).
+- `pnpm e2e:web` creates several people through the API and waits out the five-codes-a-minute
+  limit when it hits it, so a run takes a few minutes. Start the API from `apps/api` so it
+  reads `apps/api/.env`.
+- Orbit and Discover share one recommendations query (fresh for 3 minutes); someone who
+  becomes eligible in that window appears on the next refresh.
+- On a phone, panning the Orbit canvas vertically competes with scrolling the screen; the
+  zoom and re-centre buttons always work.
 - Typed routes: `apps/mobile/.expo/types` goes stale when routes change; delete it if
   typecheck complains about route strings.
 - Photo reordering in the app is "show this one first", not drag and drop.
@@ -180,5 +209,5 @@ pnpm build
 pnpm check && pnpm test:e2e
 ```
 
-Then continue Milestone 5 (`docs/IMPLEMENTATION_BACKLOG.md`): save / pass / connect APIs, the
-connection lifecycle, Orbit, and the full compatibility screen.
+Then start Milestone 6 (`docs/IMPLEMENTATION_BACKLOG.md`): messaging between mutual
+connections over Socket.IO, notifications, and Wingman.

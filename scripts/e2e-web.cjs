@@ -55,6 +55,14 @@ function psql(sql) {
   );
 }
 
+/** One value from the development database. */
+function psqlValue(sql) {
+  return require('node:child_process')
+    .execSync(`psql postgresql://vyra:vyra@localhost:5432/vyra_dev -tAc "${sql}"`)
+    .toString()
+    .trim();
+}
+
 async function call(pathname, body, token, method = 'POST') {
   const response = await fetch(API + pathname, {
     method,
@@ -70,7 +78,16 @@ async function call(pathname, body, token, method = 'POST') {
 
 /** Registers someone through the public API and returns their tokens. */
 async function apiSession(email) {
-  const code = await call('/auth/otp/request', { channel: 'email', destination: email });
+  // Code requests are limited to five a minute per address; wait out the limit rather than fail.
+  let code;
+  for (let attempt = 0; !code; attempt += 1) {
+    try {
+      code = await call('/auth/otp/request', { channel: 'email', destination: email });
+    } catch (error) {
+      if (!error.message.endsWith(': 429') || attempt >= 8) throw error;
+      await new Promise((r) => setTimeout(r, 10_000));
+    }
+  }
   const verified = await call('/auth/otp/verify', {
     channel: 'email',
     destination: email,
@@ -135,7 +152,7 @@ async function createApiPerson(name) {
     await new Promise((r) => setTimeout(r, 500));
   }
   await call('/me/onboarding/complete', null, t);
-  return { photoId: photo.id };
+  return { photoId: photo.id, token: t };
 }
 
 async function main() {
@@ -151,9 +168,17 @@ async function main() {
   // Expected: 401/403 while signed out or after deletion, and the 422 the test provokes
   // with an unusable pasted reply. Anything else is a defect.
   page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
+  // Say which response failed; the console message alone doesn't. Signatures are dropped.
+  page.on('response', (response) => {
+    if (response.status() === 404) problems.push(`404: ${new URL(response.url()).pathname}`);
+  });
+  page.on('requestfailed', (request) => {
+    const reason = request.failure()?.errorText ?? '';
+    if (reason.includes('BLOCKED')) problems.push(`${reason}: ${new URL(request.url()).pathname}`);
+  });
   page.on('console', (message) => {
     if (message.type() === 'error' && !/status of 4(01|03|22)/.test(message.text()))
-      problems.push(`console: ${message.text()}`);
+      if (!/status of 404/.test(message.text())) problems.push(`console: ${message.text()}`);
   });
 
   let shot = 0;
@@ -178,6 +203,8 @@ async function main() {
   };
   const button = (name) => page.getByRole('button', { name, exact: true });
   const heading = (text) => page.getByText(text, { exact: true });
+  // A screen title. Names also appear on cards in tabs that stay mounted underneath.
+  const title = (text) => page.getByRole('heading', { name: text, exact: true });
 
   // A plain test image, large enough to pass the upload size rule.
   const photoPath = path.join(os.tmpdir(), `vyra-e2e-${Date.now()}.png`);
@@ -450,6 +477,10 @@ async function main() {
   });
 
   await step('discover: unapproved photos never show, approved ones do', async () => {
+    // People left by earlier runs would crowd this run's people out of the top 30.
+    psql(
+      `update user_profiles set is_discoverable=false where display_name ~ '^(Ravi|Kabir|Dev|Arjun)[0-9]+$'`,
+    );
     // A second person, created through the API, who fits the viewer's choices.
     const subjectName = `Ravi${Date.now() % 100000}`;
     const subject = await createApiPerson(subjectName);
@@ -458,6 +489,8 @@ async function main() {
       `update user_photos set moderation_status='REVIEW_REQUIRED', moderation_reason='possibly_explicit', moderated_at=now() where id='${subject.photoId}'`,
     );
 
+    // Orbit already fetched recommendations before this person existed.
+    await page.reload({ waitUntil: 'networkidle' });
     await page.getByRole('tab', { name: 'Discover' }).click();
     const card = page.getByRole('link', { name: new RegExp(`^${subjectName},`) });
     await card.waitFor({ timeout: 15000 });
@@ -468,7 +501,7 @@ async function main() {
     await snap('discover-placeholder');
 
     await card.click();
-    await heading(subjectName).waitFor();
+    await title(subjectName).waitFor();
     await page.getByRole('img', { name: `No photo of ${subjectName} yet` }).waitFor();
     await page.getByText('Estimated alignment', { exact: true }).waitFor();
     await snap('person-placeholder');
@@ -496,6 +529,118 @@ async function main() {
       .waitFor({ timeout: 15000 });
     await snap('discover-approved');
     await page.getByRole('tab', { name: 'You' }).click();
+  });
+
+  await step('discovery: orbit, filters, compatibility, connections, pass, block', async () => {
+    const suffix = Date.now() % 100000;
+    const [kabir, dev, arjun] = [`Kabir${suffix}`, `Dev${suffix}`, `Arjun${suffix}`];
+    const kabirPerson = await createApiPerson(kabir);
+    await createApiPerson(dev);
+    await createApiPerson(arjun);
+    await page.reload({ waitUntil: 'networkidle' });
+
+    // Orbit: people sit around the centre; tapping one opens their profile.
+    await page.getByRole('tab', { name: 'Orbit' }).click();
+    await heading('Who’s near your centre.').waitFor({ timeout: 15000 });
+    await page.getByRole('link', { name: new RegExp(`^${kabir},`) }).waitFor();
+    await snap('orbit-people');
+    await page.getByRole('link', { name: new RegExp(`^${kabir},`) }).click();
+    await title(kabir).waitFor();
+    await button('Back').click();
+    await button('Zoom in').click();
+    await button('Re-centre').click();
+    await button('Show as a list').click();
+
+    // Discover filters are counted views of the same list.
+    await heading('Read people, don’t flick past them.').waitFor();
+    await page.getByRole('radio', { name: /^Show: Nearby \d+/ }).click();
+    await page.getByRole('radio', { name: /^Show: Nearby/, checked: true }).waitFor();
+    await snap('discover-filters');
+    await page.getByRole('radio', { name: /^Show: All/ }).click();
+
+    // Full compatibility, then save: saved people move to Connections.
+    const subjectCard = page.getByRole('link', { name: /^Ravi\d+,/ }).first();
+    const subjectLabel = await subjectCard.getAttribute('aria-label');
+    const subject = /^(Ravi\d+),/.exec(subjectLabel)[1];
+    await subjectCard.click();
+    await title(subject).waitFor();
+    await page.getByText('Why you might connect', { exact: true }).waitFor();
+    await snap('person-deep');
+    await button('See the full picture').click();
+    await title(`You and ${subject}`).waitFor();
+    await page.getByText('Six ways of looking at it', { exact: true }).waitFor();
+    await page.getByText('A first date', { exact: true }).waitFor();
+    await snap('compatibility');
+    await button('Back').click();
+    await button('Save').click();
+    await button('Saved').waitFor();
+    await button('Back').click();
+
+    // Someone asks Asha to connect; she accepts and it becomes mutual.
+    const ashaId = psqlValue(`select id from users where email='${email}'`);
+    await call(
+      '/connections/requests',
+      { recipientId: ashaId, note: 'Chai sometime?' },
+      kabirPerson.token,
+    );
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('tab', { name: 'Connections' }).click();
+    await heading('People you’re getting to know.').waitFor();
+    await page.getByText('“Chai sometime?”').waitFor();
+    await snap('connections-request');
+    await button('Accept').click();
+    await page.getByRole('radio', { name: 'Show: Mutual' }).click();
+    await page.getByRole('link', { name: new RegExp(`^${kabir},`) }).waitFor();
+    await snap('connections-mutual');
+    await page.getByRole('radio', { name: 'Show: Saved' }).click();
+    await page.getByRole('link', { name: new RegExp(`^${subject},`) }).waitFor();
+
+    // Asha asks someone with a note, sees it under Sent, and withdraws.
+    await page.getByRole('tab', { name: 'Discover' }).click();
+    await page.getByRole('link', { name: new RegExp(`^${dev},`) }).click();
+    await title(dev).waitFor();
+    await button('Connect').click();
+    await page.getByLabel('Add a note (optional)').fill('You walk well too.');
+    await snap('connect-note');
+    await button('Send request').click();
+    await page.getByText('Request sent', { exact: true }).waitFor();
+    await button('Back').click();
+    await page.getByRole('tab', { name: 'Connections' }).click();
+    await page.getByRole('radio', { name: 'Show: Sent' }).click();
+    await page.getByText('“You walk well too.”').waitFor();
+    await button('Withdraw').click();
+    await page.getByText('You haven’t asked anyone to connect.', { exact: false }).waitFor();
+
+    // Pass: gone from Discover for 30 days.
+    await page.getByRole('tab', { name: 'Discover' }).click();
+    await button(`Pass on ${arjun}`).click();
+    await page.getByText(`You passed on ${arjun}.`, { exact: false }).waitFor();
+    // The list refreshes just after the confirmation; the person must then be gone everywhere.
+    for (let i = 0; ; i += 1) {
+      if ((await page.getByRole('link', { name: new RegExp(`^${arjun},`) }).count()) === 0) break;
+      if (i > 40) throw new Error('passed person still listed');
+      await page.waitForTimeout(250);
+    }
+
+    // Block from the profile: gone everywhere, listed in Settings, unblock restores.
+    await page.getByRole('tab', { name: 'Connections' }).click();
+    await page.getByRole('radio', { name: 'Show: Saved' }).click();
+    await page.getByRole('link', { name: new RegExp(`^${subject},`) }).click();
+    await title(subject).waitFor();
+    await button('More options').click();
+    await button(`Block ${subject}`).click();
+    await heading(`Block ${subject}?`).waitFor();
+    await snap('block-confirm');
+    await button('Block').click();
+    await heading('People you’re getting to know.').waitFor();
+    await page.getByText('Nothing saved.', { exact: false }).waitFor();
+    await page.getByRole('tab', { name: 'You' }).click();
+    await page.getByRole('link', { name: 'Blocked people: 1 person' }).click();
+    await page.getByText(subject, { exact: true }).last().waitFor();
+    await snap('blocked-people');
+    await button(`Unblock ${subject}`).click();
+    await page.getByText('You haven’t blocked anyone.').waitFor();
+    await button('Back').click();
   });
 
   await step('persona from settings', async () => {
@@ -547,6 +692,7 @@ async function main() {
     await page.getByText(/Distance isn’t used until you set a location/).waitFor();
     await snap('settings-preferences-no-location');
     await button('Back').click();
+    await heading('Asha, 28').waitFor();
   });
 
   await step('session survives a reload', async () => {

@@ -39,20 +39,21 @@ Carried forward from Milestone 4:
 - Reciprocal interest in ranking once connection requests exist.
 - Index review of the candidate query with realistic data volumes (Milestone 8).
 
-## Milestone 5 — Discovery (next)
+## Milestone 5 — Discovery ✅
 
-Done ahead of the milestone: photo moderation, first Discover list and profile preview.
-Still to do: save / pass / connect, connection requests, Orbit, compatibility detail screen,
-admin moderation UI.
+Connection lifecycle API (save, pass, request with note, accept/decline/withdraw, mutual,
+end, block/unblock) · one visibility rule · recommendation exclusions · Orbit (pan/pinch canvas
+with Zoom/Re-centre buttons and list view) · Deep Discover profile with action bar · full
+compatibility screen · Discover filters with Save/Pass · Connections tab · Blocked people.
 
-Recommendation API · Orbit (gesture canvas + accessible list view) · Deep Discover profile
-reading · compatibility detail screen · save / pass / connect · discovery events · filters.
+Carried forward: admin moderation UI (Milestone 8 console); learning from discovery events
+(Milestone 7); request expiry job (requests stay pending until answered or withdrawn).
 
 ## Milestone 6 — Social
 
-Connection lifecycle · matches · Socket.IO messaging with Redis adapter (delivery, typing,
+Socket.IO messaging with Redis adapter (delivery, typing,
 read receipts honouring privacy switches) · media messages · notifications · Wingman
-(suggest-only, opt-in context) · date planning · block and report.
+(suggest-only, opt-in context) · date planning.
 
 ## Milestone 7 — Advanced intelligence
 

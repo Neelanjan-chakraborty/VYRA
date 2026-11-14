@@ -6,19 +6,24 @@ design for expansion.
 
 ## In place now
 
-| Control                                       | Where                                                           |
-| --------------------------------------------- | --------------------------------------------------------------- |
-| Fail-fast configuration, values never printed | `apps/api/src/config/env.ts` (+ test)                           |
-| Security headers                              | `helmet` in `configure-app.ts` (e2e-tested)                     |
-| CORS allow-list, default deny                 | `CORS_ORIGINS`                                                  |
-| Baseline rate limiting                        | `ThrottlerGuard`, 120/min per IP                                |
-| Uniform errors, no internal leakage           | `ApiExceptionFilter` (e2e-tested)                               |
-| Request ids safe against log injection        | `request-id.middleware.ts` (e2e-tested)                         |
-| Parameterised SQL only                        | Prisma; raw queries use tagged templates                        |
-| Integrity rules in the database               | CHECK constraints (see DATABASE_SCHEMA.md)                      |
-| Secrets stored only as hashes                 | Schema design: OTP codes, destinations, refresh tokens          |
-| No secrets in the repository                  | `.env*` git-ignored; `.env.example` holds local dev values only |
-| Response validation on the client             | `apiGet` parses every response with the shared schema           |
+| Control                                       | Where                                                                                                                             |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| Fail-fast configuration, values never printed | `apps/api/src/config/env.ts` (+ test)                                                                                             |
+| Security headers                              | `helmet` in `configure-app.ts` (e2e-tested)                                                                                       |
+| CORS allow-list, default deny                 | `CORS_ORIGINS`                                                                                                                    |
+| Baseline rate limiting                        | `ThrottlerGuard`, 120/min per IP                                                                                                  |
+| Uniform errors, no internal leakage           | `ApiExceptionFilter` (e2e-tested)                                                                                                 |
+| Request ids safe against log injection        | `request-id.middleware.ts` (e2e-tested)                                                                                           |
+| Parameterised SQL only                        | Prisma; raw queries use tagged templates                                                                                          |
+| Integrity rules in the database               | CHECK constraints (see DATABASE_SCHEMA.md)                                                                                        |
+| Secrets stored only as hashes                 | Schema design: OTP codes, destinations, refresh tokens                                                                            |
+| No secrets in the repository                  | `.env*` git-ignored; `.env.example` holds local dev values only                                                                   |
+| Response validation on the client             | `apiGet` parses every response with the shared schema                                                                             |
+| Connection actions are IDOR-safe              | Accept/decline only by the recipient, withdraw only by the sender, end only by a participant; anyone else gets `404` (e2e-tested) |
+| One visibility rule for other people          | `PeopleService.visiblePair`: blocks, deletion and suspension always hide; leak suite covers Connections                           |
+| Notes are plain text                          | ≤ 300 chars, control characters stripped, rendered as text, shown only to sender and recipient                                    |
+| Blocks are total and silent                   | End the match, expire requests and remove saves both ways; the other person is not told; audited                                  |
+| Pressure limits                               | Pass hides 30 days; decline blocks re-asking 30 days; ≤ 20 pending; 20 requests/min                                               |
 
 ## Threat model and planned controls
 

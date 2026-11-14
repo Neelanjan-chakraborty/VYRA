@@ -175,6 +175,23 @@ Impact is reported in buckets so it cannot identify anyone.
 safety, distance and must-have notices can be verified end to end. Connect, save, pass and
 Orbit remain Milestone 5.
 
+**D-049 · Existing ties keep people visible.** A pending request or mutual connection keeps both
+people viewable to each other even if one later changes preferences or hides from discovery;
+blocks, deletion and suspension always win. One rule (`PeopleService.visiblePair`) serves every
+non-owner endpoint.
+
+**D-050 · Pass hides for 30 days; a decline blocks re-asking for 30 days; at most 20 pending
+requests.** Gentle limits against pressure and spam without permanent judgements. A withdrawn
+request can be re-sent at once. Mutual requests become a connection immediately.
+
+**D-051 · No engagement counters.** No unread badges on tabs, no "X people liked you", and
+reciprocal interest is not a ranking signal. Connections lists what is waiting, calmly.
+
+**D-052 · Orbit places people by estimated alignment, angle by a hash of their id.** Rings are
+alignment bands (insufficient data on a dashed outer ring); the angle carries no meaning and is
+stable between visits. Pure function, unit-tested; pan/pinch plus Zoom and Re-centre buttons;
+reduced motion skips animation.
+
 ## Open (need the product owner)
 
 | #   | Question                                               | Needed by     | Default if unanswered                                                    |

@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/notice';
 import { Toggle } from '@/components/ui/toggle';
 import { signOut } from '@/features/auth/auth-api';
+import { useBlocked } from '@/features/discovery/discovery-api';
 import { usePersona } from '@/features/persona/persona-api';
 import { useDeleteAccount, useMe, useUpdateProfile } from '@/features/profile/profile-api';
 import { errorMessage } from '@/lib/api';
@@ -69,6 +70,12 @@ function criteriaSummary(me: Me): string {
     .join(', ');
 }
 
+function blockedSummary(count: number | undefined): string {
+  if (count === undefined) return '…';
+  if (count === 0) return 'Nobody';
+  return `${count} ${count === 1 ? 'person' : 'people'}`;
+}
+
 function LinkRow(props: { label: string; value: string; href: Href }) {
   const router = useRouter();
   return (
@@ -101,6 +108,7 @@ function LinkRow(props: { label: string; value: string; href: Href }) {
 export default function YouScreen() {
   const me = useMe().data;
   const persona = usePersona().data;
+  const blocked = useBlocked();
   const updateProfile = useUpdateProfile();
   const deleteAccount = useDeleteAccount();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -161,6 +169,11 @@ export default function YouScreen() {
       />
       <LinkRow label="Who you see" value={preferenceSummary(me)} href="/settings/preferences" />
       <LinkRow label="What matters to you" value={criteriaSummary(me)} href="/settings/matters" />
+      <LinkRow
+        label="Blocked people"
+        value={blockedSummary(blocked.data?.blocked.length)}
+        href="/settings/blocked"
+      />
       <View style={styles.row}>
         <View style={styles.rowCopy}>
           <Text variant="bodyStrong">Visible to others</Text>

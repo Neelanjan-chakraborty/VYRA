@@ -49,7 +49,7 @@ export function Button({
     <Pressable
       {...rest}
       role="button"
-      aria-label={label}
+      aria-label={rest['aria-label'] ?? label}
       aria-disabled={inactive}
       aria-busy={loading}
       disabled={inactive}

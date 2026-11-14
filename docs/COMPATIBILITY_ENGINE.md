@@ -122,7 +122,9 @@ before any repeats.
 ## 6. Ranking pipeline (API, `CompatibilityService.recommendations`)
 
 1. **SQL pool**: active, discoverable, not self, not blocked either way, age within the
-   viewer's range, the viewer within the candidate's age range.
+   viewer's range, the viewer within the candidate's age range — and not someone the viewer
+   saved, passed in the last 30 days, or has a pending request or active connection with
+   (those are in Connections).
 2. **Embedding similarity** (pgvector HNSW, cosine) orders that pool and keeps the nearest
    200; people without an embedding follow by recent activity. The embedding only decides
    who is scored, never the score.
@@ -133,8 +135,9 @@ before any repeats.
 6. **Diversity**: −0.05 for having the same strongest dimension as the previous pick.
 7. **Explain** with highlights and shared interests.
 
-Reciprocal _interest_ (has the other person shown interest?) arrives with connection
-requests in Milestone 5.
+Reciprocal _interest_ is deliberately **not** a ranking signal: someone who asked to connect
+appears in Connections › Requests, not boosted in Discover, so ranking never leaks who is
+interested in whom.
 
 ## 7. Caching and invalidation
 
