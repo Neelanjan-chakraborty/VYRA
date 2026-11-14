@@ -251,5 +251,7 @@ export const publicProfileSchema = z.object({
   distance: z.string().nullable(),
   photos: z.array(publicPhotoSchema),
   interests: z.array(z.string()),
+  /** Interests both people chose. */
+  sharedInterests: z.array(z.string()),
 });
 export type PublicProfile = z.infer<typeof publicProfileSchema>;

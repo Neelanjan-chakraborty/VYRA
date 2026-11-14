@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { Person } from '@vyra/compatibility-engine';
+import { ineligibility, type Person } from '@vyra/compatibility-engine';
 import {
   ageInYears,
   criteriaListSchema,
@@ -46,7 +46,10 @@ function visibleGender(
 /** What the ranking needs besides the engine's view of a person. */
 export interface LoadedPerson {
   readonly person: Person;
+  /** Active, not deleted and discoverable: can be recommended. */
   readonly eligible: boolean;
+  /** Active or paused and not deleted: can still be seen by people already connected. */
+  readonly reachable: boolean;
   readonly displayName: string;
   readonly city: string | null;
   readonly bio: string | null;
@@ -127,6 +130,8 @@ export class PeopleService {
           user.status === 'ACTIVE' &&
           user.deletedAt === null &&
           user.profile?.isDiscoverable === true,
+        reachable:
+          (user.status === 'ACTIVE' || user.status === 'PAUSED') && user.deletedAt === null,
         displayName: user.profile?.displayName ?? '',
         city: user.profile?.city ?? null,
         bio: user.profile?.bio ?? null,
@@ -151,6 +156,47 @@ export class PeopleService {
       orderBy: { position: 'asc' },
       select: { id: true, storageKey: true, width: true, height: true },
     });
+  }
+
+  /** An active match, or a pending request in either direction. */
+  async hasActiveTie(a: string, b: string): Promise<boolean> {
+    const [low, high] = a < b ? [a, b] : [b, a];
+    const [matches, requests] = await Promise.all([
+      this.prisma.match.count({ where: { userAId: low, userBId: high, endedAt: null } }),
+      this.prisma.connectionRequest.count({
+        where: {
+          status: 'PENDING',
+          OR: [
+            { senderId: a, recipientId: b },
+            { senderId: b, recipientId: a },
+          ],
+        },
+      }),
+    ]);
+    return matches + requests > 0;
+  }
+
+  /**
+   * The one visibility rule for showing `targetId` to `viewerId`. Nobody is
+   * visible across a block, or after deletion or suspension. Otherwise a
+   * person is visible if they could be recommended (discoverable and passing
+   * every gate both ways), or if the two already have a pending request or a
+   * mutual connection — so existing connections don't vanish when someone
+   * changes their preferences or hides from discovery.
+   */
+  async visiblePair(
+    viewerId: string,
+    targetId: string,
+  ): Promise<{ viewer: LoadedPerson; target: LoadedPerson } | null> {
+    if (viewerId === targetId) return null;
+    const loaded = await this.load([viewerId, targetId]);
+    const viewer = loaded.get(viewerId);
+    const target = loaded.get(targetId);
+    if (!viewer || !target || !target.reachable) return null;
+    if (await this.isBlocked(viewerId, targetId)) return null;
+    if (target.eligible && ineligibility(viewer.person, target.person) === null)
+      return { viewer, target };
+    return (await this.hasActiveTie(viewerId, targetId)) ? { viewer, target } : null;
   }
 
   /** True when either person has blocked the other. */

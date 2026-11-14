@@ -6,5 +6,6 @@ import { PeopleService } from './people.service.js';
 @Module({
   controllers: [CompatibilityController],
   providers: [CompatibilityService, PeopleService],
+  exports: [CompatibilityService, PeopleService],
 })
 export class CompatibilityModule {}

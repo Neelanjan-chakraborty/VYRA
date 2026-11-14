@@ -12,6 +12,7 @@ import { AuditModule } from './modules/audit/audit.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { CompatibilityModule } from './modules/compatibility/compatibility.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { ConnectionsModule } from './modules/connections/connections.module.js';
 import { ConsentsModule } from './modules/consents/consents.module.js';
 import { LocationModule } from './modules/location/location.module.js';
 import { MeModule } from './modules/me/me.module.js';
@@ -49,6 +50,7 @@ import { SafetyModule } from './modules/safety/safety.module.js';
     ConsentsModule,
     PersonaModule,
     CompatibilityModule,
+    ConnectionsModule,
     SafetyModule,
   ],
   providers: [

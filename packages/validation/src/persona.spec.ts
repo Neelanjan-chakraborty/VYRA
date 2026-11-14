@@ -145,3 +145,14 @@ describe('relationship criteria', () => {
     ]);
   });
 });
+
+describe('connection notes', () => {
+  it('strips control characters, trims and caps length', async () => {
+    const { connectionNoteSchema } = await import('./connections.js');
+    expect(connectionNoteSchema.parse('  Hi\u0007 there\u0000 ')).toBe('Hi there');
+    expect(connectionNoteSchema.parse('<script>alert(1)</script>')).toBe(
+      '<script>alert(1)</script>',
+    ); // kept as text, never rendered as HTML
+    expect(connectionNoteSchema.safeParse('x'.repeat(301)).success).toBe(false);
+  });
+});

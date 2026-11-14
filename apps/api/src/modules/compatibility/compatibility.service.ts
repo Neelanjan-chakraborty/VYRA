@@ -7,6 +7,7 @@ import {
   ineligibility,
   rankWithDiversity,
   score,
+  sharedInterestLabels,
   type Ranked,
   type Weights,
 } from '@vyra/compatibility-engine';
@@ -18,6 +19,8 @@ import {
   distanceKm,
   distanceLabel,
   type DistanceFilterStatus,
+  PASS_HIDE_DAYS,
+  type PersonSummary,
   type PublicProfile,
   compatibilityWeightsSchema,
   type Recommendation,
@@ -64,19 +67,9 @@ export class CompatibilityService {
    */
   async forPair(viewerId: string, targetId: string): Promise<CompatibilityView> {
     const { version, weights } = await this.activeWeights();
-    const loaded = await this.people.load([viewerId, targetId]);
-    const viewer = loaded.get(viewerId);
-    const target = loaded.get(targetId);
-    if (
-      !viewer ||
-      !target ||
-      !target.eligible ||
-      (await this.people.isBlocked(viewerId, targetId))
-    ) {
-      throw new NotFoundException(NOT_FOUND);
-    }
-    if (ineligibility(viewer.person, target.person) !== null)
-      throw new NotFoundException(NOT_FOUND);
+    const pair = await this.people.visiblePair(viewerId, targetId);
+    if (!pair) throw new NotFoundException(NOT_FOUND);
+    const { viewer, target } = pair;
 
     const result = score(viewer.person, target.person, weights, version);
     await this.persist(viewer, target, result);
@@ -93,19 +86,9 @@ export class CompatibilityService {
 
   /** Another person's profile as the viewer may see it. Same visibility rules as `forPair`. */
   async profile(viewerId: string, targetId: string): Promise<PublicProfile> {
-    const loaded = await this.people.load([viewerId, targetId]);
-    const viewer = loaded.get(viewerId);
-    const target = loaded.get(targetId);
-    if (
-      !viewer ||
-      !target ||
-      !target.eligible ||
-      (await this.people.isBlocked(viewerId, targetId))
-    ) {
-      throw new NotFoundException(NOT_FOUND);
-    }
-    if (ineligibility(viewer.person, target.person) !== null)
-      throw new NotFoundException(NOT_FOUND);
+    const pair = await this.people.visiblePair(viewerId, targetId);
+    if (!pair) throw new NotFoundException(NOT_FOUND);
+    const { viewer, target } = pair;
     const photos = await this.people.approvedPhotos(targetId);
     await this.prisma.discoveryEvent.create({
       data: { userId: viewerId, targetUserId: targetId, type: 'PROFILE_OPENED', context: {} },
@@ -126,7 +109,38 @@ export class CompatibilityService {
         height: p.height,
       })),
       interests: target.person.interests.map((i) => i.label),
+      sharedInterests: sharedInterestLabels(viewer.person, target.person),
     };
+  }
+
+  /**
+   * Short cards for people the viewer already has a tie with (Connections).
+   * Photos only when approved and the person is still discoverable — the same
+   * condition the media endpoint applies to public URLs.
+   */
+  async summaries(viewerId: string, ids: readonly string[]): Promise<Map<string, PersonSummary>> {
+    const { version, weights } = await this.activeWeights();
+    const loaded = await this.people.load([viewerId, ...ids]);
+    const viewer = loaded.get(viewerId);
+    const out = new Map<string, PersonSummary>();
+    if (!viewer) return out;
+    for (const id of ids) {
+      const target = loaded.get(id);
+      if (!target?.reachable) continue;
+      const result = score(viewer.person, target.person, weights, version);
+      out.set(id, {
+        userId: id,
+        displayName: target.displayName,
+        age: target.person.age,
+        city: target.city,
+        photoUrl:
+          target.eligible && target.photoKey ? this.media.sign(target.photoKey, 'public') : null,
+        distance: distanceBetween(viewer, target),
+        overall: result.overall,
+        sufficiency: result.sufficiency,
+      });
+    }
+    return out;
   }
 
   /**
@@ -272,6 +286,27 @@ export class CompatibilityService {
           OR pr.latitude IS NULL
           OR (pr.latitude BETWEEN ${box?.latMin ?? 0}::float8 AND ${box?.latMax ?? 0}::float8
               AND pr.longitude BETWEEN ${box?.lonMin ?? 0}::float8 AND ${box?.lonMax ?? 0}::float8)
+        )
+        -- People already handled live in Connections, and passes rest for a while.
+        AND NOT EXISTS (
+          SELECT 1 FROM discovery_events de
+          WHERE de.user_id = ${viewerId}::uuid AND de.target_user_id = u.id AND de.type = 'PASSED'
+            AND de.created_at > now() - make_interval(days => ${PASS_HIDE_DAYS}::int)
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM saved_profiles sp WHERE sp.user_id = ${viewerId}::uuid AND sp.target_user_id = u.id
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM connection_requests cr
+          WHERE cr.status = 'PENDING'
+            AND ((cr.sender_id = ${viewerId}::uuid AND cr.recipient_id = u.id)
+              OR (cr.sender_id = u.id AND cr.recipient_id = ${viewerId}::uuid))
+        )
+        AND NOT EXISTS (
+          SELECT 1 FROM matches m
+          WHERE m.ended_at IS NULL
+            AND ((m.user_a_id = ${viewerId}::uuid AND m.user_b_id = u.id)
+              OR (m.user_a_id = u.id AND m.user_b_id = ${viewerId}::uuid))
         )
         AND NOT EXISTS (
           SELECT 1 FROM blocked_users b

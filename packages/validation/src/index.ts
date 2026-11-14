@@ -2,6 +2,7 @@ export * from './api.js';
 export * from './assistant-questionnaire.js';
 export * from './auth.js';
 export * from './compatibility.js';
+export * from './connections.js';
 export * from './domain.js';
 export * from './location.js';
 export * from './me.js';
