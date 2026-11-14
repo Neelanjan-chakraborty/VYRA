@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { COMPATIBILITY_DIMENSIONS, COMPATIBILITY_SCENARIOS } from './domain.js';
+import { distanceFilterStatusSchema } from './location.js';
 
 /**
  * How someone describes their gender. Asked once, never inferred from names,
@@ -120,6 +121,8 @@ export const recommendationSchema = z.object({
   city: z.string().nullable(),
   /** Signed URL of the first approved photo, if any. */
   photoUrl: z.string().nullable(),
+  /** A band like "About 10 km away"; null when either location is unknown. */
+  distance: z.string().nullable(),
   overall: z.number().min(0).max(1).nullable(),
   confidence: z.number().min(0).max(1),
   sufficiency: sufficiencySchema,
@@ -130,6 +133,7 @@ export const recommendationSchema = z.object({
 export type Recommendation = z.infer<typeof recommendationSchema>;
 export const recommendationListSchema = z.object({
   recommendations: z.array(recommendationSchema),
+  distanceFilter: distanceFilterStatusSchema,
   engineVersion: z.string(),
   weightsVersion: z.string(),
 });
@@ -151,6 +155,7 @@ export const publicProfileSchema = z.object({
   occupation: z.string().nullable(),
   /** Only present when the person chose to show it. Never a guess. */
   gender: z.string().nullable(),
+  distance: z.string().nullable(),
   photos: z.array(publicPhotoSchema),
   interests: z.array(z.string()),
 });

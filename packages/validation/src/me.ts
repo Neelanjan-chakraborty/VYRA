@@ -5,6 +5,7 @@ import {
   genderIdentitySchema,
 } from './compatibility.js';
 import { relationshipIntentSchema } from './domain.js';
+import { locationViewSchema } from './location.js';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 /** Optional text field: empty string or null clears it. */
@@ -38,8 +39,6 @@ export const profileUpdateSchema = z
     discoverableAs: categoryListSchema,
     pronouns: clearable(PROFILE_LIMITS.short),
     occupation: clearable(PROFILE_LIMITS.occupation),
-    city: clearable(PROFILE_LIMITS.city),
-    countryCode: z.union([z.string().regex(/^[A-Z]{2}$/), z.null()]),
     isDiscoverable: z.boolean(),
   })
   .partial();
@@ -173,6 +172,8 @@ export const meSchema = z.object({
     }),
   ),
   discoveryPreferences: discoveryPreferencesSchema.nullable(),
+  /** null when no location is set. Coordinates are never included. */
+  location: locationViewSchema.nullable(),
   interests: z.array(interestSchema),
   /** What still has to be provided before onboarding can be completed. */
   onboardingMissing: z.array(z.enum(['profile', 'photo', 'relationshipIntent'])),

@@ -13,6 +13,7 @@ import { AuthModule } from './modules/auth/auth.module.js';
 import { CompatibilityModule } from './modules/compatibility/compatibility.module.js';
 import { HealthModule } from './modules/health/health.module.js';
 import { ConsentsModule } from './modules/consents/consents.module.js';
+import { LocationModule } from './modules/location/location.module.js';
 import { MeModule } from './modules/me/me.module.js';
 import { ModerationModule } from './modules/moderation/moderation.module.js';
 import { PersonaModule } from './modules/persona/persona.module.js';
@@ -43,6 +44,7 @@ import { SafetyModule } from './modules/safety/safety.module.js';
     ModerationModule,
     AuthModule,
     HealthModule,
+    LocationModule,
     MeModule,
     ConsentsModule,
     PersonaModule,

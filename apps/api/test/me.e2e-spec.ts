@@ -65,8 +65,7 @@ describe('Profile, photos and account (e2e)', () => {
         .send({
           displayName: '  Asha ',
           bio: 'Reads too much.',
-          city: 'Bengaluru',
-          countryCode: 'IN',
+          occupation: 'Writer',
         })
         .expect(200);
       const updated = await http()
@@ -77,7 +76,6 @@ describe('Profile, photos and account (e2e)', () => {
       expect(meSchema.parse(updated.body).profile).toMatchObject({
         displayName: 'Asha',
         bio: null,
-        city: 'Bengaluru',
         occupation: 'Designer',
         isDiscoverable: false,
       });
@@ -86,7 +84,7 @@ describe('Profile, photos and account (e2e)', () => {
     it.each([
       [{ displayName: 'x'.repeat(61) }, 'displayName'],
       [{ displayName: 'Ok', bio: 'x'.repeat(601) }, 'bio'],
-      [{ displayName: 'Ok', countryCode: 'india' }, 'countryCode'],
+      [{ displayName: 'Ok', genderIdentity: 'female' }, 'genderIdentity'],
     ])('rejects %j', async (body, field) => {
       const user = await registerUser(app);
       const response = await http().patch('/v1/me/profile').set(user.auth).send(body);

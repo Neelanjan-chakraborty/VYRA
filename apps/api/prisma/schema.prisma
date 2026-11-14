@@ -171,9 +171,17 @@ model UserProfile {
   city           String?  @db.VarChar(80)
   /// ISO 3166-1 alpha-2.
   countryCode    String?  @map("country_code") @db.Char(2)
-  /// Coarse coordinates (rounded before storage) used only for distance filtering.
+  /// Coordinates on a 0.02° grid (~2 km), used only for distance. Never returned by the API.
   latitude       Float?
   longitude      Float?
+  /// How the location was set; null = no location.
+  locationSource LocationSource? @map("location_source")
+  /// GeoNames id of a manually chosen place, e.g. "gn:1277333".
+  placeId        String?         @map("place_id") @db.VarChar(40)
+  /// Admin region label of the place, e.g. "Karnataka".
+  region         String?         @db.VarChar(80)
+  /// Neighbourhood label typed by the person. Never used for distance.
+  area           String?         @db.VarChar(80)
   /// Last completed onboarding stage key.
   onboardingStep String?  @map("onboarding_step") @db.VarChar(40)
   isDiscoverable Boolean  @default(false) @map("is_discoverable")
@@ -184,6 +192,11 @@ model UserProfile {
 
   @@index([isDiscoverable, countryCode])
   @@map("user_profiles")
+}
+
+enum LocationSource {
+  DEVICE_APPROXIMATE
+  MANUAL
 }
 
 enum GenderIdentity {

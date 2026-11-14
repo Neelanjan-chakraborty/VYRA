@@ -49,7 +49,11 @@ const server = http.createServer((req, res) => {
 async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: ORIGIN });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write', 'geolocation'], {
+    origin: ORIGIN,
+  });
+  // A precise device position in Bengaluru; VYRA must store and show only a rough area.
+  await context.setGeolocation({ latitude: 12.971942, longitude: 77.593689 });
   const page = await context.newPage();
   const problems = [];
   // Expected: 401/403 while signed out or after deletion, and the 422 the test provokes
@@ -162,7 +166,6 @@ async function main() {
     await button('Continue').click();
     await page.getByText('Tell us what to call you').waitFor(); // name is required
     await page.getByLabel('Name', { exact: true }).fill('Asha');
-    await page.getByLabel('City (optional)').fill('Bengaluru');
     await page.getByRole('radio', { name: 'Woman' }).click();
     await page.getByRole('switch', { name: 'Show gender on my profile', checked: false }).waitFor();
     await page
@@ -295,6 +298,20 @@ async function main() {
     await button('Approve and continue').click();
   });
 
+  await step('onboarding: location (manual city)', async () => {
+    await heading('Where are you?').waitFor();
+    await page.getByText('Not set', { exact: true }).waitFor();
+    await button('Choose a city').click();
+    await page.getByLabel('City', { exact: true }).fill('beng');
+    await button('Bengaluru, Karnataka').click();
+    await page.getByLabel('Area or neighbourhood (optional)').fill('Indiranagar');
+    await snap('onboarding-location');
+    await button('Use Bengaluru').click();
+    await page.getByText('Indiranagar, Bengaluru, Karnataka', { exact: true }).waitFor();
+    await page.getByText(/measured from the city centre/).waitFor();
+    await button('Continue').click();
+  });
+
   await step('onboarding: preferences', async () => {
     await heading('Who should we look for?').waitFor();
     await button('Increase Oldest').click();
@@ -340,6 +357,26 @@ async function main() {
       .waitFor();
     await button('Back').click();
     await page.getByText(/things approved/).waitFor();
+  });
+
+  await step('location from settings: device, then removal', async () => {
+    await page.getByRole('link', { name: /^Where you are/ }).click();
+    await heading('Where are you?').waitFor();
+    await button('Use my approximate location').click();
+    await page.getByText('From your device, approximate.').waitFor();
+    await page.getByText('Bengaluru, Karnataka', { exact: true }).waitFor();
+    // The page never shows the precise position it was given.
+    const text = await page.locator('body').innerText();
+    if (/12\.97|77\.59/.test(text)) throw new Error('precise coordinates shown');
+    await snap('settings-location-device');
+    await button('Remove my location').click();
+    await page.getByText('Not set', { exact: true }).waitFor();
+    await button('Back').click();
+    await page.getByText(/needs a location/).waitFor();
+    await page.getByRole('link', { name: /^Who you see/ }).click();
+    await page.getByText(/Distance isn’t used until you set a location/).waitFor();
+    await snap('settings-preferences-no-location');
+    await button('Back').click();
   });
 
   await step('session survives a reload', async () => {

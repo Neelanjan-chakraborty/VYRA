@@ -1,5 +1,6 @@
 import type {
   DealBreaker,
+  LocationUpdate,
   GenderCategory,
   GenderIdentity,
   PersonaAttributeKey,
@@ -29,6 +30,8 @@ export interface SyntheticPerson {
   readonly discoverable?: boolean;
   /** "pending" returns without waiting for moderation to approve the photo. */
   readonly photo?: 'approved' | 'pending';
+  readonly location?: LocationUpdate;
+  readonly maxDistanceKm?: number | null;
 }
 
 function dobForAge(age: number): string {
@@ -79,7 +82,7 @@ export async function createPerson(
     .send({
       minAge: spec.minAge ?? 18,
       maxAge: spec.maxAge ?? 99,
-      maxDistanceKm: null,
+      maxDistanceKm: spec.maxDistanceKm ?? null,
       showGenders: [...(spec.showGenders ?? [])],
       includeUnlistedGenders: spec.includeUnlistedGenders ?? true,
       showAstrology: false,
@@ -92,6 +95,9 @@ export async function createPerson(
       .filter((i: { slug: string }) => spec.interests?.includes(i.slug))
       .map((i: { id: string }) => i.id);
     await http().put('/v1/me/interests').set(user.auth).send({ interestIds: ids }).expect(200);
+  }
+  if (spec.location) {
+    await http().put('/v1/me/location').set(user.auth).send(spec.location).expect(200);
   }
   if (spec.traits && Object.keys(spec.traits).length > 0) {
     await http()

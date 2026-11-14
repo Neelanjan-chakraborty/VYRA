@@ -21,7 +21,6 @@ export function IdentityStep({ mode }: { readonly mode: StepMode }) {
     discoverableAs: profile?.discoverableAs ?? [],
     visible: profile?.genderVisible ?? false,
   });
-  const [city, setCity] = useState(profile?.city ?? '');
   const [occupation, setOccupation] = useState(profile?.occupation ?? '');
   const [bio, setBio] = useState(profile?.bio ?? '');
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -31,7 +30,6 @@ export function IdentityStep({ mode }: { readonly mode: StepMode }) {
     const update = {
       displayName,
       pronouns,
-      city,
       occupation,
       bio,
       genderIdentity: gender.identity,
@@ -97,14 +95,6 @@ export function IdentityStep({ mode }: { readonly mode: StepMode }) {
         value={gender}
         onChange={setGender}
         error={errors.genderSelfDescription ?? serverField('genderIdentity')}
-      />
-      <TextField
-        label="City (optional)"
-        value={city}
-        onChangeText={setCity}
-        error={errors.city}
-        maxLength={PROFILE_LIMITS.city}
-        autoCapitalize="words"
       />
       <TextField
         label="What you do (optional)"

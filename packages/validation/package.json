@@ -8,6 +8,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./places": {
+      "types": "./dist/places.d.ts",
+      "default": "./dist/places.js"
     }
   },
   "files": [

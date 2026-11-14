@@ -35,7 +35,12 @@ function intentSummary(me: Me): string {
 function preferenceSummary(me: Me): string {
   const prefs = me.discoveryPreferences;
   if (!prefs) return 'Not set';
-  const distance = prefs.maxDistanceKm === null ? 'anywhere' : `within ${prefs.maxDistanceKm} km`;
+  const distance =
+    prefs.maxDistanceKm === null
+      ? 'anywhere'
+      : me.location?.distanceAvailable
+        ? `within ${prefs.maxDistanceKm} km`
+        : `within ${prefs.maxDistanceKm} km (needs a location)`;
   return `Ages ${prefs.minAge}–${prefs.maxAge}, ${distance}`;
 }
 
@@ -132,6 +137,15 @@ export default function YouScreen() {
       <Text variant="eyebrow" tone="textSecondary" style={styles.section}>
         Discovery
       </Text>
+      <LinkRow
+        label="Where you are"
+        value={
+          me.location
+            ? [me.location.area, me.location.city].filter(Boolean).join(', ') || 'Set'
+            : 'Not set — distance isn’t used'
+        }
+        href="/settings/location"
+      />
       <LinkRow label="Who you see" value={preferenceSummary(me)} href="/settings/preferences" />
       <View style={styles.row}>
         <View style={styles.rowCopy}>

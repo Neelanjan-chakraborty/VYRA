@@ -10,14 +10,21 @@
     "backgroundColor": "#100F13",
     "ios": {
       "bundleIdentifier": "app.vyra.mobile",
-      "supportsTablet": false
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationDefaultAccuracyReduced": true
+      }
     },
     "android": {
       "package": "app.vyra.mobile",
       "adaptiveIcon": {
         "backgroundColor": "#100F13",
         "foregroundImage": "./assets/images/adaptive-icon.png"
-      }
+      },
+      "blockedPermissions": [
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
+      ]
     },
     "web": {
       "output": "single",
@@ -36,7 +43,16 @@
         }
       ],
       "expo-secure-store",
-      "expo-image"
+      "expo-image",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "VYRA uses your approximate location to show roughly how far away people are. You can choose a city instead.",
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false,
+          "isAndroidForegroundServiceEnabled": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

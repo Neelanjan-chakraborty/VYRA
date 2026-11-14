@@ -1,5 +1,11 @@
 import { space } from '@vyra/design-system';
-import { GENDER_CATEGORIES, SHOW_GENDER_LABELS, type GenderCategory } from '@vyra/validation';
+import {
+  DISTANCE_OPTIONS_KM,
+  GENDER_CATEGORIES,
+  SHOW_GENDER_LABELS,
+  type GenderCategory,
+} from '@vyra/validation';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
@@ -15,16 +21,15 @@ import { errorMessage } from '@/lib/api';
 import { type StepMode, useStepChrome } from './step-chrome';
 
 const DISTANCES: readonly { label: string; km: number | null }[] = [
-  { label: 'Within 10 km', km: 10 },
-  { label: 'Within 25 km', km: 25 },
-  { label: 'Within 50 km', km: 50 },
-  { label: 'Within 100 km', km: 100 },
+  ...DISTANCE_OPTIONS_KM.map((km) => ({ label: `Within ${km} km`, km })),
   { label: 'Anywhere', km: null },
 ];
 
 export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
-  const chrome = useStepChrome(mode, 5);
+  const chrome = useStepChrome(mode, 6);
   const me = useMe().data;
+  const router = useRouter();
+  const distanceAvailable = me?.location?.distanceAvailable ?? false;
   const current = me?.discoveryPreferences;
   const save = useSetPreferences();
   const complete = useCompleteOnboarding();
@@ -128,6 +133,20 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
       <Text variant="eyebrow" tone="textSecondary" style={styles.heading}>
         Distance
       </Text>
+      {distanceAvailable ? null : (
+        <View style={styles.distanceNotice} role="note">
+          <Text variant="caption" tone="textSecondary">
+            {me?.location
+              ? 'Your location is a place we can’t measure from, so a distance limit won’t be applied.'
+              : 'Distance isn’t used until you set a location. Your choice is saved and starts working when you do.'}
+          </Text>
+          <Button
+            label="Set my location"
+            variant="quiet"
+            onPress={() => router.push(mode === 'edit' ? '/settings/location' : '/location')}
+          />
+        </View>
+      )}
       <View role="radiogroup" aria-label="Distance">
         {DISTANCES.map((option) => (
           <SelectRow
@@ -148,6 +167,7 @@ const styles = StyleSheet.create({
   ages: { flexDirection: 'row', gap: space.xl },
   tags: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
   note: { marginTop: space.s },
+  distanceNotice: { marginBottom: space.s, gap: space.xs },
   unlisted: { flexDirection: 'row', alignItems: 'center', gap: space.l, marginTop: space.l },
   unlistedCopy: { flex: 1, gap: space.xxs },
 });

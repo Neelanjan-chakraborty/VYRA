@@ -55,7 +55,7 @@ export function PersonaScreen({ mode }: { readonly mode: PersonaScreenMode }) {
     setConsent.error ??
     clear.error;
 
-  const finishOnboarding = () => router.push('/preferences');
+  const finishOnboarding = () => router.push('/location');
 
   async function approveDraft() {
     await approve.mutateAsync();

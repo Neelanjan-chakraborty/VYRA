@@ -113,6 +113,16 @@ export class MeService {
         showAstrology: prefs.showAstrology,
         dealBreakers: dealBreakerListSchema.catch([]).parse(prefs.dealBreakers),
       },
+      location: profile?.locationSource
+        ? {
+            source: profile.locationSource,
+            city: profile.city,
+            region: profile.region,
+            area: profile.area,
+            countryCode: profile.countryCode,
+            distanceAvailable: profile.latitude !== null && profile.longitude !== null,
+          }
+        : null,
       interests: user.interests.map(({ interest }) => ({
         id: interest.id,
         slug: interest.slug,

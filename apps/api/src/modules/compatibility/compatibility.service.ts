@@ -11,6 +11,9 @@ import {
 import {
   type CompatibilityResult,
   type CompatibilityView,
+  distanceKm,
+  distanceLabel,
+  type DistanceFilterStatus,
   type PublicProfile,
   compatibilityWeightsSchema,
   type Recommendation,
@@ -109,6 +112,7 @@ export class CompatibilityService {
       bio: target.bio,
       occupation: target.occupation,
       gender: target.visibleGender,
+      distance: distanceBetween(viewer, target),
       photos: photos.map((p) => ({
         id: p.id,
         url: this.media.sign(p.storageKey, 'public'),
@@ -158,12 +162,14 @@ export class CompatibilityService {
     return {
       engineVersion: ENGINE_VERSION,
       weightsVersion: version,
+      distanceFilter: distanceFilterStatus(viewer),
       recommendations: ranked.map(({ item, result }): Recommendation => ({
         userId: item.person.id,
         displayName: item.displayName,
         age: item.person.age,
         city: item.city,
         photoUrl: item.photoKey ? this.media.sign(item.photoKey, 'public') : null,
+        distance: distanceBetween(viewer, item),
         overall: result.overall,
         confidence: result.confidence,
         sufficiency: result.sufficiency,
@@ -179,7 +185,24 @@ export class CompatibilityService {
    * the score. Exact rules are re-checked by the engine.
    */
   private async candidatePool(viewerId: string, viewer: LoadedPerson): Promise<string[]> {
-    const { minAge, maxAge } = viewer.person.preferences;
+    const { minAge, maxAge, maxDistanceKm } = viewer.person.preferences;
+    // Bounding box around the viewer when distance applies. People without a
+    // location stay in the pool: missing location is never treated as far away.
+    const box =
+      maxDistanceKm !== null && viewer.person.location
+        ? {
+            latMin: viewer.person.location.latitude - maxDistanceKm / 111,
+            latMax: viewer.person.location.latitude + maxDistanceKm / 111,
+            lonMin:
+              viewer.person.location.longitude -
+              maxDistanceKm /
+                (111 * Math.max(0.1, Math.cos((viewer.person.location.latitude * Math.PI) / 180))),
+            lonMax:
+              viewer.person.location.longitude +
+              maxDistanceKm /
+                (111 * Math.max(0.1, Math.cos((viewer.person.location.latitude * Math.PI) / 180))),
+          }
+        : null;
     const rows = await this.prisma.$queryRaw<{ id: string }[]>`
       WITH viewer_vector AS (
         SELECT e.embedding
@@ -200,6 +223,12 @@ export class CompatibilityService {
         AND u.date_of_birth <= current_date - make_interval(years => ${minAge}::int)
         AND u.date_of_birth > current_date - make_interval(years => ${maxAge + 1}::int)
         AND (dp.user_id IS NULL OR ${viewer.person.age}::int BETWEEN dp.min_age AND dp.max_age)
+        AND (
+          ${box === null}::boolean
+          OR pr.latitude IS NULL
+          OR (pr.latitude BETWEEN ${box?.latMin ?? 0}::float8 AND ${box?.latMax ?? 0}::float8
+              AND pr.longitude BETWEEN ${box?.lonMin ?? 0}::float8 AND ${box?.lonMax ?? 0}::float8)
+        )
         AND NOT EXISTS (
           SELECT 1 FROM blocked_users b
           WHERE (b.blocker_id = ${viewerId}::uuid AND b.blocked_id = u.id)
@@ -262,4 +291,15 @@ export class CompatibilityService {
       );
     }
   }
+}
+
+/** A distance band only when both people have a location. Never a guess. */
+function distanceBetween(a: LoadedPerson, b: LoadedPerson): string | null {
+  if (!a.person.location || !b.person.location) return null;
+  return distanceLabel(distanceKm(a.person.location, b.person.location));
+}
+
+function distanceFilterStatus(viewer: LoadedPerson): DistanceFilterStatus {
+  if (viewer.person.preferences.maxDistanceKm === null) return 'off';
+  return viewer.person.location ? 'active' : 'no_location';
 }

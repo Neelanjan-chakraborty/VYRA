@@ -1,15 +1,2 @@
-const EARTH_RADIUS_KM = 6371;
-const toRadians = (degrees: number) => (degrees * Math.PI) / 180;
-
-/** Great-circle distance in kilometres. */
-export function distanceKm(
-  a: { latitude: number; longitude: number },
-  b: { latitude: number; longitude: number },
-): number {
-  const dLat = toRadians(b.latitude - a.latitude);
-  const dLon = toRadians(b.longitude - a.longitude);
-  const h =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRadians(a.latitude)) * Math.cos(toRadians(b.latitude)) * Math.sin(dLon / 2) ** 2;
-  return 2 * EARTH_RADIUS_KM * Math.asin(Math.min(1, Math.sqrt(h)));
-}
+// One definition of distance, shared with the API and the app.
+export { distanceKm } from '@vyra/validation';
