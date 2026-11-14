@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { COMPATIBILITY_DIMENSIONS, COMPATIBILITY_SCENARIOS } from './domain.js';
 import { distanceFilterStatusSchema } from './location.js';
+import { PERSONA_ATTRIBUTES } from './persona.js';
 
 /**
  * How someone describes their gender. Asked once, never inferred from names,
@@ -40,16 +41,108 @@ export const categoryListSchema = z
   .refine((list) => new Set(list).size === list.length, 'Duplicate choice');
 
 /**
- * A hard rule: never suggest someone whose attribute has one of these values.
- * Applied only when the other person's value is known with enough confidence.
+ * What someone can say about the people they're shown, criterion by criterion:
+ * - `must`: a strict filter. Someone whose value is *known* and not accepted
+ *   is never shown. Unknown values never count as a mismatch.
+ * - `prefer`: a ranking signal only; nobody is excluded.
+ * - `open`: no effect.
+ * Private to the person who sets them.
  */
-export const dealBreakerSchema = z.object({
-  kind: z.literal('attribute'),
-  attribute: z.enum(['lifestylePace', 'weekendRhythm', 'communicationStyle']),
-  exclude: z.array(z.string().min(1).max(40)).min(1).max(4),
+export const CRITERIA = [
+  'relationshipIntent',
+  'lifestylePace',
+  'weekendRhythm',
+  'communicationStyle',
+  'values',
+] as const;
+export const criterionKeySchema = z.enum(CRITERIA);
+export type CriterionKey = z.infer<typeof criterionKeySchema>;
+export const criterionModeSchema = z.enum(['must', 'prefer', 'open']);
+export type CriterionMode = z.infer<typeof criterionModeSchema>;
+
+const option = (value: string, label: string) => ({ value, label });
+/** The options for each criterion. Persona criteria reuse the persona catalogue. */
+export const CRITERION_OPTIONS: Readonly<
+  Record<CriterionKey, { label: string; options: readonly { value: string; label: string }[] }>
+> = {
+  relationshipIntent: {
+    label: 'What they’re looking for',
+    options: [
+      option('serious', 'Something serious'),
+      option('casual', 'Something casual'),
+      option('exploring', 'Still working it out'),
+      option('companionship', 'Companionship'),
+      option('other', 'Something else'),
+    ],
+  },
+  lifestylePace: {
+    label: PERSONA_ATTRIBUTES.lifestylePace.label,
+    options: PERSONA_ATTRIBUTES.lifestylePace.options,
+  },
+  weekendRhythm: {
+    label: PERSONA_ATTRIBUTES.weekendRhythm.label,
+    options: PERSONA_ATTRIBUTES.weekendRhythm.options,
+  },
+  communicationStyle: {
+    label: PERSONA_ATTRIBUTES.communicationStyle.label,
+    options: PERSONA_ATTRIBUTES.communicationStyle.options,
+  },
+  values: { label: 'Values (at least one shared)', options: PERSONA_ATTRIBUTES.values.vocabulary },
+};
+
+export const criterionSchema = z
+  .object({
+    criterion: criterionKeySchema,
+    mode: criterionModeSchema,
+    /** Acceptable values. Required for must/prefer; ignored for open. */
+    accepted: z.array(z.string().min(1).max(40)).max(15).default([]),
+  })
+  .superRefine((c, ctx) => {
+    const allowed = new Set(CRITERION_OPTIONS[c.criterion].options.map((o) => o.value));
+    if (c.accepted.some((v) => !allowed.has(v)))
+      ctx.addIssue({ code: 'custom', path: ['accepted'], message: 'Unknown option' });
+    if (new Set(c.accepted).size !== c.accepted.length)
+      ctx.addIssue({ code: 'custom', path: ['accepted'], message: 'Duplicate option' });
+    if (c.mode !== 'open' && c.accepted.length === 0)
+      ctx.addIssue({ code: 'custom', path: ['accepted'], message: 'Choose at least one option' });
+    if (c.mode === 'must' && c.accepted.length === allowed.size) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['accepted'],
+        message: 'Accepting every option isn’t a must-have — choose “Open” instead',
+      });
+    }
+  })
+  .transform((c) => (c.mode === 'open' ? { ...c, accepted: [] } : c));
+export type Criterion = z.output<typeof criterionSchema>;
+
+export const criteriaListSchema = z
+  .array(criterionSchema)
+  .max(CRITERIA.length)
+  .refine(
+    (list) => new Set(list.map((c) => c.criterion)).size === list.length,
+    'Each criterion once',
+  );
+
+/** Counts are bucketed so the impact estimate never identifies anyone. */
+export const countBucketSchema = z.enum(['0', '1–5', '6–20', '20+']);
+export type CountBucket = z.infer<typeof countBucketSchema>;
+export function countBucket(n: number): CountBucket {
+  if (n <= 0) return '0';
+  if (n <= 5) return '1–5';
+  if (n <= 20) return '6–20';
+  return '20+';
+}
+
+export const criteriaImpactSchema = z.object({
+  /** People who fit everything except the viewer's must-haves. */
+  withoutMustHaves: countBucketSchema,
+  withMustHaves: countBucketSchema,
+  /** Must-haves remove at least half of a pool of at least ten people. */
+  significant: z.boolean(),
+  perCriterion: z.array(z.object({ criterion: criterionKeySchema, excludes: countBucketSchema })),
 });
-export type DealBreaker = z.infer<typeof dealBreakerSchema>;
-export const dealBreakerListSchema = z.array(dealBreakerSchema).max(5);
+export type CriteriaImpact = z.infer<typeof criteriaImpactSchema>;
 
 export const sufficiencySchema = z.enum(['INSUFFICIENT', 'PARTIAL', 'SUFFICIENT']);
 export type Sufficiency = z.infer<typeof sufficiencySchema>;

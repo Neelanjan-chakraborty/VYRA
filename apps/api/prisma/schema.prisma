@@ -316,8 +316,9 @@ model DiscoveryPreferences {
   showGenders            GenderIdentity[] @default([]) @map("show_genders")
   /// Also show self-described (without chosen searches), undisclosed and unanswered.
   includeUnlistedGenders Boolean          @default(true) @map("include_unlisted_genders")
-  /// Hard deal-breakers as structured rules, validated by @vyra/validation.
-  dealBreakers    Json     @default("[]") @map("deal_breakers")
+  /// Must-haves, preferences and open-to-exploring, validated by
+  /// criteriaListSchema in @vyra/validation. Private to this person.
+  criteria               Json             @default("[]") @map("relationship_criteria")
   showAstrology   Boolean  @default(false) @map("show_astrology")
   updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 

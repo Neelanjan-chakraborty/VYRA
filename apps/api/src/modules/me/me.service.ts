@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   ageInYears,
-  dealBreakerListSchema,
+  criteriaListSchema,
   type DiscoveryPreferences,
   type GenderCategory,
   type Interest,
@@ -111,7 +111,7 @@ export class MeService {
         showGenders: prefs.showGenders.filter(isCategory),
         includeUnlistedGenders: prefs.includeUnlistedGenders,
         showAstrology: prefs.showAstrology,
-        dealBreakers: dealBreakerListSchema.catch([]).parse(prefs.dealBreakers),
+        criteria: criteriaListSchema.catch([]).parse(prefs.criteria),
       },
       location: profile?.locationSource
         ? {

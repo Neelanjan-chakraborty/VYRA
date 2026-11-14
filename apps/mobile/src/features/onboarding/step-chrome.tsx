@@ -14,8 +14,9 @@ const STEPS = [
   '/understand',
   '/location',
   '/preferences',
+  '/matters',
 ] as const;
-export type StepIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+export type StepIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 interface StepChrome {
   readonly eyebrow: string;

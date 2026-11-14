@@ -3,6 +3,7 @@ import {
   type PersonaAttributeKey,
   type RelationshipIntent,
 } from '@vyra/validation';
+import { preferenceFit } from './criteria.js';
 import { distanceKm } from './geo.js';
 import type { Person } from './types.js';
 
@@ -23,7 +24,8 @@ export type FeatureKey =
   | 'values'
   | 'intents'
   | 'sharedInterests'
-  | 'preferenceFit';
+  | 'preferenceFit'
+  | 'statedPreferences';
 
 export interface Comparison {
   readonly similarity: number;
@@ -224,6 +226,22 @@ function compareIntents(a: Person, b: Person): Comparison | null {
   };
 }
 
+/** Each person's "prefer" criteria against the other, averaged over both directions. */
+function compareStatedPreferences(a: Person, b: Person): Comparison | null {
+  const fits = [preferenceFit(a, b), preferenceFit(b, a)].filter(
+    (f): f is NonNullable<typeof f> => f !== null,
+  );
+  if (fits.length === 0) return null;
+  const similarity = fits.reduce((s, f) => s + f.similarity, 0) / fits.length;
+  const confidence = Math.min(1, fits.reduce((s, f) => s + f.confidence, 0) / fits.length);
+  return {
+    similarity,
+    confidence,
+    aligned: similarity >= 0.75 ? 'You match what each other prefers' : null,
+    different: similarity <= 0.25 ? 'Some of what you each prefer doesn’t match' : null,
+  };
+}
+
 /** Every feature for a pair, computed once and shared by dimensions and scenarios. */
 export function compareAll(a: Person, b: Person): Map<FeatureKey, Comparison> {
   const result = new Map<FeatureKey, Comparison>();
@@ -253,6 +271,7 @@ export function compareAll(a: Person, b: Person): Map<FeatureKey, Comparison> {
   set('intents', compareIntents(a, b));
   set('sharedInterests', compareInterests(a, b));
   set('preferenceFit', comparePreferences(a, b));
+  set('statedPreferences', compareStatedPreferences(a, b));
   return result;
 }
 

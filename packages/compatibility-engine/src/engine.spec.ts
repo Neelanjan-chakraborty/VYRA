@@ -5,7 +5,9 @@ import {
   DEFAULT_COMPATIBILITY_WEIGHTS,
 } from '@vyra/validation';
 import { describe, expect, it } from 'vitest';
+import { failsMustHaves } from './criteria.js';
 import { acceptsGender, ineligibility } from './eligibility.js';
+import type { Person } from './types.js';
 import { INTERESTS, OPPOSITE, person, RICH, traits } from './fixtures.js';
 import { rankScore, rankWithDiversity } from './rank.js';
 import { highlights, score } from './score.js';
@@ -19,9 +21,23 @@ const viewerShowing = (
   includeUnlistedGenders = true,
 ) => person('viewer', { gender: 'WOMAN', preferences: { showGenders, includeUnlistedGenders } });
 const candidate = (
-  gender: (typeof IDENTITIES)[number],
+  gender: Person['gender'],
   discoverableAs: ('WOMAN' | 'MAN' | 'NON_BINARY')[] = [],
 ) => person('c', { gender, discoverableAs });
+
+const homebodyOnly = (extra: Partial<Person['preferences']> = {}) =>
+  person('a', {
+    preferences: {
+      criteria: [{ criterion: 'lifestylePace', mode: 'must', accepted: ['homebody', 'balanced'] }],
+      ...extra,
+    },
+  });
+
+const richWithPace = (pace: string) =>
+  traits({
+    ...Object.fromEntries(Object.entries(RICH).map(([k, t]) => [k, t?.value])),
+    lifestylePace: pace,
+  });
 
 describe('eligibility gates', () => {
   it('never pairs someone with themselves', () => {
@@ -103,7 +119,7 @@ describe('eligibility gates', () => {
     expect(ineligibility(near, person('b', { location: null }))).toBeNull();
   });
 
-  it('treats serious vs casual as a deal-breaker, but not other overlaps', () => {
+  it('treats serious vs casual as a hard mismatch, but not other overlaps', () => {
     expect(
       ineligibility(person('a', { intents: ['serious'] }), person('b', { intents: ['casual'] })),
     ).toBe('intent_mismatch');
@@ -122,22 +138,122 @@ describe('eligibility gates', () => {
     expect(ineligibility(person('a', { intents: [] }), person('b'))).toBe('intent_mismatch');
   });
 
-  it('fires a deal-breaker only on a confidently known value', () => {
-    const picky = person('a', {
+  describe('must-haves', () => {
+    it('exclude a known, unaccepted value, in both directions', () => {
+      const outgoing = person('b', { traits: traits({ lifestylePace: 'outgoing' }) });
+      expect(ineligibility(homebodyOnly(), outgoing)).toBe('must_have');
+      expect(ineligibility(outgoing, homebodyOnly())).toBe('must_have');
+      expect(
+        ineligibility(
+          homebodyOnly(),
+          person('b', { traits: traits({ lifestylePace: 'balanced' }) }),
+        ),
+      ).toBeNull();
+    });
+
+    it('never treat missing or low-confidence information as a mismatch', () => {
+      expect(ineligibility(homebodyOnly(), person('b'))).toBeNull();
+      expect(
+        ineligibility(
+          homebodyOnly(),
+          person('b', { traits: traits({ lifestylePace: 'outgoing' }, 0.4) }),
+        ),
+      ).toBeNull();
+    });
+
+    it('all must-haves apply together', () => {
+      const viewer = person('a', {
+        preferences: {
+          criteria: [
+            { criterion: 'lifestylePace', mode: 'must', accepted: ['homebody'] },
+            { criterion: 'values', mode: 'must', accepted: ['honesty', 'kindness'] },
+            {
+              criterion: 'relationshipIntent',
+              mode: 'must',
+              accepted: ['serious', 'companionship'],
+            },
+          ],
+        },
+      });
+      const fits = person('b', {
+        intents: ['serious'],
+        traits: traits({ lifestylePace: 'homebody', values: ['kindness', 'calm'] }),
+      });
+      expect(ineligibility(viewer, fits)).toBeNull();
+      expect(
+        ineligibility(
+          viewer,
+          person('b', {
+            intents: ['serious'],
+            traits: traits({ lifestylePace: 'homebody', values: ['calm'] }),
+          }),
+        ),
+      ).toBe('must_have');
+      expect(
+        ineligibility(
+          viewer,
+          person('b', { intents: ['exploring'], traits: traits({ lifestylePace: 'homebody' }) }),
+        ),
+      ).toBe('must_have');
+      // Intentions are stated, so they always count as known.
+      expect(failsMustHaves(viewer, person('b', { intents: ['exploring'] }))?.criterion).toBe(
+        'relationshipIntent',
+      );
+    });
+
+    it('preferences and "open" never exclude anyone', () => {
+      const viewer = person('a', {
+        preferences: {
+          criteria: [
+            { criterion: 'lifestylePace', mode: 'prefer', accepted: ['homebody'] },
+            { criterion: 'weekendRhythm', mode: 'open', accepted: [] },
+          ],
+        },
+      });
+      expect(
+        ineligibility(
+          viewer,
+          person('b', { traits: traits({ lifestylePace: 'outgoing', weekendRhythm: 'social' }) }),
+        ),
+      ).toBeNull();
+    });
+  });
+
+  describe('preferences are a soft score', () => {
+    const prefersHomebodies = person('a', {
+      traits: RICH,
+      interests: INTERESTS,
       preferences: {
-        dealBreakers: [{ kind: 'attribute', attribute: 'lifestylePace', exclude: ['outgoing'] }],
+        criteria: [{ criterion: 'lifestylePace', mode: 'prefer', accepted: ['homebody'] }],
       },
     });
-    expect(
-      ineligibility(picky, person('b', { traits: traits({ lifestylePace: 'outgoing' }) })),
-    ).toBe('deal_breaker');
-    expect(
-      ineligibility(person('b', { traits: traits({ lifestylePace: 'outgoing' }) }), picky),
-    ).toBe('deal_breaker');
-    expect(
-      ineligibility(picky, person('b', { traits: traits({ lifestylePace: 'outgoing' }, 0.3) })),
-    ).toBeNull();
-    expect(ineligibility(picky, person('b'))).toBeNull();
+
+    it('raise the score of people who match and lower it for those who don’t', () => {
+      const match = run(
+        prefersHomebodies,
+        person('b', { traits: richWithPace('homebody'), interests: INTERESTS }),
+      );
+      const miss = run(
+        prefersHomebodies,
+        person('c', { traits: richWithPace('outgoing'), interests: INTERESTS }),
+      );
+      expect(match.dimensions.mutualPreferences.features.map((f) => f.feature)).toContain(
+        'statedPreferences',
+      );
+      expect(match.dimensions.mutualPreferences.score).toBeGreaterThan(
+        miss.dimensions.mutualPreferences.score ?? 1,
+      );
+    });
+
+    it('ignore people whose value is unknown', () => {
+      const unknown = run(
+        prefersHomebodies,
+        person('b', { traits: traits({ socialEnergy: 0.5 }) }),
+      );
+      expect(unknown.dimensions.mutualPreferences.features.map((f) => f.feature)).toEqual([
+        'preferenceFit',
+      ]);
+    });
   });
 });
 

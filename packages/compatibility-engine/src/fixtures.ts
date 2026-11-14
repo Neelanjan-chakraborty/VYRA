@@ -24,7 +24,7 @@ export function person(
       maxDistanceKm: null,
       showGenders: [],
       includeUnlistedGenders: true,
-      dealBreakers: [],
+      criteria: [],
       ...overrides.preferences,
     },
   };

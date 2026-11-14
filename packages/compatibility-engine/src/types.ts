@@ -1,6 +1,6 @@
 import type {
   CompatibilityDimension,
-  DealBreaker,
+  Criterion,
   GenderCategory,
   GenderIdentity,
   PersonaAttributeKey,
@@ -30,7 +30,8 @@ export interface Person {
     readonly showGenders: readonly GenderCategory[];
     /** Whether to also see people whose identity isn't one of the listed categories. */
     readonly includeUnlistedGenders: boolean;
-    readonly dealBreakers: readonly DealBreaker[];
+    /** Must-haves (strict), preferences (ranking) and open. */
+    readonly criteria: readonly Criterion[];
   };
   readonly location: { readonly latitude: number; readonly longitude: number } | null;
   /** From the approved persona only. Missing = unknown. */
@@ -39,6 +40,6 @@ export interface Person {
 }
 
 export type IneligibleReason =
-  'self' | 'age_preference' | 'gender_preference' | 'distance' | 'intent_mismatch' | 'deal_breaker';
+  'self' | 'age_preference' | 'gender_preference' | 'distance' | 'intent_mismatch' | 'must_have';
 
 export type Weights = Readonly<Record<CompatibilityDimension, number>>;

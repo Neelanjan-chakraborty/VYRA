@@ -93,3 +93,55 @@ describe('gender identity', () => {
     for (const key of PERSONA_ATTRIBUTE_KEYS) expect(key.toLowerCase()).not.toContain('gender');
   });
 });
+
+describe('relationship criteria', () => {
+  it('validates options per criterion and mode', async () => {
+    const { criterionSchema, criteriaListSchema } = await import('./compatibility.js');
+    expect(
+      criterionSchema.safeParse({
+        criterion: 'lifestylePace',
+        mode: 'must',
+        accepted: ['homebody', 'balanced'],
+      }).success,
+    ).toBe(true);
+    expect(
+      criterionSchema.safeParse({ criterion: 'lifestylePace', mode: 'must', accepted: ['party'] })
+        .success,
+    ).toBe(false);
+    expect(
+      criterionSchema.safeParse({ criterion: 'lifestylePace', mode: 'prefer', accepted: [] })
+        .success,
+    ).toBe(false);
+    expect(
+      criterionSchema.safeParse({
+        criterion: 'lifestylePace',
+        mode: 'must',
+        accepted: ['homebody', 'balanced', 'outgoing'],
+      }).success,
+    ).toBe(false);
+    expect(
+      criterionSchema.parse({ criterion: 'values', mode: 'open', accepted: ['honesty'] }).accepted,
+    ).toEqual([]);
+    expect(
+      criterionSchema.safeParse({ criterion: 'religion', mode: 'must', accepted: ['x'] }).success,
+    ).toBe(false);
+    expect(
+      criteriaListSchema.safeParse([
+        { criterion: 'values', mode: 'open' },
+        { criterion: 'values', mode: 'open' },
+      ]).success,
+    ).toBe(false);
+  });
+
+  it('buckets counts', async () => {
+    const { countBucket } = await import('./compatibility.js');
+    expect([0, 1, 5, 6, 20, 21].map(countBucket)).toEqual([
+      '0',
+      '1–5',
+      '1–5',
+      '6–20',
+      '6–20',
+      '20+',
+    ]);
+  });
+});
