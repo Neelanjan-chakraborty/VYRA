@@ -22,6 +22,22 @@ const CODE_BY_STATUS: Readonly<Record<number, ApiErrorCode>> = {
   503: 'SERVICE_UNAVAILABLE',
 };
 
+type ErrorDetails = NonNullable<ApiError['error']['details']>;
+
+function publicDetails(exception: HttpException): ErrorDetails | undefined {
+  const body = exception.getResponse();
+  if (typeof body !== 'object' || body === null || !('details' in body)) return undefined;
+  const { details } = body;
+  if (!Array.isArray(details)) return undefined;
+  return details.filter(
+    (d): d is ErrorDetails[number] =>
+      typeof d === 'object' &&
+      d !== null &&
+      typeof d.path === 'string' &&
+      typeof d.message === 'string',
+  );
+}
+
 const GENERIC_MESSAGE = 'Something went wrong. Please try again.';
 
 function publicMessage(exception: HttpException): string {
@@ -64,6 +80,7 @@ export class ApiExceptionFilter implements ExceptionFilter {
       error: {
         code: CODE_BY_STATUS[status] ?? (status >= 500 ? 'INTERNAL_ERROR' : 'BAD_REQUEST'),
         message: exposeMessage ? publicMessage(exception) : GENERIC_MESSAGE,
+        ...(exposeMessage && publicDetails(exception) ? { details: publicDetails(exception) } : {}),
         requestId,
       },
     };

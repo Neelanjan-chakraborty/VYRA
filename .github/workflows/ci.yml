@@ -38,6 +38,9 @@ jobs:
       DATABASE_URL: postgresql://vyra:vyra@localhost:5432/vyra_ci
       REDIS_URL: redis://localhost:6379
       AI_PROVIDER: mock
+      JWT_ACCESS_SECRET: ci-only-jwt-secret-0000000000000000000000
+      OTP_PEPPER: ci-only-otp-pepper-00000000000000000000000
+      MEDIA_URL_SECRET: ci-only-media-secret-000000000000000000000
       NODE_ENV: test
     steps:
       - uses: actions/checkout@v4

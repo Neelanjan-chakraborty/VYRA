@@ -10,21 +10,59 @@ const csv = z
       .filter(Boolean),
   );
 
+const secret = z.string().min(32, 'must be at least 32 characters');
+
 /**
  * Every environment variable the API reads. The process refuses to start when
  * any value is missing or malformed, so misconfiguration fails fast and loudly.
  */
-export const envSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.coerce.number().int().min(1).max(65535).default(4000),
-  DATABASE_URL: z
-    .url()
-    .refine((value) => /^postgres(ql)?:\/\//.test(value), 'must be a postgresql:// URL'),
-  REDIS_URL: z.url().refine((value) => /^rediss?:\/\//.test(value), 'must be a redis:// URL'),
-  AI_PROVIDER: z.enum(['mock', 'openai', 'gemini']).default('mock'),
-  CORS_ORIGINS: csv,
-  LOG_LEVEL: z.enum(['error', 'warn', 'log', 'debug', 'verbose']).default('log'),
-});
+export const envSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+    DATABASE_URL: z
+      .url()
+      .refine((value) => /^postgres(ql)?:\/\//.test(value), 'must be a postgresql:// URL'),
+    REDIS_URL: z.url().refine((value) => /^rediss?:\/\//.test(value), 'must be a redis:// URL'),
+    AI_PROVIDER: z.enum(['mock', 'openai', 'gemini']).default('mock'),
+    CORS_ORIGINS: csv,
+    LOG_LEVEL: z.enum(['error', 'warn', 'log', 'debug', 'verbose']).default('log'),
+
+    /** Signs access and registration tokens (HS256). */
+    JWT_ACCESS_SECRET: secret,
+    /** Keys the HMACs of OTP codes and destinations. */
+    OTP_PEPPER: secret,
+    /** Signs short-lived media URLs. */
+    MEDIA_URL_SECRET: secret,
+    ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
+    REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().min(1).max(90).default(30),
+    /** "dev" returns the code in the API response and sends nothing. */
+    OTP_DELIVERY: z.enum(['dev']).default('dev'),
+    /** "local" writes to STORAGE_LOCAL_DIR on this machine's disk. */
+    STORAGE_DRIVER: z.enum(['local']).default('local'),
+    STORAGE_LOCAL_DIR: z.string().min(1).default('./.storage'),
+    /** Public origin of this API, used to build media URLs. */
+    PUBLIC_API_URL: z.url().default('http://localhost:4000'),
+  })
+  .superRefine((env, ctx) => {
+    if (env.NODE_ENV !== 'production') return;
+    // Development stand-ins must never run in production. Until real SMS/e-mail
+    // and object-storage adapters exist, a production boot fails here on purpose.
+    if (env.OTP_DELIVERY === 'dev') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['OTP_DELIVERY'],
+        message: 'the dev sender is not allowed in production',
+      });
+    }
+    if (env.STORAGE_DRIVER === 'local') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['STORAGE_DRIVER'],
+        message: 'local disk storage is not allowed in production',
+      });
+    }
+  });
 
 export type Env = z.infer<typeof envSchema>;
 

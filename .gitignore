@@ -35,3 +35,4 @@ expo-env.d.ts
 # Logs
 *.log
 visual-check-output/
+.storage/

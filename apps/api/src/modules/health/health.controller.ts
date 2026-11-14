@@ -3,10 +3,12 @@ import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { SkipThrottle } from '@nestjs/throttler';
 import type { HealthResponse } from '@vyra/validation';
 import type { Response } from 'express';
+import { Public } from '../auth/auth.decorators.js';
 import { HealthService } from './health.service.js';
 
 @ApiTags('health')
 @SkipThrottle()
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly health: HealthService) {}

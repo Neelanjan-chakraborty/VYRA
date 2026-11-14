@@ -1,11 +1,17 @@
 import { type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
-import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { APP_FILTER, APP_GUARD, APP_PIPE } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { ApiExceptionFilter } from './common/api-exception.filter.js';
 import { requestIdMiddleware } from './common/request-id.middleware.js';
-import { ConfigModule } from './config/config.module.js';
+import { createValidationPipe } from './common/validation.js';
+import { ConfigModule, ENV } from './config/config.module.js';
+import type { Env } from './config/env.js';
 import { DatabaseModule } from './database/database.module.js';
+import { AuditModule } from './modules/audit/audit.module.js';
+import { AuthModule } from './modules/auth/auth.module.js';
 import { HealthModule } from './modules/health/health.module.js';
+import { MeModule } from './modules/me/me.module.js';
+import { StorageModule } from './modules/storage/storage.module.js';
 import { RedisModule } from './redis/redis.module.js';
 
 @Module({
@@ -14,11 +20,25 @@ import { RedisModule } from './redis/redis.module.js';
     DatabaseModule,
     RedisModule,
     // Baseline per-IP limit; sensitive routes (OTP, uploads) add stricter limits.
-    ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // Disabled under NODE_ENV=test, where every request comes from one address;
+    // test/rate-limit.e2e-spec.ts turns it back on to prove the limits hold.
+    ThrottlerModule.forRootAsync({
+      inject: [ENV],
+      useFactory: (env: Env) => ({
+        throttlers: [{ ttl: 60_000, limit: 120 }],
+        skipIf: () => env.NODE_ENV === 'test',
+      }),
+    }),
+    AuditModule,
+    StorageModule,
+    AuthModule,
     HealthModule,
+    MeModule,
   ],
   providers: [
+    // Order matters: rate limiting runs before authentication (AuthModule's guard).
     { provide: APP_GUARD, useClass: ThrottlerGuard },
+    { provide: APP_PIPE, useFactory: createValidationPipe },
     { provide: APP_FILTER, useClass: ApiExceptionFilter },
   ],
 })
