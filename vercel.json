@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "landing": {
+      "root": "apps/landing/",
+      "framework": "nextjs"
+    }
+  },
+  "rewrites": [{ "source": "/(.*)", "destination": { "service": "landing" } }]
+}
