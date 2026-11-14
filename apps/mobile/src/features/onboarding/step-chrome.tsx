@@ -6,8 +6,8 @@ import { Text } from '@/components/text';
 export type StepMode = 'onboarding' | 'edit';
 
 /** Order of the onboarding flow. Routes live under `src/app/(onboarding)`. */
-const STEPS = ['/', '/photos', '/interests', '/intention', '/preferences'] as const;
-export type StepIndex = 0 | 1 | 2 | 3 | 4;
+const STEPS = ['/', '/photos', '/interests', '/intention', '/understand', '/preferences'] as const;
+export type StepIndex = 0 | 1 | 2 | 3 | 4 | 5;
 
 interface StepChrome {
   readonly eyebrow: string;

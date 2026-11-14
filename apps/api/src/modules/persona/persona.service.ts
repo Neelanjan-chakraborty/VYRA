@@ -48,7 +48,7 @@ const GENERATION_COOLDOWN_MS = 60_000;
 
 const PARSE_MESSAGES: Record<ReflectionParseError, string> = {
   no_json:
-    'We couldn’t find the answers in that text. Paste the assistant’s whole reply, including the part between the ``` marks.',
+    'We couldn’t find the answers in that text. Paste the assistant’s whole reply, including the code block with its answers.',
   invalid_json: 'The reply looks cut off. Copy the assistant’s whole reply and try again.',
   wrong_shape:
     'That reply isn’t in the format the questionnaire asks for. Copy the prompt again and send it to your assistant.',

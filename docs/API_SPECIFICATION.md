@@ -77,6 +77,25 @@ and deletion take effect at once.
 | DELETE | `/v1/me/photos/:photoId`                | `204`. Another person's photo id → `404`                                                                                                                                                 |
 | GET    | `/v1/media/photos/:owner/:file?exp&sig` | Public but only with a valid signature (10-minute lifetime). Anything else → `404`                                                                                                       |
 
+### Consents 🔒
+
+| Method | Path                    | Description                                                                                                                                                                                                        |
+| ------ | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/v1/me/consents`       | Each optional consent and whether it is granted                                                                                                                                                                    |
+| PUT    | `/v1/me/consents/:type` | Body `{granted}`. Types: `AI_PERSONA_PROCESSING`, `AI_IMPORT_PROCESSING`, `PHOTO_ANALYSIS`, `ASTROLOGY`, `WINGMAN_MESSAGE_CONTEXT`, `ANALYTICS`, `MARKETING`. Withdrawing either AI consent deletes persona drafts |
+
+### Persona 🔒
+
+| Method | Path                                  | Description                                                                                                                                                                                                                                                                 |
+| ------ | ------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/me/persona`                      | `{generation:{status,failureCode}, current, draft}`; each version lists attributes with evidence and the `unknown` keys                                                                                                                                                     |
+| POST   | `/v1/me/persona/generate`             | `202`. Needs `AI_PERSONA_PROCESSING` (`409` otherwise). One in flight (`409`), one a minute (`429`). Failure codes: `nothing_to_read`, `provider_unavailable`, `provider_bad_response`, `provider_error`                                                                    |
+| POST   | `/v1/me/persona/assistant-reflection` | Body `{assistant, reply}` (reply ≤ 20 000 chars). Needs `AI_IMPORT_PROCESSING`. `200 {result:{accepted,unknown,rejected}, persona}`. Unusable reply → `422` with `details[0].message` one of `no_json`, `invalid_json`, `wrong_shape`, `wrong_version`, `no_usable_answers` |
+| PATCH  | `/v1/me/persona/draft`                | Body `{set?, confirm?, clear?}`; opens a draft from the approved persona if none. Invalid values → `422` per field                                                                                                                                                          |
+| POST   | `/v1/me/persona/draft/approve`        | Draft becomes current; embedding stored. No draft → `404`; empty → `409`                                                                                                                                                                                                    |
+| DELETE | `/v1/me/persona/draft`                | Discard the draft                                                                                                                                                                                                                                                           |
+| DELETE | `/v1/me/persona`                      | `204`. Deletes every version, evidence and embedding                                                                                                                                                                                                                        |
+
 ## Planned
 
 Endpoint groups arrive with their milestones (see IMPLEMENTATION_BACKLOG.md): `persona`, `imports`, `discovery`, `compatibility`, `connections`,

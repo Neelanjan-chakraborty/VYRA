@@ -21,31 +21,37 @@ interface ScreenProps {
 export function Screen({ eyebrow, title, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[
-        styles.content,
-        {
-          paddingTop: insets.top + space.xxl,
-          paddingBottom: insets.bottom + TAB_BAR_HEIGHT + space.xxl,
-        },
-      ]}
-    >
-      <View style={styles.column}>
-        <Text variant="eyebrow" tone="textSecondary" accessibilityRole="header">
-          {eyebrow}
-        </Text>
-        <Text variant="displayL" style={styles.title}>
-          {title}
-        </Text>
-        {children}
-      </View>
-    </ScrollView>
+    // The scroll view is pinned to its frame so it always scrolls internally.
+    // Inside expo-router's tab slot on web the screen wrapper grows with its
+    // content instead, which made the page scroll under the tab bar.
+    <View style={styles.frame}>
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={[
+          styles.content,
+          {
+            paddingTop: insets.top + space.xxl,
+            paddingBottom: insets.bottom + TAB_BAR_HEIGHT + space.xxl,
+          },
+        ]}
+      >
+        <View style={styles.column}>
+          <Text variant="eyebrow" tone="textSecondary" accessibilityRole="header">
+            {eyebrow}
+          </Text>
+          <Text variant="displayL" style={styles.title}>
+            {title}
+          </Text>
+          {children}
+        </View>
+      </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: color.background },
+  frame: { flex: 1, backgroundColor: color.background },
+  root: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   content: { flexGrow: 1, paddingHorizontal: space.xl },
   column: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
   title: { marginTop: space.m, marginBottom: space.xl },

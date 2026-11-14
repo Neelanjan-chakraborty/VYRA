@@ -4,7 +4,7 @@ VYRA holds intimate data. Security and privacy requirements are acceptance crite
 feature, not a later phase. Target regimes: India's DPDP Act 2023 first, GDPR-compatible by
 design for expansion.
 
-## In place now (Milestones 1–2)
+## In place now (Milestones 1–3)
 
 | Control                                       | Where                                                           |
 | --------------------------------------------- | --------------------------------------------------------------- |
@@ -70,4 +70,8 @@ design for expansion.
 - **The web build keeps the refresh token in `sessionStorage`.** It is a development and QA
   target; a public web app would need HTTP-only cookies instead.
 - No automated account-fraud signals, no payment or identity-verification integrations.
+- **Gemini provider unverified**: never run against the live API. `AI_PROVIDER=gemini` sends
+  redacted profile text to Google; enabling it needs the privacy notice to say so.
+- **Queue jobs run inside the API process** by default; `RUN_QUEUE_WORKERS=false` plus
+  `node dist/worker.js` separates them.
 - A formal security review is scheduled for Milestone 8, with a lighter one each milestone.

@@ -53,6 +53,11 @@ engine logic changes the key the same way.
 when `sufficiency = 'INSUFFICIENT'`. The database cannot hold a confident-looking score built
 on missing data.
 
+**Persona generation state** lives on `personas` (`generation_status` — CHECK-constrained to
+`idle | queued | generating | ready | failed` — plus `generation_failure_code` and
+`generation_requested_at`). `persona_evidence.source_detail` names the assistant for
+`ASSISTANT_REFLECTION` evidence.
+
 **Embeddings.** `vyra_vector.persona_embeddings (persona_version_id, model, embedding
 vector(768))` with an HNSW cosine index. It sits outside the Prisma-managed `public` schema
 (see TECHNICAL_RESEARCH.md) and is accessed with parameterised raw SQL.

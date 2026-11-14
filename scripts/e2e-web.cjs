@@ -49,12 +49,14 @@ const server = http.createServer((req, res) => {
 async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.grantPermissions(['clipboard-read', 'clipboard-write'], { origin: ORIGIN });
   const page = await context.newPage();
   const problems = [];
-  // 401s are expected while signed out and after deletion; anything else is a defect.
+  // Expected: 401/403 while signed out or after deletion, and the 422 the test provokes
+  // with an unusable pasted reply. Anything else is a defect.
   page.on('pageerror', (error) => problems.push(`page error: ${error.message}`));
   page.on('console', (message) => {
-    if (message.type() === 'error' && !/status of 40[13]/.test(message.text()))
+    if (message.type() === 'error' && !/status of 4(01|03|22)/.test(message.text()))
       problems.push(`console: ${message.text()}`);
   });
 
@@ -70,9 +72,12 @@ async function main() {
     } catch (error) {
       await page.screenshot({ path: path.join(out, `FAILED-${name}.png`) });
       const seen = problems.length > 0 ? `\nBrowser reported:\n  - ${problems.join('\n  - ')}` : '';
-      throw new Error(`Step "${name}" failed: ${error.message.split('\n')[0]}${seen}`, {
-        cause: error,
-      });
+      throw new Error(
+        `Step "${name}" failed: ${error.message.split('\n').slice(0, 12).join('\n')}${seen}`,
+        {
+          cause: error,
+        },
+      );
     }
   };
   const button = (name) => page.getByRole('button', { name, exact: true });
@@ -193,6 +198,90 @@ async function main() {
     await button('Continue').click();
   });
 
+  await step('onboarding: understand', async () => {
+    await heading('Help VYRA understand you.').waitFor();
+    await page.getByRole('checkbox', { name: 'Draft a persona from my profile' }).click();
+    await page
+      .getByRole('checkbox', { name: 'Draft a persona from my profile', checked: true })
+      .waitFor();
+    await snap('onboarding-understand');
+    await button('Ask the AI you use').click();
+  });
+
+  await step('ask your AI: choose and copy', async () => {
+    await heading('Which assistant knows you best?').waitFor();
+    await page.getByRole('radio', { name: 'ChatGPT' }).click();
+    await snap('ask-ai-pick');
+    await button('Continue').click();
+    await heading('Copy the questions.').waitFor();
+    await button('Copy questions').click();
+    await button('Copied').waitFor();
+    const copied = await page.evaluate(() => navigator.clipboard.readText());
+    if (!copied.includes('"vyra_questionnaire"') || !copied.includes('socialEnergy —')) {
+      throw new Error('clipboard does not hold the questionnaire');
+    }
+    await button('Read the questions first').click();
+    await snap('ask-ai-copy');
+    await button('I have the answer').click();
+  });
+
+  await step('ask your AI: paste the reply', async () => {
+    await heading('Paste the answer.').waitFor();
+    // An unusable reply is explained and nothing is saved.
+    await page.getByLabel('Assistant’s reply').fill('Sorry, I don’t remember anything about you.');
+    await page.getByRole('checkbox', { name: 'Let VYRA read the answers I paste' }).click();
+    await button('Read the answers').click();
+    await page.getByText(/couldn’t find the answers/).waitFor();
+    await snap('ask-ai-error');
+    const reply = [
+      'Here you go:',
+      '```json',
+      JSON.stringify({
+        vyra_questionnaire: '1',
+        answers: {
+          socialEnergy: {
+            value: 2,
+            confidence: 'high',
+            why: 'Prefers small dinners to big parties',
+          },
+          conflictApproach: {
+            value: 5,
+            confidence: 'medium',
+            why: 'Likes to talk problems through',
+          },
+          communicationStyle: {
+            value: 'reflective',
+            confidence: 'medium',
+            why: 'Writes long, considered messages',
+          },
+          weekendRhythm: { value: 'unknown', confidence: 'low', why: '' },
+        },
+      }),
+      '```',
+    ].join('\n');
+    await page.evaluate((text) => navigator.clipboard.writeText(text), reply);
+    await page.getByLabel('Assistant’s reply').fill('');
+    await button('Paste from clipboard').click();
+    await button('Read the answers').click();
+  });
+
+  await step('persona review in onboarding', async () => {
+    await heading('Is this you?').waitFor({ timeout: 15000 });
+    await page.getByText('Prefers small dinners to big parties — from ChatGPT').waitFor();
+    await page.getByText('Thoughtful and considered').waitFor();
+    await snap('persona-review');
+    // Correct one answer: it moves to "You told us".
+    await button('Change Social energy').click();
+    await page.getByRole('dialog', { name: 'Social energy' }).waitFor();
+    await page.getByRole('radio', { name: 'In between' }).click();
+    await snap('persona-edit');
+    await button('Save').click();
+    await page
+      .getByRole('button', { name: 'That’s right Social energy' })
+      .waitFor({ state: 'detached' });
+    await button('Approve and continue').click();
+  });
+
   await step('onboarding: preferences', async () => {
     await heading('Who should we look for?').waitFor();
     await button('Increase Oldest').click();
@@ -211,6 +300,27 @@ async function main() {
     await snap('you');
   });
 
+  await step('persona from settings', async () => {
+    await page.getByRole('link', { name: /^Your persona/ }).click();
+    await heading('Your persona.')
+      .waitFor({ timeout: 15000 })
+      .catch(() => heading('Is this you?').waitFor());
+    // The profile-based suggestions requested during onboarding arrive as a new draft.
+    await page
+      .getByText('These are new suggestions.', { exact: false })
+      .waitFor({ timeout: 15000 });
+    await page.getByText('Somewhere in between').waitFor(); // the person's own answer survived
+    await snap('persona-settings');
+    await button('Approve').click();
+    await heading('Your persona.').waitFor();
+    await page.getByRole('switch', { name: 'Suggestions from my profile', checked: true }).click();
+    await page
+      .getByRole('switch', { name: 'Suggestions from my profile', checked: false })
+      .waitFor();
+    await button('Back').click();
+    await page.getByText(/things approved/).waitFor();
+  });
+
   await step('session survives a reload', async () => {
     await page.reload({ waitUntil: 'networkidle' });
     await heading('Asha, 28').waitFor({ timeout: 15000 });
@@ -223,7 +333,10 @@ async function main() {
     await snap('settings-profile');
     await button('Save').click();
     await page.getByText('Product designer').waitFor();
-    await page.getByRole('switch', { name: 'Visible to others', checked: true }).click();
+    const visibility = page.getByRole('switch', { name: 'Visible to others', checked: true });
+    // Centre it: the floating tab bar covers the bottom edge of the viewport.
+    await visibility.evaluate((element) => element.scrollIntoView({ block: 'center' }));
+    await visibility.click();
     await page.getByText('Hidden. Nobody new will see you.').waitFor();
   });
 

@@ -1,66 +1,107 @@
 # AI Persona Engine
 
-Status: **designed, not implemented** (Milestone 3). The storage for it exists
-(`personas`, `persona_versions`, `persona_evidence`, `ai_imports`).
+Status: **implemented** (Milestone 3) with the deterministic mock provider. The Gemini adapter
+is written but has **not been run against the live API** (no key configured yet).
 
 ## What a persona is
 
 A structured, versioned description of how someone communicates, socialises and wants to
-relate — built from what they told us and approved by them. It is a working model for
-matching, not a psychological assessment, and the product never presents it as one.
+relate — built from what they gave VYRA and approved by them. It is a working model for
+suggestions, not a psychological assessment, and the app says so on every persona screen.
 
-## Attribute record
+## Attribute catalogue (`packages/validation/src/persona.ts`, schema version 1)
 
-Every attribute, in every version, carries:
+| Key                       | Type  | Values                                               |
+| ------------------------- | ----- | ---------------------------------------------------- |
+| `socialEnergy`            | scale | 0 recharges alone … 1 recharges around people        |
+| `emotionalExpressiveness` | scale | 0 keeps feelings private … 1 shares openly           |
+| `intellectualCuriosity`   | scale | 0 prefers the familiar … 1 chases new ideas          |
+| `adventureOrientation`    | scale | 0 routine and comfort … 1 seeks the unfamiliar       |
+| `planningStyle`           | scale | 0 spontaneous … 1 plans ahead                        |
+| `conflictApproach`        | scale | 0 needs space first … 1 talks it through at once     |
+| `affectionExpression`     | scale | 0 shows care quietly … 1 shows care openly           |
+| `communicationStyle`      | enum  | concise · expansive · playful · reflective           |
+| `lifestylePace`           | enum  | homebody · balanced · outgoing                       |
+| `weekendRhythm`           | enum  | restful · social · adventurous · productive          |
+| `values`                  | list  | up to 5 of 15 fixed words (honesty, kindness, …)     |
+| `boundaries`              | list  | up to 5 free-text items — **set only by the person** |
 
-| Field              | Meaning                                                                                                       |
-| ------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `value`            | Typed per attribute (scale 0–1, enum, or list)                                                                |
-| `confidence`       | 0–1, calibrated (below)                                                                                       |
-| `evidenceCategory` | `OBSERVED`, `INFERRED` or `USER_STATED`                                                                       |
-| `sourceType`       | `PROFILE`, `PHOTO`, `CHATGPT_IMPORT`, `GEMINI_IMPORT`, `INTEREST_SELECTION`, `INTEGRATION`, `USER_CORRECTION` |
-| `updatedAt`        | When this value was last set                                                                                  |
-| `confirmation`     | `unreviewed`, `confirmed` or `corrected`                                                                      |
+There is no field for health, religion, caste, ethnicity, sexuality, politics or finances, so
+none can be inferred, stored or shown. A test enforces this.
 
-An attribute with no evidence is **unknown** and is stored as absent, not as a default value.
+Each stored attribute carries `value`, `confidence` (0–1), `evidenceCategory`
+(`USER_STATED` · `OBSERVED` · `INFERRED`), `sourceType`, `updatedAt`, `confirmation`
+(`unreviewed` · `confirmed` · `corrected`) and `needsReview`. A missing attribute is
+**unknown** and is shown in its own section, never filled with a default.
 
-Planned attribute groups: social energy, communication style, emotional expression,
-intellectual curiosity, lifestyle, adventure orientation, romantic preferences, relationship
-intention, interests, user-confirmed boundaries.
+## Sources
 
-## Pipeline
+1. **The person's own profile** (needs consent `AI_PERSONA_PROCESSING`): bio, occupation,
+   selected interests, relationship intentions. Name, age, gender, city and photos are
+   deliberately not sent. Text is redacted (e-mails, numbers, links, handles, key-like strings).
+2. **Their own AI assistant** (needs consent `AI_IMPORT_PROCESSING`) — see below.
+3. **The person's edits and confirmations.**
 
-1. **Collect** permitted sources: profile fields, selected interests, approved import
-   extracts, earlier corrections.
-2. **Extract evidence** (worker): the provider returns candidate attributes, each with a
-   short evidence summary, as JSON matching a Zod schema. Invalid output is rejected and
-   retried once, then failed — never repaired by guesswork.
-3. **Calibrate** deterministically: confidence is capped by evidence category
-   (stated > observed > inferred) and by evidence count; contradictory evidence lowers
-   confidence and flags the attribute for the user rather than picking a side.
-4. **Draft** a new `persona_versions` row (`DRAFT`).
-5. **Review**: the user sees observed, inferred and unknown separately, edits or removes
-   anything, and approves.
-6. **Approve**: the version becomes `APPROVED`, the previous one `SUPERSEDED`, an embedding is
-   computed, and cached compatibility for this user is naturally invalidated.
+## Pipeline (profile)
 
-User corrections always win and are stored as `USER_STATED` / `USER_CORRECTION` at high
-confidence.
+1. `POST /v1/me/persona/generate` queues a BullMQ job (one in flight per person, one request a
+   minute).
+2. The worker builds the source bundle, each item with a ref id (`profile.bio`,
+   `interest.trekking`, …), and asks the provider for attributes. The provider's answer is
+   typed `unknown`.
+3. `candidatesFromModel` keeps only catalogue attributes with a valid value **and at least one
+   ref that exists in the bundle**; `boundaries` are refused from any AI source. Everything
+   else is dropped (and logged as key + reason code only). Unusable output is retried once,
+   then the generation is marked `failed` with a code — never repaired.
+4. `combine` (deterministic) merges the candidates into the open draft, or a copy of the
+   approved persona.
+5. The person reviews, edits and approves.
 
-## Guardrails
+### Calibration
 
-- No inference of sensitive traits: health, religion, caste, ethnicity, sexual orientation,
-  political opinion, finances. The schema has no fields for them and the extraction prompt
-  forbids them; a post-filter drops anything that slips through.
-- Imported content is untrusted input. It is redacted for secrets and identifiers, passed as
-  delimited data, and instructions inside it are ignored by construction (the model is asked
-  only to fill a fixed schema).
-- Source conversations are never shown to other users and never stored beyond the retention
-  window. Only short derived summaries persist.
-- Private data is never used to train shared models.
+- Category caps: `USER_STATED` 0.95, `OBSERVED` 0.8, `INFERRED` 0.6.
+- Model inferences: `confidence = cap × (0.6 + 0.4 × min(n, 3) / 3)` for _n_ cited items.
+- Sources that agree (scales within 0.25, equal enums, overlapping lists) are combined —
+  confidence-weighted mean for scales, union for lists — with +0.05 per extra source, capped.
+- Sources that disagree: the stronger value is kept at **half** confidence and the attribute
+  is flagged `needsReview`. VYRA does not pick a side silently.
+- Anything the person set, confirmed or corrected is never changed by any later source.
+
+## "Ask your AI" — questionnaire round trip
+
+Many people already talk to an assistant that knows them. VYRA cannot (and does not try to)
+read those accounts. Instead:
+
+1. The person picks their assistant: ChatGPT, Gemini, Claude, DeepSeek, Copilot or another.
+2. VYRA builds a questionnaire (`buildQuestionnairePrompt`, shared package) and the person
+   copies it into their assistant. It asks for 1–5 answers, fixed options or "unknown" for
+   each attribute, with a confidence and a one-line reason, as one JSON code block. It tells
+   the assistant to leave out names, places, contact details and sensitive topics.
+   Assistants that usually don't remember past chats get a warning in the app and a prompt
+   that asks for "unknown" rather than guesses.
+3. The person reads the answer and pastes it back. `POST /v1/me/persona/assistant-reflection`
+   parses it **as data only** — it is never sent to a model, so instructions inside it have no
+   effect. Unasked keys, invalid values and sensitive content are dropped. The reply itself is
+   not stored or logged; only the parsed values and a redacted reason (≤ 200 characters) are.
+4. Answers become `INFERRED` evidence with `sourceType ASSISTANT_REFLECTION` and the assistant
+   name, confidence low/medium/high → 0.3/0.45/0.6, merged with the same `combine` step.
+
+## Versions and storage
+
+- Editing or adding sources writes to one open `DRAFT` version (opened from the approved one
+  if needed). Approval makes it `APPROVED`, the previous one `SUPERSEDED`, and stores a
+  768-dimension embedding in `vyra_vector.persona_embeddings`, replacing older ones.
+- `persona_evidence` holds one short summary per reason — never source text.
+- Withdrawing either AI consent deletes drafts immediately; the approved persona stays until
+  the person deletes it (`DELETE /v1/me/persona`) or their account.
 
 ## Providers
 
-`AiProvider` interface, chosen by `AI_PROVIDER`: `mock` (deterministic, default, used in all
-tests), `gemini`, `openai`. Real providers are only reported as working after a real call
-succeeds with a configured key.
+`AI_PROVIDER=mock` (default, all tests): transparent keyword and interest rules; same input,
+same output; SHA-256-seeded embeddings. `AI_PROVIDER=gemini` with `GEMINI_API_KEY`:
+`@google/genai`, JSON-schema-constrained output, temperature 0, user material inside one
+JSON-encoded `<member_data>` block; models `GEMINI_MODEL` (default `gemini-3.8-flash`) and
+`GEMINI_EMBEDDING_MODEL` (default `gemini-embedding-001`, 768 dimensions, re-normalised).
+`openai` is rejected at boot until implemented.
+
+Private data is never used to train shared models.

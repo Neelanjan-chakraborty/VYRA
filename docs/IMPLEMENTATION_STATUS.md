@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 14 November 2026, end of Milestone 2.
+Last updated: 14 November 2026, end of Milestone 3.
 
 ## Summary
 
@@ -9,11 +9,30 @@ Last updated: 14 November 2026, end of Milestone 2.
 | 0 — Audit and plan            | Done                                              |
 | 1 — Foundation                | Done                                              |
 | 2 — Design and authentication | Done, with the gaps listed below                  |
-| 3 — AI Persona                | Not started (schema tables and design doc only)   |
+| 3 — AI Persona                | Done with the mock provider; Gemini unverified    |
 | 4 — Compatibility             | Not started (weights, tables and design doc only) |
 | 5–8                           | Not started                                       |
 
 ## What works today
+
+**New in Milestone 3 — AI persona.** During onboarding (optional) or later under You → Your
+persona, a person can:
+
+- let VYRA draft a persona from their own bio, interests and intentions (consent required);
+- **ask the AI assistant they already use**: pick ChatGPT, Gemini, Claude, DeepSeek, Copilot
+  or another, copy VYRA's questionnaire into it, paste its answer back; VYRA reads only the
+  answers, never keeps the reply, and never connects to the assistant;
+- review the result split into **You told us / We inferred / Not known yet**, with confidence
+  in words and the reason for every inference, and flags where sources disagree;
+- confirm, change or remove anything, set boundaries only they can set, and approve — or
+  discard; approval stores a 768-dimension embedding for matching;
+- withdraw either AI consent (drafts are deleted at once) or delete the persona entirely.
+
+API: persona and consent endpoints, BullMQ generation worker (in-process, or separately via
+`dist/worker.js`), deterministic mock provider, Gemini adapter, calibration, questionnaire
+parser. 12 attributes, none for sensitive traits.
+
+**From Milestone 2:**
 
 A person can sign up with an e-mail address or phone number, prove they are an adult, give
 consent, build a profile with photos, interests, intentions and discovery preferences, use the
@@ -41,40 +60,44 @@ delete their account.
 - **Terms of Service and Privacy Policy documents do not exist**; the consent screen has
   nothing to link to.
 - Orbit, Discover, Connections and Messages are still empty states.
-- No persona, compatibility, discovery, messaging, import, admin console.
-- Onboarding has no AI-import or persona-review step yet (decision D-024).
+- No compatibility scoring, discovery, messaging, archive import, admin console.
+- The approved persona is stored but nothing uses it yet; Milestone 4 will.
 - Photo moderation does not exist; photos are not yet shown to anyone but their owner.
 
 ## Verification (run 14 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                         |
-| --------------------------------- | -------------------------------------------------------------- |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                           |
-| `pnpm build`, `pnpm typecheck`    | Pass                                                           |
-| `pnpm test`                       | Pass — 45 tests (validation 22, design-system 11, api 12)      |
-| `pnpm test:e2e`                   | Pass — 64 tests against real PostgreSQL and Redis              |
-| `prisma migrate diff --exit-code` | Pass — no drift, 2 migrations                                  |
-| `expo export --platform web`      | Pass                                                           |
-| `pnpm e2e:web`                    | Pass — 14 steps, 18 screenshots, no browser errors (see below) |
+| Check                             | Result                                                        |
+| --------------------------------- | ------------------------------------------------------------- |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                          |
+| `pnpm build`, `pnpm typecheck`    | Pass                                                          |
+| `pnpm test`                       | Pass — 91 tests (validation 34, design-system 11, api 46)     |
+| `pnpm test:e2e`                   | Pass — 87 tests against real PostgreSQL, Redis and the queue  |
+| `prisma migrate diff --exit-code` | Pass — no drift, 3 migrations                                 |
+| `expo export --platform web`      | Pass                                                          |
+| `pnpm e2e:web`                    | Pass — 21 steps, 25 screenshots, no unexpected browser errors |
+| `node dist/worker.js`             | Starts and connects (standalone worker)                       |
 
-The API e2e suite covers: OTP hashing, enumeration resistance, per-destination and per-IP
-limits, wrong/expired/replayed/superseded codes, attempt lock-out, under-18 refusal with
-nothing stored, the 18th-birthday boundary, consent enforcement, forged and cross-purpose
-tokens, refresh rotation, reuse revocation, logout, suspension, profile validation,
-mass-assignment, upload content sniffing, EXIF/GPS removal, size and count limits,
-duplicates, reorder, another person's photo (IDOR), signed-URL forgery/extension/swap/
-traversal, onboarding gating, and full account deletion.
+New in Milestone 3, the API tests cover: consent required for each AI source; generation
+through the real queue; evidence stored without raw profile text or contact details;
+provider output with invented evidence, unknown or sensitive keys, AI-set boundaries and
+invalid values filtered; garbage output retried once then failed with a code; empty profile;
+edit / confirm / remove / approve / discard; supersession keeps one embedding; pasted replies
+merged, disagreement flagged, the reply absent from the database and audit log; unusable
+replies explained with nothing saved; oversize replies; consent withdrawal deleting drafts;
+another person's persona inaccessible; persona and embedding removed on deletion. Unit tests
+cover calibration, redaction, prompt containment against injection, the mock provider's
+determinism and the reply parser (prose around JSON, two blocks, truncation, wrong version,
+injected instructions).
 
-`pnpm e2e:web` drives the real exported app in Chromium against the real API: under-age
-refusal, field validation, wrong then right code, age, consent, all five onboarding steps
-with a real photo upload, the signed-in tabs, session restore after reload, editing from
-Settings, the visibility toggle, layout at 320pt and 820pt without overflow, sign-out,
-sign-in as a returning person, account deletion, and re-registration of the freed address.
+`pnpm e2e:web` now also walks the onboarding "Help VYRA understand you" step, picks ChatGPT,
+copies the questionnaire (checked via the real clipboard), pastes an unusable reply (error
+shown), pastes a valid one, corrects an answer, approves, then later reviews and approves the
+profile-based suggestions from Settings and switches profile reading off.
 
-Not verified: iOS and Android native builds (no simulator or emulator here) — including
-Keychain storage, the native photo picker, keyboard avoidance and SMS code autofill; the
-GitHub Actions workflow (has not run); Docker Compose; screen-reader behaviour on a device;
-component-level mobile tests (none exist — the browser run is the UI test).
+Not verified: the Gemini adapter against the live API (no key); the questionnaire against
+real ChatGPT/Gemini/Claude/DeepSeek/Copilot replies (only hand-written replies in the format
+the prompt asks for); iOS and Android native builds, including the native clipboard; the
+GitHub Actions workflow; Docker Compose; screen readers on a device.
 
 ## Known issues and caveats
 
@@ -85,8 +108,12 @@ component-level mobile tests (none exist — the browser run is the UI test).
 - Photo reordering in the app is "show this one first", not drag and drop.
 - The country code on the phone field is a pre-filled `+91`, not a country picker.
 - Refresh on web uses `sessionStorage` (QA target only).
-- A Gemini API key is still not saved in the environment. Needed for Milestone 3's real
-  provider; the mock provider needs nothing.
+- A Gemini API key is still not saved in the environment; the app runs on the mock provider.
+- Fixed in this milestone: on web, tab screens grew with their content so the page scrolled
+  under the tab bar. Tab screens now scroll inside their own frame.
+- A removed attribute can be suggested again by the next generation (backlog).
+- If storing an embedding fails, the persona is still approved without one (logged; no
+  backfill job yet).
 
 ## Resume here
 
@@ -99,6 +126,6 @@ pnpm build
 pnpm check && pnpm test:e2e
 ```
 
-Then start Milestone 3 (`docs/IMPLEMENTATION_BACKLOG.md`): persona schema in
-`@vyra/validation`, the `AiProvider` interface with the deterministic mock, then the
-generation worker.
+Then start Milestone 4 (`docs/IMPLEMENTATION_BACKLOG.md`): the pure
+`@vyra/compatibility-engine` package with synthetic-profile tests, scoring approved persona
+versions only.

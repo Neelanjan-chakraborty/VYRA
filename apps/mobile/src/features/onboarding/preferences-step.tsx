@@ -22,7 +22,7 @@ const DISTANCES: readonly { label: string; km: number | null }[] = [
 ];
 
 export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
-  const chrome = useStepChrome(mode, 4);
+  const chrome = useStepChrome(mode, 5);
   const me = useMe().data;
   const current = me?.discoveryPreferences;
   const save = useSetPreferences();

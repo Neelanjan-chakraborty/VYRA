@@ -95,6 +95,29 @@ layout): signed out → auth, onboarding → setup, active → app.
 (`pnpm e2e:web`) against the real API, replacing the tab-only screenshot script. Component
 tests with `jest-expo` are deferred; see the backlog.
 
+**D-028 · Provider output is typed `unknown` and filtered, never repaired.** An attribute
+survives only if it is in the catalogue, has a valid value and cites material the person
+actually gave. Unusable output is retried once and then fails with a code.
+
+**D-029 · Calibration is deterministic code, not the model's own confidence.** Caps by
+evidence type; disagreement halves confidence and asks the person.
+
+**D-030 · "Ask your AI" is a copy-and-paste questionnaire, not an integration.** No assistant
+offers an API to read a person's history. The person copies VYRA's questions into their own
+assistant and pastes the answer back. VYRA parses the answer as JSON and never sends it to a
+model, which makes prompt injection through it inert. Requested by the product owner during
+Milestone 3.
+
+**D-031 · Scales are asked as 1–5 and stored as 0–1,** edited as a five-step control. They
+describe tendencies, not measurements, so a continuous slider would imply false precision.
+
+**D-032 · Generation runs on BullMQ inside the API process by default.** `src/worker.ts`
+and `RUN_QUEUE_WORKERS=false` split it out without code changes when load requires it.
+
+**D-033 · Default Gemini models: `gemini-3.8-flash` and `gemini-embedding-001`** (both
+configurable). The embedding model is the stable one; `gemini-embedding-2` was preview-only
+when checked (14 Nov 2026).
+
 ## Open (need the product owner)
 
 | #   | Question                                              | Needed by     | Default if unanswered                                             |

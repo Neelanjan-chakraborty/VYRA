@@ -21,14 +21,18 @@ Carried forward from Milestone 2 (not blocking Milestone 3):
 - Native device pass: Keychain storage, photo picker permissions, keyboard, SMS autofill.
 - Scheduled clean-up of expired OTP challenges and sessions.
 
-## Milestone 3 — AI Persona (next)
+## Milestone 3 — AI Persona ✅
 
-Persona Zod schema (versioned) · `AiProvider` interface + deterministic mock + Gemini adapter ·
-generation worker (BullMQ) · calibration and contradiction handling · draft/approve/edit API ·
-persona review and persona screens · embeddings into `vyra_vector` · tests incl.
-prompt-injection fixtures and sensitive-trait filter.
+Carried forward from Milestone 3:
 
-## Milestone 4 — Compatibility
+- Verify the Gemini adapter against the live API once a key is configured; review the
+  privacy notice before enabling it for real users.
+- Redis-backed rate-limit store and a separate worker deployment before scaling out.
+- Remember attributes a person removed, so a later generation doesn't suggest them again.
+- Embedding backfill job for approved versions whose embedding failed to store.
+- Mobile component tests for the persona review and questionnaire screens.
+
+## Milestone 4 — Compatibility (next)
 
 `@vyra/compatibility-engine` package: feature extraction, similarity functions, weighted
 confidence-aware score, sufficiency states, gates, ten scenarios, explanations · API service

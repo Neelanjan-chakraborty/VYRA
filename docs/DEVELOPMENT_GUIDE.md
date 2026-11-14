@@ -52,6 +52,10 @@ API (`apps/api/.env`, validated at boot by `src/config/env.ts`):
 | `STORAGE_DRIVER` / `STORAGE_LOCAL_DIR` | `local` / `./.storage` | Photo storage. `local` is refused in production |
 | `PUBLIC_API_URL` | `http://localhost:4000` | Origin used in signed media URLs |
 
+| `GEMINI_API_KEY` | — | Required only with `AI_PROVIDER=gemini` |
+| `GEMINI_MODEL` / `GEMINI_EMBEDDING_MODEL` | `gemini-3.8-flash` / `gemini-embedding-001` | Gemini models |
+| `RUN_QUEUE_WORKERS` | `true` | `false` stops this process running queue jobs; run `node apps/api/dist/worker.js` instead |
+
 **Signing in during development:** no message is sent. The verification screen shows the code
 under "Development build", and the API returns it as `devCode`.
 

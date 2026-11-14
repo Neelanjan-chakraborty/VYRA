@@ -38,6 +38,7 @@ pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>   # browser run of t
   duplicated in an app. No `any`.
 - Database changes: follow the `database-migrations` skill. Never edit an applied migration.
 - UI work: follow the `vyra-design-system` skill. Tokens only, no raw hex or font sizes in screens.
+- Persona and anything sent to a model: follow the `persona-engineering` skill.
 - AI output is untrusted data. Compatibility is computed deterministically, never by asking an
   LLM. Tests use the mock AI provider (`AI_PROVIDER=mock`).
 - Never log message bodies, imported content, tokens or OTPs.

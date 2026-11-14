@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/notice';
 import { Toggle } from '@/components/ui/toggle';
 import { signOut } from '@/features/auth/auth-api';
+import { usePersona } from '@/features/persona/persona-api';
 import { useDeleteAccount, useMe, useUpdateProfile } from '@/features/profile/profile-api';
 import { errorMessage } from '@/lib/api';
 
@@ -36,6 +37,18 @@ function preferenceSummary(me: Me): string {
   if (!prefs) return 'Not set';
   const distance = prefs.maxDistanceKm === null ? 'anywhere' : `within ${prefs.maxDistanceKm} km`;
   return `Ages ${prefs.minAge}–${prefs.maxAge}, ${distance}`;
+}
+
+function personaSummary(view: ReturnType<typeof usePersona>['data']): string {
+  if (!view) return 'Loading…';
+  if (view.generation.status === 'queued' || view.generation.status === 'generating')
+    return 'Being prepared…';
+  if (view.draft) return 'New suggestions to review';
+  if (view.current) {
+    const n = Object.keys(view.current.attributes).length;
+    return `${n} ${n === 1 ? 'thing' : 'things'} approved`;
+  }
+  return 'Not set up';
 }
 
 function LinkRow(props: { label: string; value: string; href: Href }) {
@@ -69,6 +82,7 @@ function LinkRow(props: { label: string; value: string; href: Href }) {
 
 export default function YouScreen() {
   const me = useMe().data;
+  const persona = usePersona().data;
   const updateProfile = useUpdateProfile();
   const deleteAccount = useDeleteAccount();
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -113,6 +127,7 @@ export default function YouScreen() {
         href="/settings/interests"
       />
       <LinkRow label="Looking for" value={intentSummary(me)} href="/settings/intention" />
+      <LinkRow label="Your persona" value={personaSummary(persona)} href="/settings/persona" />
 
       <Text variant="eyebrow" tone="textSecondary" style={styles.section}>
         Discovery
