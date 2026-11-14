@@ -1,6 +1,11 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { CompatibilityView, PublicProfile, RecommendationList } from '@vyra/validation';
+import type {
+  CompatibilityView,
+  CriteriaImpact,
+  PublicProfile,
+  RecommendationList,
+} from '@vyra/validation';
 import { z } from 'zod';
 import { type AuthContext, CurrentUser } from '../auth/auth.decorators.js';
 import { CompatibilityService } from './compatibility.service.js';
@@ -29,6 +34,14 @@ export class CompatibilityController {
     @Param('userId', { schema: z.uuid() }) userId: string,
   ): Promise<PublicProfile> {
     return this.compatibility.profile(user.userId, userId);
+  }
+
+  @Get('discovery/criteria-impact')
+  @ApiOperation({
+    summary: 'How much your must-haves narrow who you can be shown (bucketed counts)',
+  })
+  impact(@CurrentUser() user: AuthContext): Promise<CriteriaImpact> {
+    return this.compatibility.criteriaImpact(user.userId);
   }
 
   @Get('discovery/recommendations')

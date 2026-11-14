@@ -36,15 +36,14 @@ Carried forward from Milestone 3:
 
 Carried forward from Milestone 4:
 
-- Collect a coarse location (opt-in) so the distance gate does something.
-- Deal-breaker editing in the app (API accepts them; no screen yet).
-- Explicit gender category choice in the profile, so free text never hides anyone (D-036).
 - Reciprocal interest in ranking once connection requests exist.
 - Index review of the candidate query with realistic data volumes (Milestone 8).
 
 ## Milestone 5 — Discovery (next)
 
-Start with photo moderation (photos are not shown to others until approved).
+Done ahead of the milestone: photo moderation, first Discover list and profile preview.
+Still to do: save / pass / connect, connection requests, Orbit, compatibility detail screen,
+admin moderation UI.
 
 Recommendation API · Orbit (gesture canvas + accessible list view) · Deep Discover profile
 reading · compatibility detail screen · save / pass / connect · discovery events · filters.

@@ -169,7 +169,7 @@ describe('Profile, photos and account (e2e)', () => {
       expect(meSchema.parse(response.body).discoveryPreferences).toEqual({
         ...prefs,
         includeUnlistedGenders: true,
-        dealBreakers: [],
+        criteria: [],
       });
       await http()
         .put('/v1/me/discovery-preferences')

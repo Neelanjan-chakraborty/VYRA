@@ -70,12 +70,39 @@ and deletion take effect at once.
 
 ### Photos 🔒
 
-| Method | Path                                    | Description                                                                                                                                                                              |
-| ------ | --------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| POST   | `/v1/me/photos`                         | `multipart/form-data`, field `file`. JPEG/PNG/WebP judged by content, ≤ 10 MB (`413`), ≥ 400 px. Re-encoded to JPEG ≤ 2048 px with all metadata removed. Max 6 and no duplicates (`409`) |
-| PUT    | `/v1/me/photos/order`                   | Body `{photoIds}` naming every photo once                                                                                                                                                |
-| DELETE | `/v1/me/photos/:photoId`                | `204`. Another person's photo id → `404`                                                                                                                                                 |
-| GET    | `/v1/media/photos/:owner/:file?exp&sig` | Public but only with a valid signature (10-minute lifetime). Anything else → `404`                                                                                                       |
+| Method | Path                                      | Description                                                                                                                                                                                                                                                                                                                                        |
+| ------ | ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/v1/me/photos`                           | `multipart/form-data`, field `file`. Declared type must be `image/jpeg`, `image/png` or `image/webp` (`415` otherwise) **and** match the actual bytes (`400`). ≤ 10 MB (`413`), 400–8000 px per side, ≤ 50 MP. Re-encoded to JPEG ≤ 2048 px with all metadata removed. Max 6, no duplicates (`409`). Starts `PENDING` and is queued for moderation |
+| PUT    | `/v1/me/photos/:photoId`                  | Replace a photo in place: new image, back to `PENDING`, re-moderated; URLs of the old image stop working                                                                                                                                                                                                                                           |
+| POST   | `/v1/me/photos/:photoId/appeal`           | `204`. Ask a person to review a `REJECTED` photo; once per upload (`409` otherwise)                                                                                                                                                                                                                                                                |
+| PUT    | `/v1/me/photos/order`                     | Body `{photoIds}` naming every photo once                                                                                                                                                                                                                                                                                                          |
+| DELETE | `/v1/me/photos/:photoId`                  | `204`. Another person's photo id → `404`                                                                                                                                                                                                                                                                                                           |
+| GET    | `/v1/media/photos/:owner/:file?s&exp&sig` | Signed, 10-minute URL with a scope: `o` owner, `p` public, `m` moderator. Checked against the database on every request: a public URL serves only an `APPROVED` photo of an active, discoverable person. Anything else → `404`                                                                                                                     |
+
+The owner's photo list (in `/v1/me`) includes `status` (`PENDING`, `APPROVED`, `REJECTED`,
+`REVIEW_REQUIRED`), `reason` and `canAppeal`. No other response ever contains a photo that is
+not `APPROVED`.
+
+### Moderation 🔒 (role `MODERATOR` or `ADMIN`)
+
+| Method | Path                                      | Description                                                                                                                       |
+| ------ | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/moderation/photos`                   | Photos in `REVIEW_REQUIRED` (inconclusive, appealed or reported), oldest first, with moderator-scoped URLs and open report counts |
+| POST   | `/v1/moderation/photos/:photoId/decision` | Body `{decision: approve\|reject, reason}`. `204`. Resolves open reports on the photo. Audited                                    |
+
+### Reports 🔒
+
+| Method | Path          | Description                                                                                                                                      |
+| ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/v1/reports` | Body `{reportedUserId, reason, details?, photoId?}`. `202`. Not yourself (`400`). A photo is hidden for review once 2 different people report it |
+
+### Location 🔒
+
+| Method | Path                       | Description                                                                                                                                                                                                                                                                                               |
+| ------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| PUT    | `/v1/me/location`          | `{source:"device", latitude, longitude}` (snapped to a 0.02° grid, labelled with the nearest listed place) or `{source:"manual", countryCode, placeId?, city?, area?}` (a listed place's centre; an unlisted city is a label with no distance). Returns the location view. Coordinates are never returned |
+| DELETE | `/v1/me/location`          | `204`. Clears every location field                                                                                                                                                                                                                                                                        |
+| GET    | `/v1/places?country=IN&q=` | Place search (GeoNames, CC BY 4.0)                                                                                                                                                                                                                                                                        |
 
 ### Consents 🔒
 
@@ -98,13 +125,23 @@ and deletion take effect at once.
 
 ### Compatibility and discovery 🔒
 
-| Method | Path                                     | Description                                                                                                                                                                                                                                            |
-| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | `/v1/discovery/recommendations?limit=20` | Up to 50 ranked people (`recommendationListSchema`): name, age, city, approved photo, `overall` (null when insufficient), `confidence`, `sufficiency`, highlights, shared interests, plus engine and weights versions. Viewer still onboarding → `409` |
-| GET    | `/v1/compatibility/:userId`              | Full result for one person (`compatibilityViewSchema`): overall, six dimensions with features and explanations, ten scenarios. Anyone the viewer may not see — hidden, blocked, outside either person's limits, deleted, self — is `404 Not found.`    |
+| Method | Path                                     | Description                                                                                                                                                                                                                                                                                                                                 |
+| ------ | ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/discovery/recommendations?limit=20` | Up to 50 ranked people (`recommendationListSchema`): name, age, city, approved photo or `null`, distance band or `null`, `overall` (null when insufficient), `confidence`, `sufficiency`, highlights, shared interests; plus `distanceFilter` (`active`, `no_location`, `off`) and engine/weights versions. Viewer still onboarding → `409` |
+| GET    | `/v1/people/:userId`                     | Profile preview (`publicProfileSchema`): name, age, city, bio, occupation, gender only if shown, distance band, approved photos only, interests. Same 404 rules as below                                                                                                                                                                    |
+| GET    | `/v1/discovery/criteria-impact`          | How much the viewer's must-haves narrow things, in buckets (`0`, `1–5`, `6–20`, `20+`), with `significant` when they remove ≥ 50 % of a pool of ≥ 10                                                                                                                                                                                        |
+| GET    | `/v1/compatibility/:userId`              | Full result for one person (`compatibilityViewSchema`): overall, six dimensions with features and explanations, ten scenarios. Anyone the viewer may not see — hidden, blocked, outside either person's limits, deleted, self — is `404 Not found.`                                                                                         |
 
-`PUT /v1/me/discovery-preferences` also accepts `dealBreakers`: up to 5
-`{kind:"attribute", attribute:"lifestylePace"|"weekendRhythm"|"communicationStyle", exclude:[…]}`.
+`PUT /v1/me/discovery-preferences` takes `minAge`, `maxAge`, `maxDistanceKm` (or null),
+`showGenders` (any of `WOMAN`, `MAN`, `NON_BINARY`; empty = everyone),
+`includeUnlistedGenders` (default true), `showAstrology` and `criteria`: up to 5
+`{criterion, mode: must|prefer|open, accepted[]}` for `relationshipIntent`, `lifestylePace`,
+`weekendRhythm`, `communicationStyle`, `values`. Criteria are never shown to anyone else.
+
+`PATCH /v1/me/profile` takes `genderIdentity` (`WOMAN`, `MAN`, `NON_BINARY`, `SELF_DESCRIBE`,
+`PREFER_NOT_TO_SAY` or null), `genderSelfDescription` and `discoverableAs` (only with
+`SELF_DESCRIBE`, else `422`), and `genderVisible` (default false). City and country now come
+from `/v1/me/location`.
 
 ## Planned
 

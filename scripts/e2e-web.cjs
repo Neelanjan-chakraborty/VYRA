@@ -46,6 +46,98 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(file).pipe(res);
 });
 
+const API = 'http://localhost:4000/v1';
+
+function psql(sql) {
+  // Development database only: used to put the test into states a user can't reach directly.
+  require('node:child_process').execSync(
+    `psql postgresql://vyra:vyra@localhost:5432/vyra_dev -qc "${sql}"`,
+  );
+}
+
+async function call(pathname, body, token, method = 'POST') {
+  const response = await fetch(API + pathname, {
+    method,
+    headers: {
+      'content-type': 'application/json',
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!response.ok) throw new Error(`${method} ${pathname}: ${response.status}`);
+  return response.status === 204 ? null : response.json();
+}
+
+/** Registers someone through the public API and returns their tokens. */
+async function apiSession(email) {
+  const code = await call('/auth/otp/request', { channel: 'email', destination: email });
+  const verified = await call('/auth/otp/verify', {
+    channel: 'email',
+    destination: email,
+    challengeId: code.challengeId,
+    code: code.devCode,
+  });
+  return call('/auth/register', {
+    registrationToken: verified.registrationToken,
+    dateOfBirth: '1997-03-03',
+    acceptedTermsVersion: '2026-11',
+    acceptedPrivacyVersion: '2026-11',
+  });
+}
+
+/** A finished, discoverable man in Bengaluru looking for women, built through the API. */
+async function createApiPerson(name) {
+  const tokens = await apiSession(`${name.toLowerCase()}@example.test`);
+  const t = tokens.accessToken;
+  await call(
+    '/me/profile',
+    { displayName: name, genderIdentity: 'MAN', bio: 'Cooks badly, walks well.' },
+    t,
+    'PATCH',
+  );
+  const png = Buffer.from(
+    await (await chromium.launch()).newPage().then(async (p) => {
+      await p.setViewportSize({ width: 600, height: 750 });
+      await p.setContent(
+        '<body style="margin:0;background:linear-gradient(200deg,#4b5d6b,#211d26)"></body>',
+      );
+      const shot = await p.screenshot();
+      await p.context().browser().close();
+      return shot;
+    }),
+  );
+  const form = new FormData();
+  form.append('file', new Blob([png], { type: 'image/png' }), 'p.png');
+  const photo = await (
+    await fetch(`${API}/me/photos`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${t}` },
+      body: form,
+    })
+  ).json();
+  await call('/me/relationship-intents', { intents: [{ kind: 'serious' }] }, t, 'PUT');
+  await call(
+    '/me/discovery-preferences',
+    { minAge: 22, maxAge: 40, maxDistanceKm: null, showGenders: ['WOMAN'], showAstrology: false },
+    t,
+    'PUT',
+  );
+  await call(
+    '/me/location',
+    { source: 'manual', countryCode: 'IN', placeId: 'gn:1277333' },
+    t,
+    'PUT',
+  );
+  // Wait for the real moderation pipeline to finish with the upload first.
+  for (let i = 0; i < 60; i += 1) {
+    const me = await call('/me', null, t, 'GET');
+    if (me.photos[0]?.status !== 'PENDING') break;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  await call('/me/onboarding/complete', null, t);
+  return { photoId: photo.id };
+}
+
 async function main() {
   const browser = await chromium.launch();
   const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
@@ -325,6 +417,24 @@ async function main() {
       .waitFor();
     await page.getByRole('radio', { name: 'Within 25 km' }).click();
     await snap('onboarding-preferences');
+    await button('Continue').click();
+  });
+
+  await step('onboarding: what matters', async () => {
+    await heading('What matters to you?').waitFor();
+    await page.getByText(/Ages 24–35 · Your “show me” choice · Within 25 km/).waitFor();
+    await page.getByRole('radio', { name: 'Pace of life: Preference' }).click();
+    await page.getByRole('checkbox', { name: 'A mix of in and out' }).click();
+    await page.getByRole('radio', { name: 'Values (at least one shared): Must-have' }).click();
+    // A must-have with nothing chosen is refused with an explanation.
+    await button('Finish').click();
+    await page
+      .getByRole('alert')
+      .filter({ hasText: /Choose at least one option/ })
+      .waitFor();
+    await page.getByRole('checkbox', { name: 'Honesty' }).click();
+    await page.getByRole('checkbox', { name: 'Kindness' }).click();
+    await snap('onboarding-matters');
     await button('Finish').click();
   });
 
@@ -335,7 +445,57 @@ async function main() {
     await heading('Asha, 28').waitFor();
     await page.getByText('Something serious · A travel partner').waitFor();
     await page.getByText('Ages 24–35, within 25 km').waitFor();
+    await page.getByText('1 must-have, 1 preference').waitFor();
     await snap('you');
+  });
+
+  await step('discover: unapproved photos never show, approved ones do', async () => {
+    // A second person, created through the API, who fits the viewer's choices.
+    const subjectName = `Ravi${Date.now() % 100000}`;
+    const subject = await createApiPerson(subjectName);
+    // Hold their photo in review, as moderation would for an uncertain image.
+    psql(
+      `update user_photos set moderation_status='REVIEW_REQUIRED', moderation_reason='possibly_explicit', moderated_at=now() where id='${subject.photoId}'`,
+    );
+
+    await page.getByRole('tab', { name: 'Discover' }).click();
+    const card = page.getByRole('link', { name: new RegExp(`^${subjectName},`) });
+    await card.waitFor({ timeout: 15000 });
+    await card.getByRole('img', { name: `No photo of ${subjectName} yet` }).waitFor();
+    if ((await card.getByRole('img', { name: `Photo of ${subjectName}`, exact: true }).count()) > 0)
+      throw new Error('unapproved photo shown');
+    await page.getByText('Under 5 km away').first().waitFor();
+    await snap('discover-placeholder');
+
+    await card.click();
+    await heading(subjectName).waitFor();
+    await page.getByRole('img', { name: `No photo of ${subjectName} yet` }).waitFor();
+    await page.getByText('Estimated alignment', { exact: true }).waitFor();
+    await snap('person-placeholder');
+    await button('Back').click();
+
+    // A moderator approves it; now — and only now — it appears.
+    const moderator = await apiSession(`mod-${Date.now()}@example.test`);
+    psql(
+      `update users set role='MODERATOR' where id=(select user_id from auth_sessions order by created_at desc limit 1)`,
+    );
+    const decision = await fetch(`${API}/moderation/photos/${subject.photoId}/decision`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        authorization: `Bearer ${moderator.accessToken}`,
+      },
+      body: JSON.stringify({ decision: 'approve', reason: 'looks_fine' }),
+    });
+    if (decision.status !== 204) throw new Error(`moderator decision failed: ${decision.status}`);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('tab', { name: 'Discover' }).click();
+    await page
+      .getByRole('link', { name: new RegExp(`^${subjectName},`) })
+      .getByRole('img', { name: `Photo of ${subjectName}`, exact: true })
+      .waitFor({ timeout: 15000 });
+    await snap('discover-approved');
+    await page.getByRole('tab', { name: 'You' }).click();
   });
 
   await step('persona from settings', async () => {
@@ -362,6 +522,16 @@ async function main() {
   await step('location from settings: device, then removal', async () => {
     await page.getByRole('link', { name: /^Where you are/ }).click();
     await heading('Where are you?').waitFor();
+    // Permission denied: VYRA explains and offers the manual choice instead.
+    await context.clearPermissions();
+    await button('Use my approximate location').click();
+    await page.getByText(/Location permission is off/).waitFor();
+    await page.getByLabel('City', { exact: true }).waitFor();
+    await snap('settings-location-denied');
+    await button('Cancel').click();
+    await context.grantPermissions(['clipboard-read', 'clipboard-write', 'geolocation'], {
+      origin: ORIGIN,
+    });
     await button('Use my approximate location').click();
     await page.getByText('From your device, approximate.').waitFor();
     await page.getByText('Bengaluru, Karnataka', { exact: true }).waitFor();

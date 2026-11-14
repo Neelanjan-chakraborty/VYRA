@@ -56,6 +56,19 @@ function personaSummary(view: ReturnType<typeof usePersona>['data']): string {
   return 'Not set up';
 }
 
+function criteriaSummary(me: Me): string {
+  const criteria = me.discoveryPreferences?.criteria ?? [];
+  const must = criteria.filter((c) => c.mode === 'must').length;
+  const prefer = criteria.filter((c) => c.mode === 'prefer').length;
+  if (must + prefer === 0) return 'Open to everything';
+  return [
+    must ? `${must} must-have${must > 1 ? 's' : ''}` : null,
+    prefer ? `${prefer} preference${prefer > 1 ? 's' : ''}` : null,
+  ]
+    .filter(Boolean)
+    .join(', ');
+}
+
 function LinkRow(props: { label: string; value: string; href: Href }) {
   const router = useRouter();
   return (
@@ -147,6 +160,7 @@ export default function YouScreen() {
         href="/settings/location"
       />
       <LinkRow label="Who you see" value={preferenceSummary(me)} href="/settings/preferences" />
+      <LinkRow label="What matters to you" value={criteriaSummary(me)} href="/settings/matters" />
       <View style={styles.row}>
         <View style={styles.rowCopy}>
           <Text variant="bodyStrong">Visible to others</Text>

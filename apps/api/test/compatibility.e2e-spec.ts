@@ -55,7 +55,13 @@ describe('Compatibility and recommendations (e2e)', () => {
         maxAge: 34,
         traits: SOCIAL_PLANNER,
         interests: INTERESTS,
-        dealBreakers: [{ kind: 'attribute', attribute: 'weekendRhythm', exclude: ['productive'] }],
+        criteria: [
+          {
+            criterion: 'weekendRhythm',
+            mode: 'must',
+            accepted: ['restful', 'social', 'adventurous'],
+          },
+        ],
       });
       const man = { gender: 'MAN', showGenders: ['WOMAN'] } as const;
       twin = await createPerson(app, {
@@ -113,7 +119,7 @@ describe('Compatibility and recommendations (e2e)', () => {
       for (const excluded of [casual, tooOld, excludesViewer, hidden, blocked, dealBreaker]) {
         expect(ids).not.toContain(excluded.id);
       }
-      expect(list.engineVersion).toBe('compat-1');
+      expect(list.engineVersion).toBe('compat-2');
       expect(list.weightsVersion).toBe('2026-11-v1');
     });
 
@@ -189,7 +195,7 @@ describe('Compatibility and recommendations (e2e)', () => {
       expect(rows[0]).toMatchObject({
         sufficiency: 'SUFFICIENT',
         weightsVersion: '2026-11-v1',
-        engineVersion: 'compat-1',
+        engineVersion: 'compat-2',
       });
       expect(rows[0]?.scenarios).toHaveLength(10);
       // Pairs where one side has no persona are not cached.
@@ -247,7 +253,7 @@ describe('Compatibility and recommendations (e2e)', () => {
     await http().get('/v1/compatibility/00000000-0000-4000-8000-000000000000').expect(401);
   });
 
-  it('rejects invalid deal-breakers', async () => {
+  it('rejects invalid criteria', async () => {
     const user = await registerUser(app);
     await http()
       .put('/v1/me/discovery-preferences')
@@ -258,7 +264,7 @@ describe('Compatibility and recommendations (e2e)', () => {
         maxDistanceKm: null,
         showGenders: [],
         showAstrology: false,
-        dealBreakers: [{ kind: 'attribute', attribute: 'religion', exclude: ['x'] }],
+        criteria: [{ criterion: 'religion', mode: 'must', accepted: ['x'] }],
       })
       .expect(422);
   });

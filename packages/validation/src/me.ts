@@ -1,9 +1,5 @@
 import { z } from 'zod';
-import {
-  categoryListSchema,
-  dealBreakerListSchema,
-  genderIdentitySchema,
-} from './compatibility.js';
+import { categoryListSchema, criteriaListSchema, genderIdentitySchema } from './compatibility.js';
 import { relationshipIntentSchema } from './domain.js';
 import { locationViewSchema } from './location.js';
 
@@ -75,7 +71,8 @@ export const discoveryPreferencesSchema = z
     /** Also show people who self-describe without choosing searches, prefer not to say, or haven't answered. */
     includeUnlistedGenders: z.boolean().default(true),
     showAstrology: z.boolean(),
-    dealBreakers: dealBreakerListSchema.default([]),
+    /** Must-haves, preferences and open-to-exploring. Private. */
+    criteria: criteriaListSchema.default([]),
   })
   .refine((prefs) => prefs.maxAge >= prefs.minAge, {
     message: 'Maximum age must not be below minimum age',

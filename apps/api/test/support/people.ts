@@ -1,5 +1,5 @@
 import type {
-  DealBreaker,
+  Criterion,
   LocationUpdate,
   GenderCategory,
   GenderIdentity,
@@ -24,7 +24,7 @@ export interface SyntheticPerson {
   readonly maxAge?: number;
   readonly showGenders?: readonly GenderCategory[];
   readonly includeUnlistedGenders?: boolean;
-  readonly dealBreakers?: DealBreaker[];
+  readonly criteria?: Criterion[];
   readonly traits?: Partial<Record<PersonaAttributeKey, PersonaAttributeValue>>;
   readonly interests?: string[];
   readonly discoverable?: boolean;
@@ -86,7 +86,7 @@ export async function createPerson(
       showGenders: [...(spec.showGenders ?? [])],
       includeUnlistedGenders: spec.includeUnlistedGenders ?? true,
       showAstrology: false,
-      dealBreakers: spec.dealBreakers ?? [],
+      criteria: spec.criteria ?? [],
     })
     .expect(200);
   if (spec.interests?.length) {

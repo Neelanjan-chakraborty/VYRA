@@ -11,7 +11,7 @@ import {
 import { compareAll, type Comparison, type FeatureKey, sharedInterestLabels } from './features.js';
 import type { Person, Weights } from './types.js';
 
-export const ENGINE_VERSION = 'compat-1';
+export const ENGINE_VERSION = 'compat-2';
 
 type FeatureWeights = Readonly<Partial<Record<FeatureKey, number>>>;
 
@@ -22,7 +22,8 @@ export const DIMENSION_FEATURES: Readonly<Record<CompatibilityDimension, Feature
   lifestyle: { socialEnergy: 1, lifestylePace: 1, weekendRhythm: 1, planningStyle: 1 },
   relationshipAlignment: { intents: 2, values: 1 },
   intellectual: { intellectualCuriosity: 1, adventureOrientation: 1, sharedInterests: 1 },
-  mutualPreferences: { preferenceFit: 1 },
+  // Stated limits (how comfortably each fits the other's) and soft preferences.
+  mutualPreferences: { preferenceFit: 1, statedPreferences: 2 },
 };
 
 /** Explicit features for each scenario. Nothing is simulated. */

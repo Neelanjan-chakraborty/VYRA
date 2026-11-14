@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { Person } from '@vyra/compatibility-engine';
 import {
   ageInYears,
-  dealBreakerListSchema,
+  criteriaListSchema,
   type GenderCategory,
   type GenderIdentity,
   GENDER_LABELS,
@@ -109,7 +109,7 @@ export class PeopleService {
           maxDistanceKm: prefs?.maxDistanceKm ?? null,
           showGenders: (prefs?.showGenders ?? []).filter(isCategory),
           includeUnlistedGenders: prefs?.includeUnlistedGenders ?? true,
-          dealBreakers: dealBreakerListSchema.catch([]).parse(prefs?.dealBreakers ?? []),
+          criteria: criteriaListSchema.catch([]).parse(prefs?.criteria ?? []),
         },
         location:
           user.profile?.latitude != null && user.profile.longitude != null

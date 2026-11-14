@@ -16,7 +16,7 @@ import { SelectRow } from '@/components/ui/select-row';
 import { Stepper } from '@/components/ui/stepper';
 import { Tag } from '@/components/ui/tag';
 import { Toggle } from '@/components/ui/toggle';
-import { useCompleteOnboarding, useMe, useSetPreferences } from '@/features/profile/profile-api';
+import { useMe, useSetPreferences } from '@/features/profile/profile-api';
 import { errorMessage } from '@/lib/api';
 import { type StepMode, useStepChrome } from './step-chrome';
 
@@ -32,7 +32,6 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
   const distanceAvailable = me?.location?.distanceAvailable ?? false;
   const current = me?.discoveryPreferences;
   const save = useSetPreferences();
-  const complete = useCompleteOnboarding();
   const ownAge = me?.age ?? 25;
   const [minAge, setMinAge] = useState(current?.minAge ?? Math.max(18, ownAge - 4));
   const [maxAge, setMaxAge] = useState(current?.maxAge ?? ownAge + 6);
@@ -57,19 +56,15 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
         showGenders: [...showGenders],
         includeUnlistedGenders: includeUnlisted,
         showAstrology: current?.showAstrology ?? false,
-        dealBreakers: current?.dealBreakers ?? [],
+        criteria: current?.criteria ?? [],
       },
       {
-        onSuccess: () => {
-          // Finishing onboarding flips the account to active; the root guard then shows the app.
-          if (mode === 'onboarding') complete.mutate();
-          else chrome.advance();
-        },
+        onSuccess: chrome.advance,
       },
     );
   }
 
-  const failure = save.error ?? complete.error;
+  const failure = save.error;
 
   return (
     <FormScreen
@@ -78,13 +73,7 @@ export function PreferencesStep({ mode }: { readonly mode: StepMode }) {
       showBack={chrome.showBack}
       title="Who should we look for?"
       intro="These are limits, not rankings. You can change them whenever you like."
-      footer={
-        <Button
-          label={mode === 'onboarding' ? 'Finish' : chrome.submitLabel}
-          loading={save.isPending || complete.isPending}
-          onPress={submit}
-        />
-      }
+      footer={<Button label={chrome.submitLabel} loading={save.isPending} onPress={submit} />}
     >
       <ErrorNotice message={failure ? errorMessage(failure) : undefined} />
 

@@ -1,6 +1,8 @@
 import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   ENGINE_VERSION,
+  failsMustHaves,
+  type Person,
   highlights,
   ineligibility,
   rankWithDiversity,
@@ -11,6 +13,8 @@ import {
 import {
   type CompatibilityResult,
   type CompatibilityView,
+  countBucket,
+  type CriteriaImpact,
   distanceKm,
   distanceLabel,
   type DistanceFilterStatus,
@@ -26,6 +30,8 @@ import { type LoadedPerson, PeopleService } from './people.service.js';
 
 /** Largest candidate pool scored per recommendations request. */
 export const CANDIDATE_POOL = 200;
+/** Pool used to estimate how much must-haves narrow things. */
+const IMPACT_POOL = 500;
 const WEIGHTS_CACHE_MS = 60_000;
 const NOT_FOUND = 'Not found.';
 
@@ -123,6 +129,40 @@ export class CompatibilityService {
     };
   }
 
+  /**
+   * How much the viewer's must-haves narrow who they can be shown. Uses the
+   * same candidate pool and gates as recommendations, with and without the
+   * viewer's must-haves, and reports bucketed counts only.
+   */
+  async criteriaImpact(viewerId: string): Promise<CriteriaImpact> {
+    const viewer = (await this.people.load([viewerId])).get(viewerId);
+    if (!viewer) throw new ConflictException('Finish setting up your profile first.');
+    const withoutMust: Person = {
+      ...viewer.person,
+      preferences: {
+        ...viewer.person.preferences,
+        criteria: viewer.person.preferences.criteria.filter((c) => c.mode !== 'must'),
+      },
+    };
+    const loaded = await this.people.load(await this.candidatePool(viewerId, viewer, IMPACT_POOL));
+    const base = [...loaded.values()].filter(
+      (c) => c.eligible && ineligibility(withoutMust, c.person) === null,
+    );
+    const kept = base.filter((c) => failsMustHaves(viewer.person, c.person) === null);
+    const musts = viewer.person.preferences.criteria.filter((c) => c.mode === 'must');
+    return {
+      withoutMustHaves: countBucket(base.length),
+      withMustHaves: countBucket(kept.length),
+      significant: base.length >= 10 && kept.length <= base.length / 2,
+      perCriterion: musts.map((criterion) => ({
+        criterion: criterion.criterion,
+        excludes: countBucket(
+          base.filter((c) => failsMustHaves(viewer.person, c.person, [criterion]) !== null).length,
+        ),
+      })),
+    };
+  }
+
   async recommendations(viewerId: string, limit: number): Promise<RecommendationList> {
     const { version, weights } = await this.activeWeights();
     const viewer = (await this.people.load([viewerId])).get(viewerId);
@@ -184,7 +224,11 @@ export class CompatibilityService {
    * both have one. The embedding only chooses who gets scored; it never sets
    * the score. Exact rules are re-checked by the engine.
    */
-  private async candidatePool(viewerId: string, viewer: LoadedPerson): Promise<string[]> {
+  private async candidatePool(
+    viewerId: string,
+    viewer: LoadedPerson,
+    limit = CANDIDATE_POOL,
+  ): Promise<string[]> {
     const { minAge, maxAge, maxDistanceKm } = viewer.person.preferences;
     // Bounding box around the viewer when distance applies. People without a
     // location stay in the pool: missing location is never treated as far away.
@@ -237,7 +281,7 @@ export class CompatibilityService {
       ORDER BY (e.embedding <=> (SELECT embedding FROM viewer_vector)) ASC NULLS LAST,
                u.last_active_at DESC NULLS LAST,
                u.id
-      LIMIT ${CANDIDATE_POOL}`;
+      LIMIT ${limit}`;
     return rows.map((row) => row.id);
   }
 

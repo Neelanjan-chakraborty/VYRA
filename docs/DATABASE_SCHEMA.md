@@ -75,8 +75,24 @@ interests, consents and sessions immediately and blanks the contact details and 
 on the `users` row, which stays as an anonymous tombstone so safety reports and moderation
 history about that account survive.
 
-**Location.** `user_profiles` stores coarse, rounded coordinates used only for distance
-filtering.
+**Location.** `user_profiles.location_source` (`DEVICE_APPROXIMATE`, `MANUAL`, or null),
+`latitude/longitude` on a 0.02° grid (CHECK enforced), `place_id` (GeoNames), `region`,
+`area` (label only), `city`, `country_code`. A CHECK keeps them consistent: no source, no
+coordinates; device always has coordinates; manual has them only with a listed place.
+
+**Gender.** `user_profiles.gender_identity` (enum, null = unanswered),
+`gender_self_description` and `discoverable_as` (only with `SELF_DESCRIBE`, CHECK enforced),
+`gender_visible` (default false). `discovery_preferences.show_genders` and
+`include_unlisted_genders` (default true). Free-text `gender` and `interested_in` were
+converted and dropped.
+
+**Criteria.** `discovery_preferences.relationship_criteria` (jsonb array, CHECK) holds
+must/prefer/open criteria; converted from the former `deal_breakers`.
+
+**Photo moderation.** `user_photos.moderation_status` adds `REVIEW_REQUIRED`;
+`moderation_reason`, `moderated_at` (CHECK: set unless pending), `appeal_requested_at`.
+History in `moderation_events` (`target_type = 'photo'`); `safety_reports.photo_id` links photo
+reports.
 
 **Soft deletion.** `users.deleted_at`, `user_photos.deleted_at` and `messages.deleted_at`.
 Account deletion marks the user, revokes sessions immediately, then a job purges personal data
