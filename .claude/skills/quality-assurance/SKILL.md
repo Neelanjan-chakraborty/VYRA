@@ -17,7 +17,8 @@ pnpm build && pnpm typecheck
 pnpm test
 pnpm test:e2e
 pnpm --filter @vyra/mobile export:web
-pnpm visual-check <output-dir>     # then open the screenshots and look at them
+CORS_ORIGINS=http://localhost:8099 node apps/api/dist/main.js &
+pnpm e2e:web <output-dir>          # then open the screenshots and look at them
 ```
 
 For API changes also boot it (`pnpm --filter @vyra/api build && node apps/api/dist/main.js`)

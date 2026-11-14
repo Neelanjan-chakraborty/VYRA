@@ -4,7 +4,7 @@ VYRA holds intimate data. Security and privacy requirements are acceptance crite
 feature, not a later phase. Target regimes: India's DPDP Act 2023 first, GDPR-compatible by
 design for expansion.
 
-## In place now (Milestone 1)
+## In place now (Milestones 1–2)
 
 | Control                                       | Where                                                           |
 | --------------------------------------------- | --------------------------------------------------------------- |
@@ -55,8 +55,19 @@ design for expansion.
 
 ## Not yet done
 
-Authentication and authorisation do not exist yet, so no user data endpoint exists either.
-Production payment, identity verification, SMS/e-mail delivery and object storage are not
-integrated; they will be built behind interfaces with local fakes and only called "working"
-after a real call succeeds. A formal security review is scheduled for Milestone 8, with a
-lighter review at the end of each milestone.
+- **No real OTP delivery.** Only the development sender exists; it returns the code in the API
+  response. Production cannot boot until an SMS/e-mail adapter is added (O-1).
+- **No real object storage.** Photos are on local disk; production cannot boot until an
+  S3-compatible adapter is added (O-2).
+- **Terms of Service and Privacy Policy do not exist as documents.** The consent screen records
+  agreement to version `2026-11`, but there is nothing yet for a person to read. Required
+  before any real user signs up.
+- **Age verification is self-declared** date of birth only (O-6).
+- **Photo moderation** is not implemented: uploads are stored with status `PENDING` and nothing
+  reviews them. Must exist before photos are shown to other people (Milestone 5).
+- **Rate-limit state is per process** (in memory). It needs the Redis store before running
+  more than one API instance.
+- **The web build keeps the refresh token in `sessionStorage`.** It is a development and QA
+  target; a public web app would need HTTP-only cookies instead.
+- No automated account-fraud signals, no payment or identity-verification integrations.
+- A formal security review is scheduled for Milestone 8, with a lighter one each milestone.

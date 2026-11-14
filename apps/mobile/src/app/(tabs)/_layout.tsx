@@ -16,19 +16,19 @@ export default function TabsLayout() {
           { height: TAB_BAR_HEIGHT + insets.bottom, paddingBottom: insets.bottom },
         ]}
       >
-        <TabTrigger name="orbit" href="/" asChild>
+        <TabTrigger name="orbit" href="/(tabs)" asChild>
           <TabBarItem icon="orbit" label="Orbit" />
         </TabTrigger>
-        <TabTrigger name="discover" href="/discover" asChild>
+        <TabTrigger name="discover" href="/(tabs)/discover" asChild>
           <TabBarItem icon="discover" label="Discover" />
         </TabTrigger>
-        <TabTrigger name="connections" href="/connections" asChild>
+        <TabTrigger name="connections" href="/(tabs)/connections" asChild>
           <TabBarItem icon="connections" label="Connections" />
         </TabTrigger>
-        <TabTrigger name="messages" href="/messages" asChild>
+        <TabTrigger name="messages" href="/(tabs)/messages" asChild>
           <TabBarItem icon="messages" label="Messages" />
         </TabTrigger>
-        <TabTrigger name="you" href="/you" asChild>
+        <TabTrigger name="you" href="/(tabs)/you" asChild>
           <TabBarItem icon="you" label="You" />
         </TabTrigger>
       </TabList>

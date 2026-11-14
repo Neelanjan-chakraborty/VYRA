@@ -60,6 +60,16 @@ vector(768))` with an HNSW cosine index. It sits outside the Prisma-managed `pub
 **Imports.** `ai_imports.raw_expires_at` is mandatory, and a CHECK guarantees that once
 `raw_deleted_at` is set the storage key is gone. `failure_code` is a code, never content.
 
+**Photo positions.** A partial unique index allows one live photo per `(user_id, position)`.
+Reordering moves every photo to `position + 1000` and then to its final slot inside one
+transaction, because that index is checked row by row. The six-photo limit is enforced by the
+API.
+
+**Account deletion** removes the profile, photos (rows and files), intentions, preferences,
+interests, consents and sessions immediately and blanks the contact details and date of birth
+on the `users` row, which stays as an anonymous tombstone so safety reports and moderation
+history about that account survive.
+
 **Location.** `user_profiles` stores coarse, rounded coordinates used only for distance
 filtering.
 

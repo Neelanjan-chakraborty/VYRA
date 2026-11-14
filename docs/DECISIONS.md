@@ -63,6 +63,38 @@ in the cloud environment. It is a proxy; native behaviour still needs device tes
 **D-018 · Cloud dev environment uses the container's own PostgreSQL and Redis;** Docker Compose
 is for workstations. Both use the same throwaway `vyra`/`vyra` dev credentials.
 
+**D-019 · Registration is a separate step after OTP verification.** Verifying a new
+destination returns a 15-minute registration token; the account is created only when a date
+of birth (18+) and consent arrive with it. No row exists for anyone who is refused or abandons.
+
+**D-020 · OTP challenges store only an HMAC of the destination,** so the client re-sends the
+destination when verifying. A leaked challenges table reveals no contact details or codes.
+
+**D-021 · Sessions are checked in the database on every authenticated request.** One indexed
+lookup buys immediate logout, suspension, deletion and reuse-revocation. Revisit with a Redis
+cache if it shows up in latency.
+
+**D-022 · Development OTP sender returns the code in the API response** and sends nothing
+(O-1 default). Configuration validation refuses it, and local-disk storage (O-2 default), in
+production — so production cannot start with a stand-in by accident.
+
+**D-023 · Account deletion purges personal data immediately and keeps an anonymous tombstone
+row,** so a reported or banned person cannot erase their safety history by deleting.
+
+**D-024 · Onboarding collects identity, photos, interests (optional), intention and
+preferences.** The AI import and persona-review stages are left out of the flow until they
+work (Milestones 3 and 7) instead of being shown as placeholders.
+
+**D-025 · One component per profile step serves both onboarding and Settings,** differing only
+in chrome (`useStepChrome`). No duplicated forms.
+
+**D-026 · Navigation is gated in one place** (`useAppPhase` + `Stack.Protected` in the root
+layout): signed out → auth, onboarding → setup, active → app.
+
+**D-027 · Mobile UI is verified by a browser run of the whole account lifecycle**
+(`pnpm e2e:web`) against the real API, replacing the tab-only screenshot script. Component
+tests with `jest-expo` are deferred; see the backlog.
+
 ## Open (need the product owner)
 
 | #   | Question                                              | Needed by     | Default if unanswered                                             |

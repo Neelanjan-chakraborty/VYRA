@@ -211,13 +211,11 @@ describe('Authentication (e2e)', () => {
 
     it('requires consent to the current terms and privacy policy', async () => {
       const { body } = await verify(uniqueEmail());
-      const response = await http()
-        .post('/v1/auth/register')
-        .send({
-          registrationToken: body.registrationToken,
-          dateOfBirth: ADULT_DOB,
-          acceptedTermsVersion: '1999-01',
-        });
+      const response = await http().post('/v1/auth/register').send({
+        registrationToken: body.registrationToken,
+        dateOfBirth: ADULT_DOB,
+        acceptedTermsVersion: '1999-01',
+      });
       expect(response.status).toBe(422);
     });
 

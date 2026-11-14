@@ -22,7 +22,7 @@ pnpm check                   # format:check + lint + typecheck + unit tests
 pnpm test:e2e                # API end-to-end tests (needs the services)
 pnpm dev:api                 # API on :4000, OpenAPI at /docs
 pnpm dev:mobile              # Expo dev server
-pnpm --filter @vyra/mobile export:web && pnpm visual-check   # screenshot QA
+pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>   # browser run of the account lifecycle
 ```
 
 ## Rules that are easy to get wrong

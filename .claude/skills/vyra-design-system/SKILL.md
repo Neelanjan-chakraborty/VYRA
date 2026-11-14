@@ -55,5 +55,6 @@ Never convey state by colour alone; pair it with text or an icon.
 
 ## Verify
 
-`pnpm --filter @vyra/mobile export:web && pnpm visual-check <dir>`, then look at the
-screenshots at all three sizes.
+Run the API with `CORS_ORIGINS=http://localhost:8099`, then
+`pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>` and look at the screenshots.
+Add a step to `scripts/e2e-web.cjs` for every new screen.

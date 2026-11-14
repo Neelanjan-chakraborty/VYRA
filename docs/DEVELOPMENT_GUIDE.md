@@ -20,16 +20,16 @@ pnpm build
 
 ## Daily commands
 
-| Command                                 | What it does                                           |
-| --------------------------------------- | ------------------------------------------------------ |
-| `pnpm dev:api`                          | API with reload on `:4000`; OpenAPI UI at `/docs`      |
-| `pnpm dev:mobile`                       | Expo dev server (press `w` for web)                    |
-| `pnpm build`                            | Build packages then the API                            |
-| `pnpm check`                            | Format check, lint, typecheck, unit tests              |
-| `pnpm test:e2e`                         | API end-to-end tests against real PostgreSQL and Redis |
-| `pnpm format`                           | Prettier write                                         |
-| `pnpm --filter @vyra/mobile export:web` | Production web bundle into `apps/mobile/dist`          |
-| `pnpm visual-check <dir>`               | Screenshot every tab at three sizes (needs Playwright) |
+| Command                                 | What it does                                                                                                                                              |
+| --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm dev:api`                          | API with reload on `:4000`; OpenAPI UI at `/docs`                                                                                                         |
+| `pnpm dev:mobile`                       | Expo dev server (press `w` for web)                                                                                                                       |
+| `pnpm build`                            | Build packages then the API                                                                                                                               |
+| `pnpm check`                            | Format check, lint, typecheck, unit tests                                                                                                                 |
+| `pnpm test:e2e`                         | API end-to-end tests against real PostgreSQL and Redis                                                                                                    |
+| `pnpm format`                           | Prettier write                                                                                                                                            |
+| `pnpm --filter @vyra/mobile export:web` | Production web bundle into `apps/mobile/dist`                                                                                                             |
+| `pnpm e2e:web <dir>`                    | Browser run of sign-up → onboarding → settings → deletion with screenshots (needs Playwright and a running API with `CORS_ORIGINS=http://localhost:8099`) |
 
 ## Environment variables
 
@@ -44,6 +44,16 @@ API (`apps/api/.env`, validated at boot by `src/config/env.ts`):
 | `AI_PROVIDER`  | `mock`        | `mock`, `openai` or `gemini`               |
 | `CORS_ORIGINS` | empty         | Comma-separated browser origins allowed    |
 | `LOG_LEVEL`    | `log`         | `error`, `warn`, `log`, `debug`, `verbose` |
+
+| `JWT_ACCESS_SECRET`, `OTP_PEPPER`, `MEDIA_URL_SECRET` | — | Secrets, ≥ 32 characters each (required). `.env.example` has development values |
+| `ACCESS_TOKEN_TTL_SECONDS` | `900` | Access-token lifetime |
+| `REFRESH_TOKEN_TTL_DAYS` | `30` | Refresh-token lifetime |
+| `OTP_DELIVERY` | `dev` | `dev` returns the code in the API response and sends nothing. Refused in production |
+| `STORAGE_DRIVER` / `STORAGE_LOCAL_DIR` | `local` / `./.storage` | Photo storage. `local` is refused in production |
+| `PUBLIC_API_URL` | `http://localhost:4000` | Origin used in signed media URLs |
+
+**Signing in during development:** no message is sent. The verification screen shows the code
+under "Development build", and the API returns it as `devCode`.
 
 Mobile (`apps/mobile/.env`): `EXPO_PUBLIC_API_URL` (default `http://localhost:4000`). On a
 physical device use the machine's LAN address and add the Expo web origin to `CORS_ORIGINS`.
@@ -68,4 +78,8 @@ physical device use the machine's LAN address and add the Expo web origin to `CO
   `--create-only`, then `migrate deploy`.
 - **`Cannot find module '../generated/prisma/client.js'`** — run `pnpm db:generate`.
 - **Mobile cannot see a change in a shared package** — run `pnpm build`.
+- **Mobile typecheck complains that a route string is not assignable** — `apps/mobile/.expo/types`
+  is stale. Delete that folder (the dev server regenerates it).
+- **`pnpm e2e:web` fails with 429** — it requests four codes and the API allows five a minute
+  per address. Wait a minute between runs.
 - **Health shows a dependency down** — start the services (`pnpm services:start` or compose).

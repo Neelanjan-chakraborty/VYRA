@@ -7,28 +7,21 @@ Ordered. A milestone is done only when the Definition of Done in
 
 ## Milestone 1 — Foundation ✅
 
-## Milestone 2 — Design and authentication (next)
+## Milestone 2 — Design and authentication ✅
 
-API
+Carried forward from Milestone 2 (not blocking Milestone 3):
 
-1. `auth` module: request OTP (e-mail/phone), verify OTP, refresh, logout. Hashed OTPs with
-   attempt caps and expiry; short-lived access JWT (`jose`); rotating hashed refresh tokens
-   with reuse detection. `OtpSender` interface with a development fake.
-2. Auth guard, `@CurrentUser()`, role guard; per-route throttles on OTP endpoints.
-3. Age gate (18+) and consent recording (`user_consents`) at sign-up.
-4. `users` / `profiles`: `GET/PATCH /v1/me`, relationship intents, discovery preferences.
-5. `photos`: upload with content sniffing, size caps, re-encode, EXIF strip; storage interface
-   with a local adapter; signed read URLs; ordering; delete.
-6. Account deletion (soft delete + session revocation), audit log entries.
-7. Tests: auth flows, brute-force limits, token rotation and reuse, IDOR on every `/me`
-   resource, under-age rejection, upload rejection cases.
+- Real OTP delivery adapter (SMS and e-mail) — needs decision O-1.
+- S3-compatible storage adapter — needs decision O-2.
+- Terms of Service and Privacy Policy documents, linked from the consent screen.
+- Redis-backed rate-limit store before running more than one API instance.
+- Mobile component tests (`jest-expo` + Testing Library), starting with the session refresh
+  logic in `src/lib/api.ts`.
+- Drag-and-drop photo reordering; country picker for phone numbers.
+- Native device pass: Keychain storage, photo picker permissions, keyboard, SMS autofill.
+- Scheduled clean-up of expired OTP challenges and sessions.
 
-Mobile 8. Design-system components: Button, TextField, OTP input, BottomSheet, Modal, Avatar, photo
-tile, loading/empty/error states, reduced-motion hook. 9. Animated splash and brand introduction. 10. Auth screens: phone/e-mail entry, OTP, age, consent. Secure token storage
-(`expo-secure-store`), session store (Zustand), authenticated API client with refresh. 11. Onboarding navigation shell: identity → photos → (optional import) → (optional interests)
-→ intention → preferences. Optional steps skippable. 12. Profile editing and settings screens (privacy, discovery, account deletion). 13. Component tests (`jest-expo` + Testing Library) and visual check of every new screen.
-
-## Milestone 3 — AI Persona
+## Milestone 3 — AI Persona (next)
 
 Persona Zod schema (versioned) · `AiProvider` interface + deterministic mock + Gemini adapter ·
 generation worker (BullMQ) · calibration and contradiction handling · draft/approve/edit API ·
