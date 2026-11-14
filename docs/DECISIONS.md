@@ -175,23 +175,23 @@ Impact is reported in buckets so it cannot identify anyone.
 safety, distance and must-have notices can be verified end to end. Connect, save, pass and
 Orbit remain Milestone 5.
 
-**D-044 · VYRA has one public description, in one file.** `apps/landing/src/lib/entity.ts`:
+**D-049 · VYRA has one public description, in one file.** `apps/landing/src/lib/entity.ts`:
 "an AI-assisted relationship discovery platform". "Dating app" appears only where the site
 explains how the two relate. The website audit fails on any other category and on superlatives,
 guarantees or user numbers.
 
-**D-045 · Search crawlers are allowed; training crawlers are an open decision.** robots.txt
+**D-050 · Search crawlers are allowed; training crawlers are an open decision.** robots.txt
 names search and user-requested agents (Googlebot, Bingbot, OAI-SearchBot, PerplexityBot,
 Claude-SearchBot and the `-User` fetchers) separately from training agents (GPTBot, ClaudeBot,
 Google-Extended, CCBot), which follow `VYRA_AI_TRAINING_CRAWLERS`. Unset, they are not named.
 See O-8.
 
-**D-046 · The Learn library cites checked sources and claims no expert.** Six articles, one per
+**D-051 · The Learn library cites checked sources and claims no expert.** Six articles, one per
 distinct question; two suggested topics were not written because they would have duplicated
 others. The byline is "The VYRA team", with "not reviewed by a clinician or lawyer" shown.
 `llms.txt` is generated and kept as a cheap experiment; Google ignores such files.
 
-**D-047 · A production website deploy without a domain is a preview, not a build failure.**
+**D-052 · A production website deploy without a domain is a preview, not a build failure.**
 Supersedes part of D-043: the first Vercel deploy must work. It stays noindex until
 `NEXT_PUBLIC_SITE_URL` is set.
 
