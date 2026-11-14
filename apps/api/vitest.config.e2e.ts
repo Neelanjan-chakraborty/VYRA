@@ -7,5 +7,10 @@ export default defineConfig({
     root: './',
     include: ['test/**/*.e2e-spec.ts'],
     fileParallelism: false,
+    // Deterministic photo moderation: approves unless a test says otherwise.
+    // The real classifier is exercised by src/modules/moderation/*.spec.ts.
+    env: { PHOTO_MODERATION_PROVIDER: 'mock' },
+    testTimeout: 20_000,
+    hookTimeout: 60_000,
   },
 });

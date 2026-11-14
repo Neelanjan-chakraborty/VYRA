@@ -14,10 +14,12 @@ import { CompatibilityModule } from './modules/compatibility/compatibility.modul
 import { HealthModule } from './modules/health/health.module.js';
 import { ConsentsModule } from './modules/consents/consents.module.js';
 import { MeModule } from './modules/me/me.module.js';
+import { ModerationModule } from './modules/moderation/moderation.module.js';
 import { PersonaModule } from './modules/persona/persona.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
+import { SafetyModule } from './modules/safety/safety.module.js';
 
 @Module({
   imports: [
@@ -38,12 +40,14 @@ import { RedisModule } from './redis/redis.module.js';
     AiModule,
     AuditModule,
     StorageModule,
+    ModerationModule,
     AuthModule,
     HealthModule,
     MeModule,
     ConsentsModule,
     PersonaModule,
     CompatibilityModule,
+    SafetyModule,
   ],
   providers: [
     // Order matters: rate limiting runs before authentication (AuthModule's guard).

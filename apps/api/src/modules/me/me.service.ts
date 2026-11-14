@@ -70,7 +70,8 @@ export class MeService {
 
     const onboardingMissing: Me['onboardingMissing'] = [];
     if (!profile) onboardingMissing.push('profile');
-    if (photos.length === 0) onboardingMissing.push('photo');
+    // A rejected photo doesn't count; one waiting for moderation does.
+    if (!photos.some((p) => p.status !== 'REJECTED')) onboardingMissing.push('photo');
     if (user.relationshipIntents.length === 0) onboardingMissing.push('relationshipIntent');
 
     return {

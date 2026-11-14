@@ -125,8 +125,8 @@ describe('Compatibility and recommendations (e2e)', () => {
       expect(first?.sharedInterests).toEqual(expect.arrayContaining(['Trekking', 'Poetry']));
       expect(second?.overall).toBeLessThan(0.55);
       expect(third).toMatchObject({ sufficiency: 'INSUFFICIENT', overall: null });
-      // Photos are not shown to other people until moderation exists.
-      expect(first?.photoUrl).toBeNull();
+      // Approved photos are shown, through a public-scope URL.
+      expect(first?.photoUrl).toMatch(/[?&]s=p&/);
     });
 
     it('limits the number of results', async () => {

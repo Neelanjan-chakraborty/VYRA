@@ -177,6 +177,17 @@ async function main() {
     await page.getByRole('button', { name: 'Add a photo' }).first().click();
     await (await chooser).setFiles(photoPath);
     await page.getByRole('button', { name: /^Photo 1/ }).waitFor({ timeout: 20000 });
+    // The real moderation pipeline (open-source classifier in the API's worker) checks it;
+    // the tile is labelled "Checking" until then. Wait for the verdict.
+    let label = '';
+    for (let i = 0; i < 120; i += 1) {
+      label =
+        (await page.getByRole('button', { name: /^Photo 1/ }).getAttribute('aria-label')) ?? '';
+      if (!label.includes('Checking')) break;
+      await page.waitForTimeout(500);
+    }
+    if (/Checking|In review|Not approved/.test(label))
+      throw new Error(`photo was not approved: ${label}`);
     await snap('onboarding-photos');
     await button('Continue').click();
   });

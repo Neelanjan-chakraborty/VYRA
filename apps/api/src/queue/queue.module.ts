@@ -5,6 +5,7 @@ import { ENV } from '../config/config.module.js';
 import type { Env } from '../config/env.js';
 
 export const PERSONA_QUEUE = 'persona';
+export const PHOTO_MODERATION_QUEUE = 'photo-moderation';
 
 /** BullMQ takes connection options rather than a URL. */
 export function redisConnection(url: string): ConnectionOptions {
@@ -29,7 +30,7 @@ export function redisConnection(url: string): ConnectionOptions {
       inject: [ENV],
       useFactory: (env: Env) => ({ connection: redisConnection(env.REDIS_URL), prefix: 'vyra' }),
     }),
-    BullModule.registerQueue({ name: PERSONA_QUEUE }),
+    BullModule.registerQueue({ name: PERSONA_QUEUE }, { name: PHOTO_MODERATION_QUEUE }),
   ],
   exports: [BullModule],
 })

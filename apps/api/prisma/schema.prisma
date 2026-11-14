@@ -184,6 +184,9 @@ enum PhotoModerationStatus {
   PENDING
   APPROVED
   REJECTED
+  /// Automated moderation was inconclusive, the owner appealed, or enough
+  /// people reported it. Hidden from others until a moderator decides.
+  REVIEW_REQUIRED
 }
 
 model UserPhoto {
@@ -201,6 +204,11 @@ model UserPhoto {
   /// Perceptual hash, for near-duplicate detection.
   perceptualHash   String?               @map("perceptual_hash") @db.VarChar(32)
   moderationStatus PhotoModerationStatus @default(PENDING) @map("moderation_status")
+  /// Machine-readable reason for the current status, e.g. "explicit_content".
+  moderationReason String?               @map("moderation_reason") @db.VarChar(60)
+  moderatedAt      DateTime?             @map("moderated_at") @db.Timestamptz(3)
+  /// Set when the owner asks for a person to look at a rejection; one appeal per upload.
+  appealRequestedAt DateTime?            @map("appeal_requested_at") @db.Timestamptz(3)
   /// BestPic assessment (quality, lighting, composition, clarity) with its version.
   assessment       Json?
   createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
@@ -210,6 +218,7 @@ model UserPhoto {
 
   @@index([userId, position])
   @@index([userId, contentHash])
+  @@index([moderationStatus, createdAt])
   @@map("user_photos")
 }
 
@@ -800,6 +809,9 @@ model SafetyReport {
   /// Message the report refers to, if any. Not a foreign key so the report
   /// survives message deletion.
   messageId      String?      @map("message_id") @db.Uuid
+  /// Photo the report refers to, if any. Not a foreign key so the report
+  /// survives the photo's deletion.
+  photoId        String?      @map("photo_id") @db.Uuid
   status         ReportStatus @default(OPEN)
   resolvedById   String?      @map("resolved_by_id") @db.Uuid
   resolutionNote String?      @map("resolution_note") @db.VarChar(1000)
@@ -812,6 +824,7 @@ model SafetyReport {
 
   @@index([status, createdAt])
   @@index([reportedUserId])
+  @@index([photoId])
   @@map("safety_reports")
 }
 
@@ -829,8 +842,12 @@ model BlockedUser {
 }
 
 enum ModerationAction {
+  PHOTO_SUBMITTED
   PHOTO_APPROVED
   PHOTO_REJECTED
+  PHOTO_REVIEW_REQUIRED
+  PHOTO_REPORTED
+  PHOTO_REMOVED
   PROFILE_HIDDEN
   PROFILE_RESTORED
   WARNING_ISSUED

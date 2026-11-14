@@ -5,7 +5,7 @@ import type {
   RelationshipIntent,
 } from '@vyra/validation';
 import request from 'supertest';
-import { registerUser, uniqueEmail, type TestApp, type TestUser } from './app.js';
+import { registerUser, uniqueEmail, waitForPhoto, type TestApp, type TestUser } from './app.js';
 import { makeImage } from './images.js';
 
 let imageSeed = 1000;
@@ -16,11 +16,13 @@ export interface SyntheticPerson {
   readonly intents?: RelationshipIntent[];
   readonly minAge?: number;
   readonly maxAge?: number;
-  readonly interestedIn?: string[];
+  readonly interestedIn?: readonly string[];
   readonly dealBreakers?: DealBreaker[];
   readonly traits?: Partial<Record<PersonaAttributeKey, PersonaAttributeValue>>;
   readonly interests?: string[];
   readonly discoverable?: boolean;
+  /** "pending" returns without waiting for moderation to approve the photo. */
+  readonly photo?: 'approved' | 'pending';
 }
 
 function dobForAge(age: number): string {
@@ -35,7 +37,7 @@ function dobForAge(age: number): string {
 export async function createPerson(
   app: TestApp,
   spec: SyntheticPerson = {},
-): Promise<TestUser & { id: string }> {
+): Promise<TestUser & { id: string; photoId: string }> {
   const http = () => request(app.getHttpServer());
   const user = await registerUser(app, uniqueEmail(), dobForAge(spec.age ?? 28));
   await http()
@@ -44,11 +46,12 @@ export async function createPerson(
     .send({ displayName: 'Synthetic', gender: spec.gender ?? null })
     .expect(200);
   imageSeed += 1;
-  await http()
+  const photo = await http()
     .post('/v1/me/photos')
     .set(user.auth)
     .attach('file', await makeImage(imageSeed), 'p.jpg')
     .expect(201);
+  if (spec.photo !== 'pending') await waitForPhoto(app, user, photo.body.id as string);
   await http()
     .put('/v1/me/relationship-intents')
     .set(user.auth)
@@ -65,7 +68,7 @@ export async function createPerson(
       minAge: spec.minAge ?? 18,
       maxAge: spec.maxAge ?? 99,
       maxDistanceKm: null,
-      interestedIn: spec.interestedIn ?? [],
+      interestedIn: [...(spec.interestedIn ?? [])],
       showAstrology: false,
       dealBreakers: spec.dealBreakers ?? [],
     })
@@ -89,7 +92,7 @@ export async function createPerson(
   if (spec.discoverable === false) {
     await http().patch('/v1/me/profile').set(user.auth).send({ isDiscoverable: false }).expect(200);
   }
-  return { ...user, id: done.body.id as string };
+  return { ...user, id: done.body.id as string, photoId: photo.body.id as string };
 }
 
 export const SOCIAL_PLANNER = {

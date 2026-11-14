@@ -50,6 +50,8 @@ export const envSchema = z
     GEMINI_EMBEDDING_MODEL: z.string().min(1).default('gemini-embedding-001'),
     /** "false" stops this process running queue workers (see src/worker.ts). */
     RUN_QUEUE_WORKERS: z.enum(['true', 'false']).default('true'),
+    /** nsfwjs = open-source classifier (default); manual = every photo to a person; mock = tests only. */
+    PHOTO_MODERATION_PROVIDER: z.enum(['nsfwjs', 'manual', 'mock']).default('nsfwjs'),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === 'gemini' && !env.GEMINI_API_KEY) {
@@ -74,6 +76,13 @@ export const envSchema = z
         code: 'custom',
         path: ['OTP_DELIVERY'],
         message: 'the dev sender is not allowed in production',
+      });
+    }
+    if (env.PHOTO_MODERATION_PROVIDER === 'mock') {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['PHOTO_MODERATION_PROVIDER'],
+        message: 'the mock moderation provider is not allowed in production',
       });
     }
     if (env.STORAGE_DRIVER === 'local') {

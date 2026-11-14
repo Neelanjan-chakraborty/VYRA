@@ -11,6 +11,7 @@ import {
 import {
   type CompatibilityResult,
   type CompatibilityView,
+  type PublicProfile,
   compatibilityWeightsSchema,
   type Recommendation,
   type RecommendationList,
@@ -81,6 +82,43 @@ export class CompatibilityService {
     return { userId: targetId, result };
   }
 
+  /** Another person's profile as the viewer may see it. Same visibility rules as `forPair`. */
+  async profile(viewerId: string, targetId: string): Promise<PublicProfile> {
+    const loaded = await this.people.load([viewerId, targetId]);
+    const viewer = loaded.get(viewerId);
+    const target = loaded.get(targetId);
+    if (
+      !viewer ||
+      !target ||
+      !target.eligible ||
+      (await this.people.isBlocked(viewerId, targetId))
+    ) {
+      throw new NotFoundException(NOT_FOUND);
+    }
+    if (ineligibility(viewer.person, target.person) !== null)
+      throw new NotFoundException(NOT_FOUND);
+    const photos = await this.people.approvedPhotos(targetId);
+    await this.prisma.discoveryEvent.create({
+      data: { userId: viewerId, targetUserId: targetId, type: 'PROFILE_OPENED', context: {} },
+    });
+    return {
+      userId: targetId,
+      displayName: target.displayName,
+      age: target.person.age,
+      city: target.city,
+      bio: target.bio,
+      occupation: target.occupation,
+      gender: null,
+      photos: photos.map((p) => ({
+        id: p.id,
+        url: this.media.sign(p.storageKey, 'public'),
+        width: p.width,
+        height: p.height,
+      })),
+      interests: target.person.interests.map((i) => i.label),
+    };
+  }
+
   async recommendations(viewerId: string, limit: number): Promise<RecommendationList> {
     const { version, weights } = await this.activeWeights();
     const viewer = (await this.people.load([viewerId])).get(viewerId);
@@ -125,7 +163,7 @@ export class CompatibilityService {
         displayName: item.displayName,
         age: item.person.age,
         city: item.city,
-        photoUrl: item.photoKey ? this.media.sign(item.photoKey) : null,
+        photoUrl: item.photoKey ? this.media.sign(item.photoKey, 'public') : null,
         overall: result.overall,
         confidence: result.confidence,
         sufficiency: result.sufficiency,

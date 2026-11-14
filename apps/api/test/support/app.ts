@@ -75,3 +75,21 @@ export async function registerUser(
   const tokens = registered.body as AuthTokens;
   return { email, tokens, auth: { Authorization: `Bearer ${tokens.accessToken}` } };
 }
+
+/** Waits until moderation has moved one of the user's photos out of PENDING. */
+export async function waitForPhoto(
+  app: TestApp,
+  user: { auth: { Authorization: string } },
+  photoId: string,
+  status: 'APPROVED' | 'REJECTED' | 'REVIEW_REQUIRED' = 'APPROVED',
+): Promise<void> {
+  for (let i = 0; i < 100; i += 1) {
+    const me = await request(app.getHttpServer()).get('/v1/me').set(user.auth);
+    const photo = (me.body.photos as { id: string; status: string }[] | undefined)?.find(
+      (p) => p.id === photoId,
+    );
+    if (photo?.status === status) return;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  throw new Error(`Photo ${photoId} never reached ${status}`);
+}

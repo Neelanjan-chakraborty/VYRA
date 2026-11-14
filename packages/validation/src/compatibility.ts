@@ -115,3 +115,24 @@ export const recommendationListSchema = z.object({
   weightsVersion: z.string(),
 });
 export type RecommendationList = z.infer<typeof recommendationListSchema>;
+
+/** What another person may see of someone's profile. Only approved photos ever appear. */
+export const publicPhotoSchema = z.object({
+  id: z.uuid(),
+  url: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+export const publicProfileSchema = z.object({
+  userId: z.uuid(),
+  displayName: z.string(),
+  age: z.number().int(),
+  city: z.string().nullable(),
+  bio: z.string().nullable(),
+  occupation: z.string().nullable(),
+  /** Only present when the person chose to show it. */
+  gender: z.string().nullable(),
+  photos: z.array(publicPhotoSchema),
+  interests: z.array(z.string()),
+});
+export type PublicProfile = z.infer<typeof publicProfileSchema>;

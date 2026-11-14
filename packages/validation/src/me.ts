@@ -88,13 +88,31 @@ export const interestsUpdateSchema = z.object({
 });
 export type InterestsUpdate = z.infer<typeof interestsUpdateSchema>;
 
+export const PHOTO_MODERATION_STATUSES = [
+  'PENDING',
+  'APPROVED',
+  'REJECTED',
+  'REVIEW_REQUIRED',
+] as const;
+export const photoModerationStatusSchema = z.enum(PHOTO_MODERATION_STATUSES);
+export type PhotoModerationStatus = z.infer<typeof photoModerationStatusSchema>;
+
+/** Accepted upload types. The bytes must match the declared type. */
+export const ACCEPTED_PHOTO_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'] as const;
+
+/** One of the owner's own photos, including where it is in moderation. */
 export const photoSchema = z.object({
   id: z.uuid(),
   position: z.number().int().nonnegative(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
-  /** Short-lived signed URL. Do not persist. */
+  /** Short-lived signed URL, valid only for the owner. Do not persist. */
   url: z.string().min(1),
+  status: photoModerationStatusSchema,
+  /** Reason code for a rejection or review, e.g. "explicit_content". */
+  reason: z.string().nullable(),
+  /** True when the owner may still ask a person to review a rejection. */
+  canAppeal: z.boolean(),
 });
 export type Photo = z.infer<typeof photoSchema>;
 

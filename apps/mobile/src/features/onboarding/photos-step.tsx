@@ -11,9 +11,12 @@ import { Button } from '@/components/ui/button';
 import { FormScreen } from '@/components/ui/form-screen';
 import { ErrorNotice } from '@/components/ui/notice';
 import {
+  type PickedImage,
+  useAppealPhoto,
   useMe,
   useRemovePhoto,
   useReorderPhotos,
+  useReplacePhoto,
   useUploadPhoto,
 } from '@/features/profile/profile-api';
 import { errorMessage } from '@/lib/api';
@@ -25,27 +28,42 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
   const upload = useUploadPhoto();
   const remove = useRemovePhoto();
   const reorder = useReorderPhotos();
+  const replace = useReplacePhoto();
+  const appeal = useAppealPhoto();
   const [selected, setSelected] = useState<Photo | null>(null);
   const [pickerError, setPickerError] = useState<string>();
 
-  async function addPhoto() {
+  async function pick(): Promise<PickedImage | null> {
     setPickerError(undefined);
-    upload.reset();
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ['images'],
         quality: 0.9,
       });
       const asset = result.canceled ? undefined : result.assets[0];
-      if (!asset) return;
-      upload.mutate({
+      if (!asset) return null;
+      return {
         uri: asset.uri,
         ...(asset.mimeType ? { mimeType: asset.mimeType } : {}),
         ...(asset.file ? { file: asset.file } : {}),
-      });
+      };
     } catch {
       setPickerError('We couldn’t open your photos. Check the permission in Settings.');
+      return null;
     }
+  }
+
+  async function addPhoto() {
+    upload.reset();
+    const image = await pick();
+    if (image) upload.mutate(image);
+  }
+
+  async function replacePhoto(photo: Photo) {
+    setSelected(null);
+    replace.reset();
+    const image = await pick();
+    if (image) replace.mutate({ photoId: photo.id, image });
   }
 
   function makeFirst(photo: Photo) {
@@ -53,7 +71,7 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
     setSelected(null);
   }
 
-  const failure = upload.error ?? remove.error ?? reorder.error;
+  const failure = upload.error ?? remove.error ?? reorder.error ?? replace.error ?? appeal.error;
   const slots = Array.from({ length: MAX_PHOTOS }, (_, index) => photos[index]);
 
   return (
@@ -62,7 +80,7 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
       progress={chrome.progress}
       showBack={chrome.showBack}
       title={mode === 'edit' ? 'Your photos.' : 'Show yourself.'}
-      intro={`Add up to ${MAX_PHOTOS}. The first is the one people see first. Location data is removed from every photo.`}
+      intro={`Add up to ${MAX_PHOTOS}. The first is the one people see first. Every photo is checked before anyone else can see it, and location data is removed.`}
       footer={
         mode === 'edit' ? (
           <Button label="Done" onPress={chrome.advance} />
@@ -82,7 +100,7 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
             <Pressable
               key={photo.id}
               role="button"
-              aria-label={`Photo ${index + 1}${index === 0 ? ', shown first' : ''}. Options`}
+              aria-label={`Photo ${index + 1}${index === 0 ? ', shown first' : ''}${STATUS_LABEL[photo.status] ? `, ${STATUS_LABEL[photo.status]}` : ''}. Options`}
               onPress={() => setSelected(photo)}
               style={[styles.tile, index === 0 && styles.lead]}
             >
@@ -92,11 +110,19 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
                 contentFit="cover"
                 transition={150}
               />
-              {index === 0 ? (
-                <View style={styles.badge}>
-                  <Text variant="eyebrow">First</Text>
-                </View>
-              ) : null}
+              {photo.status === 'REJECTED' ? <View style={styles.dim} /> : null}
+              <View style={styles.badges}>
+                {index === 0 ? (
+                  <View style={styles.badge}>
+                    <Text variant="eyebrow">First</Text>
+                  </View>
+                ) : null}
+                {STATUS_LABEL[photo.status] ? (
+                  <View style={[styles.badge, photo.status === 'REJECTED' && styles.badgeAlert]}>
+                    <Text variant="eyebrow">{STATUS_LABEL[photo.status]}</Text>
+                  </View>
+                ) : null}
+              </View>
             </Pressable>
           ) : (
             <Pressable
@@ -130,8 +156,31 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
       </View>
 
       <BottomSheet visible={selected !== null} title="This photo" onClose={() => setSelected(null)}>
+        {selected && STATUS_EXPLANATION[selected.status] ? (
+          <Text tone="textSecondary" style={styles.sheetNote}>
+            {STATUS_EXPLANATION[selected.status]}
+          </Text>
+        ) : null}
         <View style={styles.sheetActions}>
-          {selected && photos[0]?.id !== selected.id ? (
+          {selected?.canAppeal ? (
+            <Button
+              label="Ask a person to review it"
+              variant="secondary"
+              loading={appeal.isPending}
+              onPress={() => {
+                appeal.mutate(selected.id);
+                setSelected(null);
+              }}
+            />
+          ) : null}
+          {selected ? (
+            <Button
+              label="Replace photo"
+              variant="secondary"
+              onPress={() => void replacePhoto(selected)}
+            />
+          ) : null}
+          {selected && photos[0]?.id !== selected.id && selected.status !== 'REJECTED' ? (
             <Button
               label="Show this one first"
               variant="secondary"
@@ -153,6 +202,23 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
   );
 }
 
+/** Short tile labels; approved photos carry none. */
+const STATUS_LABEL: Readonly<Record<Photo['status'], string | null>> = {
+  PENDING: 'Checking',
+  REVIEW_REQUIRED: 'In review',
+  REJECTED: 'Declined',
+  APPROVED: null,
+};
+
+const STATUS_EXPLANATION: Readonly<Record<Photo['status'], string | null>> = {
+  PENDING:
+    'We’re checking this photo. Nobody else sees it until it’s approved — usually within a minute.',
+  REVIEW_REQUIRED: 'A person is reviewing this photo. Until then, only you can see it.',
+  REJECTED:
+    'This photo doesn’t meet our photo guidelines, so nobody else can see it. Replace it, remove it, or ask a person to review it.',
+  APPROVED: null,
+};
+
 const styles = StyleSheet.create({
   // Editorial grid: one tall lead image beside a column of two, then a row of three.
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s },
@@ -173,10 +239,19 @@ const styles = StyleSheet.create({
     borderStyle: 'dashed',
   },
   later: { opacity: 0.4 },
-  badge: {
+  dim: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, backgroundColor: color.scrim },
+  badges: {
     position: 'absolute',
     left: space.s,
     bottom: space.s,
+    right: space.s,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: space.xs,
+  },
+  badgeAlert: { borderWidth: 1, borderColor: color.danger },
+  sheetNote: { marginBottom: space.l },
+  badge: {
     paddingHorizontal: space.s,
     paddingVertical: space.xs,
     borderRadius: radius.s,

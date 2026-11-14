@@ -35,6 +35,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { getRequestId } from '../../common/request-id.middleware.js';
 import { type AuthContext, CurrentUser } from '../auth/auth.decorators.js';
+import { ModerationService } from '../moderation/moderation.service.js';
 import { MeService } from './me.service.js';
 import { PhotosService } from './photos.service.js';
 
@@ -47,6 +48,7 @@ export class MeController {
   constructor(
     private readonly me: MeService,
     private readonly photos: PhotosService,
+    private readonly moderation: ModerationService,
   ) {}
 
   @Get('me')
@@ -115,7 +117,7 @@ export class MeController {
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<Photo> {
     if (!file) throw new BadRequestException('Attach a photo in the "file" field.');
-    return this.photos.upload(user.userId, file.buffer);
+    return this.photos.upload(user.userId, file);
   }
 
   @Put('me/photos/order')
@@ -125,6 +127,30 @@ export class MeController {
     @Body({ schema: photoOrderSchema }) body: PhotoOrder,
   ): Promise<{ photos: Photo[] }> {
     return { photos: await this.photos.reorder(user.userId, body.photoIds) };
+  }
+
+  @Put('me/photos/:photoId')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({ summary: 'Replace a photo; the new image is moderated again' })
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MAX_PHOTO_BYTES, files: 1 } }))
+  replacePhoto(
+    @CurrentUser() user: AuthContext,
+    @Param('photoId', { schema: uuidParam }) photoId: string,
+    @UploadedFile() file: Express.Multer.File | undefined,
+  ): Promise<Photo> {
+    if (!file) throw new BadRequestException('Attach a photo in the "file" field.');
+    return this.photos.replace(user.userId, photoId, file);
+  }
+
+  @Post('me/photos/:photoId/appeal')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Ask a person to review a rejected photo (once per upload)' })
+  async appealPhoto(
+    @CurrentUser() user: AuthContext,
+    @Param('photoId', { schema: uuidParam }) photoId: string,
+  ): Promise<void> {
+    await this.moderation.appeal(user.userId, photoId);
   }
 
   @Delete('me/photos/:photoId')

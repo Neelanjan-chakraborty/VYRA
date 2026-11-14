@@ -22,9 +22,11 @@ export function useMe() {
     queryKey: ME_KEY,
     queryFn: () => api('/me', { schema: meSchema }),
     enabled: signedIn,
-    // Photo URLs are signed for ten minutes; refresh well inside that.
+    // Photo URLs are signed for ten minutes; refresh well inside that, and
+    // often while a photo is still being checked.
     staleTime: 4 * 60_000,
-    refetchInterval: 8 * 60_000,
+    refetchInterval: (query) =>
+      query.state.data?.photos.some((p) => p.status === 'PENDING') ? 3000 : 8 * 60_000,
   });
 }
 
@@ -90,22 +92,42 @@ export interface PickedImage {
   readonly file?: File;
 }
 
+function photoForm(image: PickedImage): FormData {
+  const form = new FormData();
+  if (Platform.OS === 'web' && image.file) {
+    form.append('file', image.file);
+  } else {
+    // React Native's FormData accepts this file descriptor in place of a Blob.
+    form.append('file', {
+      uri: image.uri,
+      name: 'photo.jpg',
+      type: image.mimeType ?? 'image/jpeg',
+    } as unknown as Blob);
+  }
+  return form;
+}
+
 export function useUploadPhoto() {
   return useMutation({
-    mutationFn: (image: PickedImage) => {
-      const form = new FormData();
-      if (Platform.OS === 'web' && image.file) {
-        form.append('file', image.file);
-      } else {
-        // React Native's FormData accepts this file descriptor in place of a Blob.
-        form.append('file', {
-          uri: image.uri,
-          name: 'photo.jpg',
-          type: image.mimeType ?? 'image/jpeg',
-        } as unknown as Blob);
-      }
-      return api('/me/photos', { method: 'POST', body: form, schema: photoSchema });
-    },
+    mutationFn: (image: PickedImage) =>
+      api('/me/photos', { method: 'POST', body: photoForm(image), schema: photoSchema }),
+    onSuccess: refetchMe,
+  });
+}
+
+/** Replaces the image in a slot; the new one is checked again before anyone sees it. */
+export function useReplacePhoto() {
+  return useMutation({
+    mutationFn: ({ photoId, image }: { photoId: string; image: PickedImage }) =>
+      api(`/me/photos/${photoId}`, { method: 'PUT', body: photoForm(image), schema: photoSchema }),
+    onSuccess: refetchMe,
+  });
+}
+
+/** Asks a person to look at a rejected photo. */
+export function useAppealPhoto() {
+  return useMutation({
+    mutationFn: (photoId: string) => api(`/me/photos/${photoId}/appeal`, { method: 'POST' }),
     onSuccess: refetchMe,
   });
 }

@@ -1,6 +1,6 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
-import type { CompatibilityView, RecommendationList } from '@vyra/validation';
+import type { CompatibilityView, PublicProfile, RecommendationList } from '@vyra/validation';
 import { z } from 'zod';
 import { type AuthContext, CurrentUser } from '../auth/auth.decorators.js';
 import { CompatibilityService } from './compatibility.service.js';
@@ -20,6 +20,15 @@ export class CompatibilityController {
     @Param('userId', { schema: z.uuid() }) userId: string,
   ): Promise<CompatibilityView> {
     return this.compatibility.forPair(user.userId, userId);
+  }
+
+  @Get('people/:userId')
+  @ApiOperation({ summary: 'Another person’s profile preview. Only approved photos.' })
+  profile(
+    @CurrentUser() user: AuthContext,
+    @Param('userId', { schema: z.uuid() }) userId: string,
+  ): Promise<PublicProfile> {
+    return this.compatibility.profile(user.userId, userId);
   }
 
   @Get('discovery/recommendations')

@@ -26,6 +26,8 @@ export interface LoadedPerson {
   readonly eligible: boolean;
   readonly displayName: string;
   readonly city: string | null;
+  readonly bio: string | null;
+  readonly occupation: string | null;
   readonly personaVersionId: string | null;
   /** Storage key of the first approved photo, if any. */
   readonly photoKey: string | null;
@@ -103,11 +105,27 @@ export class PeopleService {
           user.profile?.isDiscoverable === true,
         displayName: user.profile?.displayName ?? '',
         city: user.profile?.city ?? null,
+        bio: user.profile?.bio ?? null,
+        occupation: user.profile?.occupation ?? null,
         personaVersionId: version?.status === 'APPROVED' ? version.id : null,
         photoKey: user.photos[0]?.storageKey ?? null,
       });
     }
     return result;
+  }
+
+  /**
+   * The only way any non-owner response gets photos: approved, not deleted,
+   * in the owner's order. Everything else stays invisible.
+   */
+  async approvedPhotos(
+    userId: string,
+  ): Promise<{ id: string; storageKey: string; width: number; height: number }[]> {
+    return this.prisma.userPhoto.findMany({
+      where: { userId, deletedAt: null, moderationStatus: 'APPROVED' },
+      orderBy: { position: 'asc' },
+      select: { id: true, storageKey: true, width: true, height: true },
+    });
   }
 
   /** True when either person has blocked the other. */
