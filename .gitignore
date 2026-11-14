@@ -1,0 +1,37 @@
+node_modules/
+dist/
+.turbo/
+coverage/
+*.tsbuildinfo
+
+# Environment files (never commit real values)
+.env
+.env.*
+!.env.example
+
+# Prisma generated client
+apps/api/src/generated/
+
+# Expo
+.expo/
+web-build/
+expo-env.d.ts
+/apps/mobile/ios
+/apps/mobile/android
+.metro-health-check*
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# Logs
+*.log
+visual-check-output/

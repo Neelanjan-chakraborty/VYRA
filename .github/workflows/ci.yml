@@ -1,0 +1,60 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: vyra
+          POSTGRES_PASSWORD: vyra
+          POSTGRES_DB: vyra_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U vyra -d vyra_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports: ['6379:6379']
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 10
+    env:
+      # Throwaway credentials for the job's own service containers.
+      DATABASE_URL: postgresql://vyra:vyra@localhost:5432/vyra_ci
+      REDIS_URL: redis://localhost:6379
+      AI_PROVIDER: mock
+      NODE_ENV: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      - run: pnpm db:deploy
+      - name: Schema matches migrations
+        run: pnpm --filter @vyra/api exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
+      - run: pnpm build
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm test:e2e
+      - name: Mobile web export
+        run: pnpm --filter @vyra/mobile export:web

@@ -1,0 +1,869 @@
+// VYRA database schema. See docs/DATABASE_SCHEMA.md for design notes.
+// CHECK constraints and the pgvector index live in the SQL migrations because
+// Prisma's schema language cannot express them.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ───────────────────────────── Identity ─────────────────────────────
+
+enum UserRole {
+  USER
+  MODERATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ONBOARDING
+  ACTIVE
+  PAUSED
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id            String     @id @default(uuid()) @db.Uuid
+  /// Lower-cased before storage.
+  email         String?    @unique
+  /// E.164 format.
+  phone         String?    @unique
+  role          UserRole   @default(USER)
+  status        UserStatus @default(ONBOARDING)
+  dateOfBirth   DateTime?  @map("date_of_birth") @db.Date
+  ageVerifiedAt DateTime?  @map("age_verified_at") @db.Timestamptz(3)
+  lastActiveAt  DateTime?  @map("last_active_at") @db.Timestamptz(3)
+  createdAt     DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime   @updatedAt @map("updated_at") @db.Timestamptz(3)
+  /// Soft deletion marker. Personal data is purged by the deletion job.
+  deletedAt     DateTime?  @map("deleted_at") @db.Timestamptz(3)
+
+  sessions             AuthSession[]
+  consents             UserConsent[]
+  profile              UserProfile?
+  photos               UserPhoto[]
+  persona              Persona?
+  imports              AiImport[]
+  discoveryPreferences DiscoveryPreferences?
+  relationshipIntents  RelationshipIntent[]
+  interests            UserInterest[]
+  astrologyProfile     AstrologyProfile?
+  subscriptions        Subscription[]
+
+  compatibilityAsA CompatibilityScore[] @relation("CompatibilityUserA")
+  compatibilityAsB CompatibilityScore[] @relation("CompatibilityUserB")
+
+  discoveryEvents        DiscoveryEvent[] @relation("DiscoveryActor")
+  discoveryEventsAbout   DiscoveryEvent[] @relation("DiscoveryTarget")
+  savedProfiles          SavedProfile[]   @relation("SavedBy")
+  savedByOthers          SavedProfile[]   @relation("SavedTarget")
+  sentRequests           ConnectionRequest[] @relation("RequestSender")
+  receivedRequests       ConnectionRequest[] @relation("RequestRecipient")
+  matchesAsA             Match[]          @relation("MatchUserA")
+  matchesAsB             Match[]          @relation("MatchUserB")
+  conversationMemberships ConversationParticipant[]
+  messages               Message[]
+
+  feedbackGiven   UserFeedback[] @relation("FeedbackAuthor")
+  feedbackAbout   UserFeedback[] @relation("FeedbackTarget")
+  reportsFiled    SafetyReport[] @relation("ReportAuthor")
+  reportsAgainst  SafetyReport[] @relation("ReportSubject")
+  reportsResolved SafetyReport[] @relation("ReportResolver")
+  blocksCreated   BlockedUser[]  @relation("Blocker")
+  blocksReceived  BlockedUser[]  @relation("Blocked")
+  moderationEvents      ModerationEvent[] @relation("ModerationSubject")
+  moderationActions     ModerationEvent[] @relation("ModerationActor")
+  auditLogs       AuditLog[]
+
+  @@index([status])
+  @@map("users")
+}
+
+enum OtpChannel {
+  EMAIL
+  PHONE
+}
+
+/// One-time passcode challenge. Only hashes are stored.
+model OtpChallenge {
+  id              String     @id @default(uuid()) @db.Uuid
+  channel         OtpChannel
+  /// HMAC of the normalised e-mail address or phone number.
+  destinationHash String     @map("destination_hash")
+  codeHash        String     @map("code_hash")
+  attempts        Int        @default(0)
+  expiresAt       DateTime   @map("expires_at") @db.Timestamptz(3)
+  consumedAt      DateTime?  @map("consumed_at") @db.Timestamptz(3)
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([destinationHash, createdAt])
+  @@index([expiresAt])
+  @@map("otp_challenges")
+}
+
+/// Refresh-token session. The token itself is never stored.
+model AuthSession {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @unique @map("refresh_token_hash")
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(3)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(3)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastUsedAt       DateTime? @map("last_used_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("auth_sessions")
+}
+
+enum ConsentType {
+  TERMS_OF_SERVICE
+  PRIVACY_POLICY
+  AI_PERSONA_PROCESSING
+  AI_IMPORT_PROCESSING
+  PHOTO_ANALYSIS
+  ASTROLOGY
+  WINGMAN_MESSAGE_CONTEXT
+  ANALYTICS
+  MARKETING
+}
+
+/// Append-only consent ledger: a revocation sets revokedAt, a re-grant adds a row.
+model UserConsent {
+  id            String      @id @default(uuid()) @db.Uuid
+  userId        String      @map("user_id") @db.Uuid
+  type          ConsentType
+  /// Version of the policy or notice the user agreed to.
+  policyVersion String      @map("policy_version")
+  grantedAt     DateTime    @default(now()) @map("granted_at") @db.Timestamptz(3)
+  revokedAt     DateTime?   @map("revoked_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, type])
+  @@map("user_consents")
+}
+
+// ───────────────────────────── Profile ─────────────────────────────
+
+model UserProfile {
+  userId         String   @id @map("user_id") @db.Uuid
+  displayName    String   @map("display_name") @db.VarChar(60)
+  bio            String?  @db.VarChar(600)
+  /// Free-form, user-described.
+  gender         String?  @db.VarChar(40)
+  pronouns       String?  @db.VarChar(40)
+  occupation     String?  @db.VarChar(80)
+  city           String?  @db.VarChar(80)
+  /// ISO 3166-1 alpha-2.
+  countryCode    String?  @map("country_code") @db.Char(2)
+  /// Coarse coordinates (rounded before storage) used only for distance filtering.
+  latitude       Float?
+  longitude      Float?
+  /// Last completed onboarding stage key.
+  onboardingStep String?  @map("onboarding_step") @db.VarChar(40)
+  isDiscoverable Boolean  @default(false) @map("is_discoverable")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([isDiscoverable, countryCode])
+  @@map("user_profiles")
+}
+
+enum PhotoModerationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model UserPhoto {
+  id               String                @id @default(uuid()) @db.Uuid
+  userId           String                @map("user_id") @db.Uuid
+  /// Object-storage key. Served only through short-lived signed URLs.
+  storageKey       String                @unique @map("storage_key")
+  position         Int
+  width            Int
+  height           Int
+  mimeType         String                @map("mime_type") @db.VarChar(40)
+  sizeBytes        Int                   @map("size_bytes")
+  /// SHA-256 of the file, for exact-duplicate detection.
+  contentHash      String                @map("content_hash") @db.Char(64)
+  /// Perceptual hash, for near-duplicate detection.
+  perceptualHash   String?               @map("perceptual_hash") @db.VarChar(32)
+  moderationStatus PhotoModerationStatus @default(PENDING) @map("moderation_status")
+  /// BestPic assessment (quality, lighting, composition, clarity) with its version.
+  assessment       Json?
+  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt        DateTime?             @map("deleted_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, position])
+  @@index([userId, contentHash])
+  @@map("user_photos")
+}
+
+model Interest {
+  id        String   @id @default(uuid()) @db.Uuid
+  slug      String   @unique @db.VarChar(80)
+  label     String   @db.VarChar(80)
+  category  String   @db.VarChar(40)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  users  UserInterest[]
+  trends Trend[]
+
+  @@index([category])
+  @@map("interests")
+}
+
+enum InterestSource {
+  USER_SELECTED
+  IMPORT_APPROVED
+  INTEGRATION
+}
+
+model UserInterest {
+  userId     String         @map("user_id") @db.Uuid
+  interestId String         @map("interest_id") @db.Uuid
+  source     InterestSource @default(USER_SELECTED)
+  createdAt  DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interest Interest @relation(fields: [interestId], references: [id], onDelete: Cascade)
+
+  @@id([userId, interestId])
+  @@index([interestId])
+  @@map("user_interests")
+}
+
+enum RelationshipIntentKind {
+  SERIOUS
+  CASUAL
+  EXPLORING
+  COMPANIONSHIP
+  OTHER
+}
+
+model RelationshipIntent {
+  id          String                 @id @default(uuid()) @db.Uuid
+  userId      String                 @map("user_id") @db.Uuid
+  kind        RelationshipIntentKind
+  /// Required when kind is OTHER (enforced by a CHECK constraint).
+  customLabel String?                @map("custom_label") @db.VarChar(60)
+  isPrimary   Boolean                @default(false) @map("is_primary")
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, kind])
+  @@map("relationship_intents")
+}
+
+model DiscoveryPreferences {
+  userId          String   @id @map("user_id") @db.Uuid
+  minAge          Int      @default(18) @map("min_age")
+  maxAge          Int      @default(40) @map("max_age")
+  /// Null means no distance limit.
+  maxDistanceKm   Int?     @map("max_distance_km")
+  /// Genders the user wants to see; empty means everyone.
+  interestedIn    String[] @default([]) @map("interested_in")
+  /// Hard deal-breakers as structured rules, validated by @vyra/validation.
+  dealBreakers    Json     @default("[]") @map("deal_breakers")
+  showAstrology   Boolean  @default(false) @map("show_astrology")
+  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("discovery_preferences")
+}
+
+// ───────────────────────────── Persona ─────────────────────────────
+
+model Persona {
+  id               String   @id @default(uuid()) @db.Uuid
+  userId           String   @unique @map("user_id") @db.Uuid
+  /// The approved version currently used for matching.
+  currentVersionId String?  @unique @map("current_version_id") @db.Uuid
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  currentVersion PersonaVersion?  @relation("CurrentPersonaVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
+  versions       PersonaVersion[] @relation("PersonaVersions")
+
+  @@map("personas")
+}
+
+enum PersonaVersionStatus {
+  DRAFT
+  APPROVED
+  SUPERSEDED
+  REJECTED
+}
+
+model PersonaVersion {
+  id            String               @id @default(uuid()) @db.Uuid
+  personaId     String               @map("persona_id") @db.Uuid
+  version       Int
+  /// Version of the persona JSON schema in @vyra/validation.
+  schemaVersion String               @map("schema_version") @db.VarChar(20)
+  status        PersonaVersionStatus @default(DRAFT)
+  /// Attribute map: each entry carries value, confidence, evidence category,
+  /// source type, updatedAt and confirmation status.
+  attributes    Json
+  /// Provider and model that produced the draft ("mock", "gemini:…"), or "user".
+  generatedBy   String               @map("generated_by") @db.VarChar(80)
+  createdAt     DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+  approvedAt    DateTime?            @map("approved_at") @db.Timestamptz(3)
+
+  persona   Persona           @relation("PersonaVersions", fields: [personaId], references: [id], onDelete: Cascade)
+  currentOf Persona?          @relation("CurrentPersonaVersion")
+  evidence  PersonaEvidence[]
+
+  scoresAsA CompatibilityScore[] @relation("CompatibilityVersionA")
+  scoresAsB CompatibilityScore[] @relation("CompatibilityVersionB")
+
+  @@unique([personaId, version])
+  @@index([personaId, status])
+  @@map("persona_versions")
+}
+
+enum EvidenceCategory {
+  OBSERVED
+  INFERRED
+  USER_STATED
+}
+
+enum EvidenceSourceType {
+  PROFILE
+  PHOTO
+  CHATGPT_IMPORT
+  GEMINI_IMPORT
+  INTEREST_SELECTION
+  INTEGRATION
+  USER_CORRECTION
+}
+
+/// Why an attribute holds its value. Stores a short derived summary only —
+/// never raw imported conversation text.
+model PersonaEvidence {
+  id               String             @id @default(uuid()) @db.Uuid
+  personaVersionId String             @map("persona_version_id") @db.Uuid
+  attributeKey     String             @map("attribute_key") @db.VarChar(80)
+  category         EvidenceCategory
+  sourceType       EvidenceSourceType @map("source_type")
+  confidence       Float
+  summary          String             @db.VarChar(400)
+  importId         String?            @map("import_id") @db.Uuid
+  createdAt        DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  personaVersion PersonaVersion @relation(fields: [personaVersionId], references: [id], onDelete: Cascade)
+  import         AiImport?      @relation(fields: [importId], references: [id], onDelete: SetNull)
+
+  @@index([personaVersionId, attributeKey])
+  @@map("persona_evidence")
+}
+
+// Persona embeddings live in the separate "vyra_vector" PostgreSQL schema, created by
+// the init migration and queried with raw SQL (see src/database/). Prisma cannot
+// model pgvector columns or their HNSW index, and would try to drop the index on
+// every later migration if the table were declared here.
+
+enum ImportProvider {
+  CHATGPT
+  GEMINI
+}
+
+enum ImportStatus {
+  UPLOADED
+  VALIDATING
+  PROCESSING
+  AWAITING_APPROVAL
+  COMPLETED
+  REJECTED
+  FAILED
+  DELETED
+}
+
+model AiImport {
+  id             String         @id @default(uuid()) @db.Uuid
+  userId         String         @map("user_id") @db.Uuid
+  provider       ImportProvider
+  status         ImportStatus   @default(UPLOADED)
+  /// Object-storage key of the raw archive; nulled when the raw data is deleted.
+  storageKey     String?        @map("storage_key")
+  sizeBytes      BigInt         @map("size_bytes")
+  /// Machine-readable failure code. Never contains imported content.
+  failureCode    String?        @map("failure_code") @db.VarChar(60)
+  /// Raw archive must be deleted by this time.
+  rawExpiresAt   DateTime       @map("raw_expires_at") @db.Timestamptz(3)
+  rawDeletedAt   DateTime?      @map("raw_deleted_at") @db.Timestamptz(3)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(3)
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  evidence PersonaEvidence[]
+
+  @@index([userId, createdAt])
+  @@index([status])
+  @@index([rawExpiresAt])
+  @@map("ai_imports")
+}
+
+// ─────────────────────────── Compatibility ───────────────────────────
+
+/// A versioned set of dimension weights. Exactly one is active at a time
+/// (enforced by a partial unique index in the migration).
+model CompatibilityWeightSet {
+  version   String   @id @db.VarChar(40)
+  weights   Json
+  isActive  Boolean  @default(false) @map("is_active")
+  notes     String?  @db.VarChar(400)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  scores CompatibilityScore[]
+
+  @@map("compatibility_weight_sets")
+}
+
+enum DataSufficiency {
+  INSUFFICIENT
+  PARTIAL
+  SUFFICIENT
+}
+
+/// Cached pairwise result. The pair is stored once with userAId < userBId
+/// (CHECK constraint). Rows are keyed to the two persona versions used, so
+/// approving a new persona version makes the old rows unreachable and they
+/// are deleted by cascade when the superseded version is purged.
+model CompatibilityScore {
+  id                String          @id @default(uuid()) @db.Uuid
+  userAId           String          @map("user_a_id") @db.Uuid
+  userBId           String          @map("user_b_id") @db.Uuid
+  personaVersionAId String          @map("persona_version_a_id") @db.Uuid
+  personaVersionBId String          @map("persona_version_b_id") @db.Uuid
+  weightsVersion    String          @map("weights_version") @db.VarChar(40)
+  engineVersion     String          @map("engine_version") @db.VarChar(20)
+  /// Null when data is insufficient: no number is better than a misleading one.
+  overall           Float?
+  confidence        Float
+  sufficiency       DataSufficiency
+  /// Per-dimension score, confidence, coverage and explanation.
+  dimensions        Json
+  /// Hard deal-breaker or eligibility failure, if any.
+  blockedReason     String?         @map("blocked_reason") @db.VarChar(80)
+  computedAt        DateTime        @default(now()) @map("computed_at") @db.Timestamptz(3)
+
+  userA           User                   @relation("CompatibilityUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB           User                   @relation("CompatibilityUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  personaVersionA PersonaVersion         @relation("CompatibilityVersionA", fields: [personaVersionAId], references: [id], onDelete: Cascade)
+  personaVersionB PersonaVersion         @relation("CompatibilityVersionB", fields: [personaVersionBId], references: [id], onDelete: Cascade)
+  weightSet       CompatibilityWeightSet @relation(fields: [weightsVersion], references: [version])
+  scenarios       CompatibilityScenario[]
+
+  @@unique([personaVersionAId, personaVersionBId, weightsVersion, engineVersion])
+  @@index([userAId, overall])
+  @@index([userBId, overall])
+  @@index([personaVersionBId])
+  @@map("compatibility_scores")
+}
+
+/// Scenario-specific estimated alignment for a scored pair.
+model CompatibilityScenario {
+  id          String   @id @default(uuid()) @db.Uuid
+  scoreId     String   @map("score_id") @db.Uuid
+  scenarioKey String   @map("scenario_key") @db.VarChar(40)
+  alignment   Float?
+  confidence  Float
+  /// Features used and their contribution, for the explanation UI.
+  explanation Json
+
+  score CompatibilityScore @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+
+  @@unique([scoreId, scenarioKey])
+  @@map("compatibility_scenarios")
+}
+
+// ───────────────────────────── Discovery ─────────────────────────────
+
+enum DiscoveryEventType {
+  IMPRESSION
+  PROFILE_OPENED
+  COMPATIBILITY_VIEWED
+  SAVED
+  UNSAVED
+  PASSED
+  CONNECT_REQUESTED
+  CONNECTION_ACCEPTED
+  CONNECTION_DECLINED
+  FIRST_MESSAGE
+  CONVERSATION_SUSTAINED
+  FEEDBACK_SUBMITTED
+}
+
+/// Append-only behavioural events feeding the learning system.
+model DiscoveryEvent {
+  id           String             @id @default(uuid()) @db.Uuid
+  userId       String             @map("user_id") @db.Uuid
+  targetUserId String?            @map("target_user_id") @db.Uuid
+  type         DiscoveryEventType
+  /// Surface, rank position, engine versions. No free text.
+  context      Json               @default("{}")
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       User  @relation("DiscoveryActor", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser User? @relation("DiscoveryTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, targetUserId, type])
+  @@index([type, createdAt])
+  @@map("discovery_events")
+}
+
+model SavedProfile {
+  userId       String   @map("user_id") @db.Uuid
+  targetUserId String   @map("target_user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       User @relation("SavedBy", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser User @relation("SavedTarget", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@id([userId, targetUserId])
+  @@index([targetUserId])
+  @@map("saved_profiles")
+}
+
+enum ConnectionRequestStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+  WITHDRAWN
+  EXPIRED
+}
+
+model ConnectionRequest {
+  id          String                  @id @default(uuid()) @db.Uuid
+  senderId    String                  @map("sender_id") @db.Uuid
+  recipientId String                  @map("recipient_id") @db.Uuid
+  status      ConnectionRequestStatus @default(PENDING)
+  /// Optional introduction written or approved by the sender.
+  note        String?                 @db.VarChar(300)
+  createdAt   DateTime                @default(now()) @map("created_at") @db.Timestamptz(3)
+  respondedAt DateTime?               @map("responded_at") @db.Timestamptz(3)
+
+  sender    User   @relation("RequestSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User   @relation("RequestRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  match     Match?
+
+  @@unique([senderId, recipientId])
+  @@index([recipientId, status])
+  @@index([senderId, status])
+  @@map("connection_requests")
+}
+
+/// A mutual connection. Stored once with userAId < userBId (CHECK constraint).
+model Match {
+  id                  String    @id @default(uuid()) @db.Uuid
+  userAId             String    @map("user_a_id") @db.Uuid
+  userBId             String    @map("user_b_id") @db.Uuid
+  connectionRequestId String    @unique @map("connection_request_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  /// Set when either person disconnects or blocks.
+  endedAt             DateTime? @map("ended_at") @db.Timestamptz(3)
+
+  userA             User              @relation("MatchUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB             User              @relation("MatchUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  connectionRequest ConnectionRequest @relation(fields: [connectionRequestId], references: [id], onDelete: Cascade)
+  conversation      Conversation?
+
+  @@unique([userAId, userBId])
+  @@index([userBId])
+  @@map("matches")
+}
+
+// ───────────────────────────── Messaging ─────────────────────────────
+
+model Conversation {
+  id            String    @id @default(uuid()) @db.Uuid
+  matchId       String    @unique @map("match_id") @db.Uuid
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(3)
+
+  match        Match                     @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  participants ConversationParticipant[]
+  messages     Message[]
+
+  @@index([lastMessageAt])
+  @@map("conversations")
+}
+
+model ConversationParticipant {
+  conversationId String    @map("conversation_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  lastReadAt     DateTime? @map("last_read_at") @db.Timestamptz(3)
+  /// Whether this person shares read receipts in this conversation.
+  sendsReadReceipts Boolean @default(true) @map("sends_read_receipts")
+  /// Explicit opt-in for Wingman to read this conversation's recent messages.
+  wingmanContextEnabled Boolean @default(false) @map("wingman_context_enabled")
+  mutedAt        DateTime? @map("muted_at") @db.Timestamptz(3)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_participants")
+}
+
+enum MessageKind {
+  TEXT
+  IMAGE
+  VOICE
+  DATE_PLAN
+  SYSTEM
+}
+
+model Message {
+  id             String      @id @default(uuid()) @db.Uuid
+  conversationId String      @map("conversation_id") @db.Uuid
+  /// Null for SYSTEM messages and for senders whose account was deleted.
+  senderId       String?     @map("sender_id") @db.Uuid
+  kind           MessageKind @default(TEXT)
+  body           String?     @db.VarChar(4000)
+  mediaKey       String?     @map("media_key")
+  /// Structured payload for DATE_PLAN and SYSTEM messages.
+  payload        Json?
+  /// True when the text started as a Wingman suggestion the sender approved.
+  aiAssisted     Boolean     @default(false) @map("ai_assisted")
+  /// Client-generated id that makes sends idempotent.
+  clientId       String?     @map("client_id") @db.Uuid
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(3)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
+
+  @@unique([conversationId, clientId])
+  @@index([conversationId, createdAt])
+  @@map("messages")
+}
+
+// ─────────────────────── Trends and astrology ───────────────────────
+
+model Trend {
+  id         String   @id @default(uuid()) @db.Uuid
+  slug       String   @unique @db.VarChar(120)
+  label      String   @db.VarChar(120)
+  category   String   @db.VarChar(40)
+  /// Identifier of the public or authorised data source.
+  source     String   @db.VarChar(60)
+  /// Normalised 0–1 momentum at observation time.
+  momentum   Float
+  /// ISO 3166-1 alpha-2; null means global.
+  regionCode String?  @map("region_code") @db.Char(2)
+  interestId String?  @map("interest_id") @db.Uuid
+  observedAt DateTime @map("observed_at") @db.Timestamptz(3)
+  expiresAt  DateTime @map("expires_at") @db.Timestamptz(3)
+
+  interest Interest? @relation(fields: [interestId], references: [id], onDelete: SetNull)
+
+  @@index([category, expiresAt])
+  @@index([interestId])
+  @@map("trends")
+}
+
+/// Optional, entertainment-only. Chart data is computed deterministically.
+model AstrologyProfile {
+  userId        String   @id @map("user_id") @db.Uuid
+  birthDate     DateTime @map("birth_date") @db.Date
+  /// Local wall-clock time "HH:mm"; null when unknown.
+  birthTime     String?  @map("birth_time") @db.Char(5)
+  birthPlace    String?  @map("birth_place") @db.VarChar(120)
+  birthLatitude  Float?  @map("birth_latitude")
+  birthLongitude Float?  @map("birth_longitude")
+  /// IANA time zone of the birth place.
+  birthTimeZone String?  @map("birth_time_zone") @db.VarChar(60)
+  /// Computed placements with the calculation library version.
+  chart         Json?
+  isVisible     Boolean  @default(false) @map("is_visible")
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("astrology_profiles")
+}
+
+// ───────────────────── Subscriptions and feedback ─────────────────────
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+model Subscription {
+  id                 String             @id @default(uuid()) @db.Uuid
+  userId             String             @map("user_id") @db.Uuid
+  plan               String             @db.VarChar(40)
+  status             SubscriptionStatus
+  /// Billing provider identifier ("app_store", "play_store", …).
+  provider           String             @db.VarChar(40)
+  providerReference  String             @map("provider_reference")
+  currentPeriodStart DateTime           @map("current_period_start") @db.Timestamptz(3)
+  currentPeriodEnd   DateTime           @map("current_period_end") @db.Timestamptz(3)
+  canceledAt         DateTime?          @map("canceled_at") @db.Timestamptz(3)
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime           @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerReference])
+  @@index([userId, status])
+  @@map("subscriptions")
+}
+
+enum FeedbackKind {
+  COMPATIBILITY_ACCURACY
+  RECOMMENDATION_QUALITY
+  PERSONA_ACCURACY
+  CONNECTION_OUTCOME
+  GENERAL
+}
+
+model UserFeedback {
+  id           String       @id @default(uuid()) @db.Uuid
+  userId       String       @map("user_id") @db.Uuid
+  targetUserId String?      @map("target_user_id") @db.Uuid
+  kind         FeedbackKind
+  /// 1–5 (CHECK constraint).
+  rating       Int?
+  comment      String?      @db.VarChar(1000)
+  createdAt    DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  user       User  @relation("FeedbackAuthor", fields: [userId], references: [id], onDelete: Cascade)
+  targetUser User? @relation("FeedbackTarget", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@index([kind, createdAt])
+  @@map("user_feedback")
+}
+
+// ───────────────────────── Safety and audit ─────────────────────────
+
+enum ReportReason {
+  HARASSMENT
+  INAPPROPRIATE_CONTENT
+  FAKE_PROFILE
+  UNDERAGE
+  SPAM_OR_SCAM
+  OFFLINE_SAFETY
+  OTHER
+}
+
+enum ReportStatus {
+  OPEN
+  IN_REVIEW
+  ACTIONED
+  DISMISSED
+}
+
+model SafetyReport {
+  id             String       @id @default(uuid()) @db.Uuid
+  /// Kept (as null) if the reporter later deletes their account.
+  reporterId     String?      @map("reporter_id") @db.Uuid
+  reportedUserId String       @map("reported_user_id") @db.Uuid
+  reason         ReportReason
+  details        String?      @db.VarChar(2000)
+  /// Message the report refers to, if any. Not a foreign key so the report
+  /// survives message deletion.
+  messageId      String?      @map("message_id") @db.Uuid
+  status         ReportStatus @default(OPEN)
+  resolvedById   String?      @map("resolved_by_id") @db.Uuid
+  resolutionNote String?      @map("resolution_note") @db.VarChar(1000)
+  createdAt      DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  resolvedAt     DateTime?    @map("resolved_at") @db.Timestamptz(3)
+
+  reporter     User? @relation("ReportAuthor", fields: [reporterId], references: [id], onDelete: SetNull)
+  reportedUser User  @relation("ReportSubject", fields: [reportedUserId], references: [id], onDelete: Cascade)
+  resolvedBy   User? @relation("ReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([reportedUserId])
+  @@map("safety_reports")
+}
+
+model BlockedUser {
+  blockerId String   @map("blocker_id") @db.Uuid
+  blockedId String   @map("blocked_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  blocker User @relation("Blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("Blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@id([blockerId, blockedId])
+  @@index([blockedId])
+  @@map("blocked_users")
+}
+
+enum ModerationAction {
+  PHOTO_APPROVED
+  PHOTO_REJECTED
+  PROFILE_HIDDEN
+  PROFILE_RESTORED
+  WARNING_ISSUED
+  ACCOUNT_SUSPENDED
+  ACCOUNT_REINSTATED
+  ACCOUNT_BANNED
+}
+
+model ModerationEvent {
+  id            String           @id @default(uuid()) @db.Uuid
+  subjectUserId String           @map("subject_user_id") @db.Uuid
+  /// Null when the action was automated.
+  actorId       String?          @map("actor_id") @db.Uuid
+  action        ModerationAction
+  targetType    String?          @map("target_type") @db.VarChar(40)
+  targetId      String?          @map("target_id") @db.Uuid
+  reason        String?          @db.VarChar(1000)
+  createdAt     DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  subjectUser User  @relation("ModerationSubject", fields: [subjectUserId], references: [id], onDelete: Cascade)
+  actor       User? @relation("ModerationActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([subjectUserId, createdAt])
+  @@map("moderation_events")
+}
+
+/// Append-only security and administrative trail. Metadata must never
+/// contain message bodies, imported content or credentials.
+model AuditLog {
+  id         String   @id @default(uuid()) @db.Uuid
+  actorId    String?  @map("actor_id") @db.Uuid
+  action     String   @db.VarChar(80)
+  entityType String?  @map("entity_type") @db.VarChar(40)
+  entityId   String?  @map("entity_id") @db.VarChar(64)
+  metadata   Json     @default("{}")
+  requestId  String?  @map("request_id") @db.VarChar(64)
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  actor User? @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([actorId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action, createdAt])
+  @@map("audit_logs")
+}

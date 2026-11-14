@@ -1,0 +1,25 @@
+{
+  "name": "@vyra/design-system",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "VYRA design tokens: colour, typography, spacing, radius, elevation and motion.",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.3",
+    "vitest": "^5.1.0"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "react-hooks", "import", "unicorn"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    "typescript/no-explicit-any": "error",
+    "no-console": [
+      "error",
+      {
+        "allow": ["warn", "error"]
+      }
+    ],
+    "react/react-in-jsx-scope": "off",
+    "import/no-unassigned-import": "off",
+    "typescript/no-extraneous-class": [
+      "warn",
+      {
+        "allowWithDecorator": true
+      }
+    ],
+    "react/style-prop-object": [
+      "warn",
+      {
+        "allow": ["StatusBar"]
+      }
+    ]
+  },
+  "ignorePatterns": ["**/dist/**", "**/.expo/**", "apps/api/src/generated/**", "**/coverage/**"],
+  "overrides": [
+    {
+      "files": ["scripts/**"],
+      "rules": {
+        "no-console": "off"
+      }
+    }
+  ]
+}
