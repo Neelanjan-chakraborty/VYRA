@@ -121,6 +121,8 @@ export const photoSchema = z.object({
   height: z.number().int().positive(),
   /** Short-lived signed URL, valid only for the owner. Do not persist. */
   url: z.string().min(1),
+  /** Small version for grids and avatars; null for photos stored before thumbnails existed. */
+  thumbUrl: z.string().nullable(),
   status: photoModerationStatusSchema,
   /** Reason code for a rejection or review, e.g. "explicit_content". */
   reason: z.string().nullable(),

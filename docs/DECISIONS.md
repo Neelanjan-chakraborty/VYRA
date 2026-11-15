@@ -218,6 +218,35 @@ alignment bands (insufficient data on a dashed outer ring); the angle carries no
 stable between visits. Pure function, unit-tested; pan/pinch plus Zoom and Re-centre buttons;
 reduced motion skips animation.
 
+**D-060 · Hybrid NestJS + Rust** (product owner's choice). Nest keeps business logic; Rust runs
+the matchmaking core in-process (napi-rs, no network hop) and the realtime gateway as its own
+process. LLM calls stay in Nest (network-bound). The TypeScript engine is kept as the
+reference: Rust must match it exactly (parity fixtures + live comparison), and production
+refuses to start without the Rust addon.
+
+**D-061 · One call per recommendation step.** Crossing the JS↔Rust boundary costs more than
+scoring one pair, so `recommend()` gates, scores, ranks and explains in Rust and returns only
+the top results. Single-pair calls still go through Rust (one implementation) at ~40 µs extra.
+Speed claims are only made from measured benchmarks (`scripts/bench-engine.mjs`).
+
+**D-062 · Learned weights are proposals, never applied automatically.** Guardrails: dimensions
+only, each weight 0.05–0.40, ±0.05 per proposal, held-out AUC must improve, minimum sample
+sizes; an admin approves, and the database allows one active, approved set.
+
+**D-063 · Realtime: Rust gateway, plain WebSocket + MessagePack, Nest still writes messages**
+(product owner's choice). Access rules stay in one place; the gateway only authenticates,
+delivers id-only events from Redis, tracks presence and relays typing after a read-only check
+mirroring the API's rule. Socket.IO removed.
+
+**D-064 · Compression where it pays:** AVIF + thumbnails for photos, speech Opus 24 kbps (+ a
+CAF copy for iOS) for voice, brotli for JSON, MessagePack for socket frames, client-side resize
+before upload. No per-message text codec (messages are small; TOAST covers large values).
+AVIF uses encoder effort 0: ~60 % smaller than JPEG at the same encode time; higher effort
+took seconds per upload.
+
+**D-065 · Media caching follows who is looking.** Owner URLs: `max-age=600, immutable`; other
+people's: 60 s, so moderation, blocks and reports reach their devices within a minute.
+
 ## Open (need the product owner)
 
 | #   | Question                                               | Needed by     | Default if unanswered                                                    |

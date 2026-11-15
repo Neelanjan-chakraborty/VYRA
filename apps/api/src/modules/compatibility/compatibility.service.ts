@@ -126,6 +126,7 @@ export class CompatibilityService {
       photos: photos.map((p) => ({
         id: p.id,
         url: this.media.sign(p.storageKey, 'public'),
+        thumbUrl: p.thumbKey ? this.media.sign(p.thumbKey, 'public') : null,
         width: p.width,
         height: p.height,
       })),
@@ -155,7 +156,9 @@ export class CompatibilityService {
         age: target.person.age,
         city: target.city,
         photoUrl:
-          target.eligible && target.photoKey ? this.media.sign(target.photoKey, 'public') : null,
+          target.eligible && target.photoKey
+            ? this.media.sign(target.thumbKey ?? target.photoKey, 'public')
+            : null,
         distance: distanceBetween(viewer, target),
         overall: result.overall,
         sufficiency: result.sufficiency,
@@ -253,7 +256,8 @@ export class CompatibilityService {
         displayName: item.displayName,
         age: item.person.age,
         city: item.city,
-        photoUrl: item.photoKey ? this.media.sign(item.photoKey, 'public') : null,
+        // Cards are small: the thumbnail is enough.
+        photoUrl: item.photoKey ? this.media.sign(item.thumbKey ?? item.photoKey, 'public') : null,
         distance: distanceBetween(viewer, item),
         overall: result.overall,
         confidence: result.confidence,

@@ -240,6 +240,8 @@ export type RecommendationList = z.infer<typeof recommendationListSchema>;
 export const publicPhotoSchema = z.object({
   id: z.uuid(),
   url: z.string(),
+  /** Small version; null for photos stored before thumbnails existed. */
+  thumbUrl: z.string().nullable(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
 });

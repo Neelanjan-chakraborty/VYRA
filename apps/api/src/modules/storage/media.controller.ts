@@ -3,17 +3,44 @@ import { ApiExcludeController } from '@nestjs/swagger';
 import type { Response } from 'express';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Public } from '../auth/auth.decorators.js';
-import { MediaUrlService } from './media-url.service.js';
+import { type MediaScope, MediaUrlService } from './media-url.service.js';
 import { OBJECT_STORAGE, type ObjectStorage } from './storage.js';
 
-/** Extensions the server writes for message media → content type. */
-const MESSAGE_MEDIA_TYPES: Readonly<Record<string, string>> = {
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+/** Extensions the server writes → content type. jpg, m4a and webm are older uploads. */
+const PHOTO_TYPES: Readonly<Record<string, string>> = {
+  avif: 'image/avif',
   jpg: 'image/jpeg',
+};
+const MESSAGE_MEDIA_TYPES: Readonly<Record<string, string>> = {
+  ...PHOTO_TYPES,
+  ogg: 'audio/ogg',
+  caf: 'audio/x-caf',
   m4a: 'audio/mp4',
   webm: 'audio/webm',
 };
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+/** `<uuid>.<ext>` or `<uuid>.thumb.<ext>` → its content type, or null if malformed. */
+function parseFile(file: string, types: Readonly<Record<string, string>>): string | null {
+  const parts = file.split('.');
+  const [id] = parts;
+  const extension = parts.at(-1);
+  const shapeOk = parts.length === 2 || (parts.length === 3 && parts[1] === 'thumb');
+  if (!id || !UUID.test(id) || !shapeOk || !extension) return null;
+  return types[extension] ?? null;
+}
+
+/**
+ * Signed URLs are immutable for their ten-minute life. The owner's own media
+ * may be cached for all of it; what other people see is cached for a minute
+ * at most, so moderation, blocks and reports reach their devices quickly.
+ */
+function cacheControl(scope: MediaScope): string {
+  if (scope === 'owner') return 'private, max-age=600, immutable';
+  if (scope === 'moderator') return 'private, no-store';
+  return 'private, max-age=60';
+}
 
 /**
  * Serves stored photos to holders of a valid signed URL. The database is
@@ -39,17 +66,17 @@ export class MediaController {
     @Query('sig') sig: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const [id, extension, ...rest] = file.split('.');
-    const wellFormed =
-      UUID.test(ownerId) && id && UUID.test(id) && extension === 'jpg' && rest.length === 0;
+    const contentType = UUID.test(ownerId) ? parseFile(file, PHOTO_TYPES) : null;
+    const wellFormed = contentType !== null;
     const key = `photos/${ownerId}/${file}`;
     // One indistinguishable answer for every refusal.
     const scope = wellFormed ? this.urls.verify(key, scopeCode, exp, sig) : null;
     // Conversation URLs are only ever issued for message media.
     if (!scope || scope === 'conversation') throw new NotFoundException('Not found');
 
-    const photo = await this.prisma.userPhoto.findUnique({
-      where: { storageKey: key },
+    // The full image or its thumbnail: both follow the photo's own state.
+    const photo = await this.prisma.userPhoto.findFirst({
+      where: { OR: [{ storageKey: key }, { thumbKey: key }] },
       select: {
         deletedAt: true,
         moderationStatus: true,
@@ -67,14 +94,10 @@ export class MediaController {
           photo.user.deletedAt === null &&
           photo.user.profile?.isDiscoverable === true));
     const data = servable ? await this.storage.get(key) : null;
-    if (!data) throw new NotFoundException('Not found');
+    if (!data || !contentType) throw new NotFoundException('Not found');
 
-    response.setHeader('content-type', 'image/jpeg');
-    // Short cache so a moderation decision takes effect quickly in browsers too.
-    response.setHeader(
-      'cache-control',
-      scope === 'public' ? 'private, max-age=60' : 'private, no-store',
-    );
+    response.setHeader('content-type', contentType);
+    response.setHeader('cache-control', cacheControl(scope));
     // The app is served from a different origin than the API.
     response.setHeader('cross-origin-resource-policy', 'cross-origin');
     response.end(data);
@@ -95,16 +118,18 @@ export class MediaController {
     @Query('sig') sig: string | undefined,
     @Res() response: Response,
   ): Promise<void> {
-    const [id, extension, ...rest] = file.split('.');
-    const contentType = extension ? MESSAGE_MEDIA_TYPES[extension] : undefined;
-    const wellFormed =
-      UUID.test(conversationId) && id && UUID.test(id) && contentType && rest.length === 0;
+    const contentType = UUID.test(conversationId) ? parseFile(file, MESSAGE_MEDIA_TYPES) : null;
+    const wellFormed = contentType !== null;
     const key = `messages/${conversationId}/${file}`;
     const scope = wellFormed ? this.urls.verify(key, scopeCode, exp, sig) : null;
     if (scope !== 'owner' && scope !== 'conversation') throw new NotFoundException('Not found');
 
     const message = await this.prisma.message.findFirst({
-      where: { mediaKey: key, conversationId, deletedAt: null },
+      where: {
+        conversationId,
+        deletedAt: null,
+        OR: [{ mediaKey: key }, { mediaThumbKey: key }, { mediaAltKey: key }],
+      },
       select: {
         senderId: true,
         mediaStatus: true,
@@ -124,7 +149,7 @@ export class MediaController {
     if (!data || !contentType) throw new NotFoundException('Not found');
 
     response.setHeader('content-type', contentType);
-    response.setHeader('cache-control', 'private, no-store');
+    response.setHeader('cache-control', cacheControl(scope));
     response.setHeader('cross-origin-resource-policy', 'cross-origin');
     response.end(data);
   }

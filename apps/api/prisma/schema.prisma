@@ -227,6 +227,8 @@ model UserPhoto {
   userId            String                @map("user_id") @db.Uuid
   /// Object-storage key. Served only through short-lived signed URLs.
   storageKey        String                @unique @map("storage_key")
+  /// 320 px AVIF used in lists and cards; null for photos stored before thumbnails.
+  thumbKey          String?               @map("thumb_key")
   position          Int
   width             Int
   height            Int
@@ -487,18 +489,18 @@ enum WeightSetStatus {
 }
 
 model CompatibilityWeightSet {
-  version   String   @id @db.VarChar(40)
-  weights   Json
-  isActive  Boolean  @default(false) @map("is_active")
-  notes     String?  @db.VarChar(400)
-  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  status    WeightSetStatus @default(APPROVED)
+  version     String          @id @db.VarChar(40)
+  weights     Json
+  isActive    Boolean         @default(false) @map("is_active")
+  notes       String?         @db.VarChar(400)
+  createdAt   DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
+  status      WeightSetStatus @default(APPROVED)
   /// The active version a proposal was learned against.
-  basedOn   String?  @map("based_on") @db.VarChar(40)
+  basedOn     String?         @map("based_on") @db.VarChar(40)
   /// Sample counts, coefficients and held-out AUC (current vs proposed). Aggregates only.
-  metrics   Json?
-  decidedById String?   @map("decided_by_id") @db.Uuid
-  decidedAt   DateTime? @map("decided_at") @db.Timestamptz(3)
+  metrics     Json?
+  decidedById String?         @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime?       @map("decided_at") @db.Timestamptz(3)
 
   scores CompatibilityScore[]
 
@@ -712,6 +714,12 @@ model Message {
   kind            MessageKind            @default(TEXT)
   body            String?                @db.VarChar(4000)
   mediaKey        String?                @map("media_key")
+  /// IMAGE: 320 px AVIF thumbnail.
+  mediaThumbKey   String?                @map("media_thumb_key")
+  /// VOICE: the same Opus audio in a CAF container, for iOS's native player.
+  mediaAltKey     String?                @map("media_alt_key")
+  /// Stored size of the main media file in bytes.
+  mediaBytes      Int?                   @map("media_bytes")
   /// Structured payload for DATE_PLAN and SYSTEM messages.
   payload         Json?
   /// True when the text started as a Wingman suggestion the sender approved.

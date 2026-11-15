@@ -2,6 +2,7 @@ import { color, radius, space } from '@vyra/design-system';
 import { MAX_PHOTOS, type Photo } from '@vyra/validation';
 import { Image } from 'expo-image';
 import * as ImagePicker from 'expo-image-picker';
+import { prepareImageForUpload } from '@/lib/prepare-image';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
@@ -42,11 +43,7 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
       });
       const asset = result.canceled ? undefined : result.assets[0];
       if (!asset) return null;
-      return {
-        uri: asset.uri,
-        ...(asset.mimeType ? { mimeType: asset.mimeType } : {}),
-        ...(asset.file ? { file: asset.file } : {}),
-      };
+      return await prepareImageForUpload(asset);
     } catch {
       setPickerError('We couldn’t open your photos. Check the permission in Settings.');
       return null;
@@ -105,7 +102,7 @@ export function PhotosStep({ mode }: { readonly mode: StepMode }) {
               style={[styles.tile, index === 0 && styles.lead]}
             >
               <Image
-                source={{ uri: photo.url }}
+                source={{ uri: photo.thumbUrl ?? photo.url }}
                 style={styles.image}
                 contentFit="cover"
                 transition={150}

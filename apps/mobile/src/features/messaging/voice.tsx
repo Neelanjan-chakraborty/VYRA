@@ -1,6 +1,7 @@
 import { color, MIN_TOUCH_TARGET, radius, space } from '@vyra/design-system';
 import { VOICE_MAX_MS } from '@vyra/validation';
 import {
+  type RecordingOptions,
   RecordingPresets,
   requestRecordingPermissionsAsync,
   setAudioModeAsync,
@@ -72,6 +73,17 @@ export function VoiceNote({
   );
 }
 
+/**
+ * Speech doesn't need music quality: mono at 64 kbps (32 kbps WebM/Opus in
+ * browsers) keeps uploads small. The server re-encodes to 24 kbps Opus anyway.
+ */
+const VOICE_RECORDING: RecordingOptions = {
+  ...RecordingPresets.HIGH_QUALITY,
+  numberOfChannels: 1,
+  bitRate: 64_000,
+  web: { mimeType: 'audio/webm', bitsPerSecond: 32_000 },
+};
+
 export interface Recording {
   readonly audio: PickedMedia;
   readonly durationMs: number;
@@ -82,7 +94,7 @@ export interface Recording {
  * between start and stop; permission is asked the first time.
  */
 export function useVoiceRecorder() {
-  const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+  const recorder = useAudioRecorder(VOICE_RECORDING);
   const [recording, setRecording] = useState(false);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [denied, setDenied] = useState(false);

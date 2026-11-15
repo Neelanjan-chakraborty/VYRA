@@ -1,20 +1,21 @@
 # Implementation status
 
-Last updated: 15 November 2026, after Milestone 6 (messaging, media, voice, notifications, Wingman, date ideas).
+Last updated: 15 November 2026, after Milestone 7 part 1 (Rust engine, learning, realtime gateway, compression).
 
 ## Summary
 
-| Milestone                     | Status                                         |
-| ----------------------------- | ---------------------------------------------- |
-| 0 — Audit and plan            | Done                                           |
-| 1 — Foundation                | Done                                           |
-| 2 — Design and authentication | Done, with the gaps listed below               |
-| 3 — AI Persona                | Done with the mock provider; Gemini unverified |
-| 4 — Compatibility             | Done                                           |
-| Gap resolution (4 items)      | Done — see below                               |
-| 5 — Discovery                 | Done                                           |
-| 6 — Social                    | Done; device push unverified                   |
-| 7–8                           | Not started                                    |
+| Milestone                     | Status                                                                          |
+| ----------------------------- | ------------------------------------------------------------------------------- |
+| 0 — Audit and plan            | Done                                                                            |
+| 1 — Foundation                | Done                                                                            |
+| 2 — Design and authentication | Done, with the gaps listed below                                                |
+| 3 — AI Persona                | Done with the mock provider; Gemini unverified                                  |
+| 4 — Compatibility             | Done                                                                            |
+| Gap resolution (4 items)      | Done — see below                                                                |
+| 5 — Discovery                 | Done                                                                            |
+| 6 — Social                    | Done; device push unverified                                                    |
+| 7 — Advanced intelligence     | Part 1 done (Rust core, learning, gateway, compression); AI archive import next |
+| 8                             | Not started                                                                     |
 
 ## Product gap resolution — complete versus still needed
 
@@ -27,6 +28,22 @@ Last updated: 15 November 2026, after Milestone 6 (messaging, media, voice, noti
 | **Discover (first cut)** | Ranked list and profile preview with photo or placeholder, distance band, estimated alignment in words, reasons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Superseded by Milestone 5 below                                                                                                                                                              |
 
 ## What works today
+
+**New in Milestone 7 (part 1) — Rust where it matters.**
+
+- **Matchmaking core in Rust**, in-process (napi-rs). Identical results to the TypeScript
+  reference on 2 000 fixture pairs, 60 rankings, and 3 000 fresh random pairs; all API tests run
+  on it. Recommendations take one native call. Measured: ~1.5–1.8× faster for a 200-candidate
+  pool through Node (Rust compute ~1 ms); single-pair calls ~40 µs slower (boundary cost).
+- **Weight learning** in Rust: guarded logistic regression on what people did (save/connect/
+  accept vs pass/decline), weekly or on demand, stored as a _proposal_ that an admin approves
+  (`/v1/admin/weights`). Only dimension scores and outcomes are used.
+- **Realtime gateway in Rust** (axum/tokio): WebSocket + MessagePack, Redis fan-out across
+  instances, presence for push suppression, typing, per-device sign-out. Measured p50 4 ms /
+  p99 12 ms publish→socket at 500 connections, ~10–13 KB per connection. Socket.IO removed.
+- **Compression**: AVIF photos + 320 px thumbnails (~60 % smaller than JPEG at equal encode
+  time), client-side resize before upload, voice re-encoded to 24 kbps speech Opus (+ CAF for
+  iOS), brotli JSON, MessagePack frames, media caching by viewer.
 
 **New in Milestone 6 — conversations.** Mutual connections can now talk:
 
@@ -138,15 +155,25 @@ delete their account.
 
 ## Verification (run 15 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                                                                                                                                                                                                                                                                    |
-| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                                                                                      |
-| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                                                                                         |
-| `pnpm test`                       | Pass — validation 46, design-system, compatibility-engine, api 59 (incl. the real nsfwjs model, audio sniffing, Wingman prompt and filter), mobile 4                                                                                                                                                      |
-| `pnpm test:e2e`                   | Pass — 191 tests in 13 suites against real PostgreSQL, Redis and the queue (new: `messaging` 15 incl. sockets, `message-media` 8)                                                                                                                                                                         |
-| `prisma migrate diff --exit-code` | Pass — no drift, 9 migrations                                                                                                                                                                                                                                                                             |
-| `expo export --platform web`      | Pass                                                                                                                                                                                                                                                                                                      |
-| `pnpm e2e:web`                    | Pass — 47 screenshots, no browser errors; adds a conversation: text, live reply and “typing…” over the socket, read tick, photo (checked, then shown), voice note from a fake microphone, date idea accepted by the other person, Wingman opt-in → suggestion → edit → send, privacy settings, unread dot |
+| Check                             | Result                                                                                                                                                                                                                                       |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                         |
+| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                            |
+| `pnpm test`                       | Pass — validation 46, design-system, compatibility-engine, api 59 (incl. the real nsfwjs model, audio sniffing, Wingman prompt and filter), mobile 4                                                                                         |
+| `pnpm test:e2e`                   | Pass — 201 tests in 14 suites against real PostgreSQL, Redis, the queue, ffmpeg and the Rust gateway (new: `learning` 5, realtime rewritten for the gateway 7, compression, AVIF/Opus media)                                                 |
+| `prisma migrate diff --exit-code` | Pass — no drift, 11 migrations                                                                                                                                                                                                               |
+| `expo export --platform web`      | Pass                                                                                                                                                                                                                                         |
+| `pnpm e2e:web`                    | Pass — 47 screenshots, no browser errors, against the Rust gateway: live reply and typing over WebSocket + MessagePack, AVIF photo thumbnail, voice note from a fake microphone re-encoded to Opus, date idea, Wingman, settings, unread dot |
+| `pnpm rust:check`                 | Pass — fmt, clippy `-D warnings`, 13 Rust tests (engine 8 incl. learning 6, parity 2 over 2 000 pairs + 60 rankings, gateway 3)                                                                                                              |
+| Benchmarks                        | `scripts/bench-engine.mjs`, `cargo bench -p vyra-engine`, `scripts/bench-realtime.mjs` — numbers above                                                                                                                                       |
+
+Found and fixed while verifying Milestone 7: the addon was first _slower_ than TypeScript
+because whole result sets crossed the boundary twice (fixed with a single `recommend` call);
+the gateway used 135 KB per connection until its socket buffers were sized for tiny frames;
+your own sent message could clear the other person's "typing…" (events now carry the actor);
+the gateway's log filter collided with the API's `LOG_LEVEL` (now `RUST_LOG`); closing a
+flooding socket could reset the connection before the client saw why (it now drains first);
+AVIF at the default encoder effort took ~1.8 s per photo (effort 0 is used).
 
 Found and fixed while verifying Milestone 6: the global HTTP auth guard crashed on socket
 messages (it now recognises socket contexts, which are authenticated at connect); live
@@ -238,5 +265,5 @@ pnpm build
 pnpm check && pnpm test:e2e
 ```
 
-Then start Milestone 7 (`docs/IMPLEMENTATION_BACKLOG.md`): advanced intelligence — learning
-from discovery events and AI archive import.
+Run the gateway alongside the API for live updates: `pnpm dev:realtime`. Then continue
+Milestone 7 (`docs/IMPLEMENTATION_BACKLOG.md`): AI archive import.

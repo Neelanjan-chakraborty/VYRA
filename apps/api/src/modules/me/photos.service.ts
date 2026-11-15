@@ -8,7 +8,12 @@ import {
 import { MAX_PHOTOS, type Photo } from '@vyra/validation';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { UserPhoto } from '../../generated/prisma/client.js';
-import { type ProcessedImage, processImage, type UploadedImage } from '../../common/image.js';
+import {
+  IMAGE_FORMAT,
+  type ProcessedImage,
+  processImage,
+  type UploadedImage,
+} from '../../common/image.js';
 import { ModerationService } from '../moderation/moderation.service.js';
 import { MediaUrlService } from '../storage/media-url.service.js';
 import { OBJECT_STORAGE, type ObjectStorage } from '../storage/storage.js';
@@ -34,6 +39,7 @@ export class PhotosService {
       width: photo.width,
       height: photo.height,
       url: this.urls.sign(photo.storageKey, 'owner'),
+      thumbUrl: photo.thumbKey ? this.urls.sign(photo.thumbKey, 'owner') : null,
       status: photo.moderationStatus,
       reason: photo.moderationStatus === 'APPROVED' ? null : photo.moderationReason,
       canAppeal: photo.moderationStatus === 'REJECTED' && photo.appealRequestedAt === null,
@@ -66,8 +72,7 @@ export class PhotosService {
     }
 
     const id = crypto.randomUUID();
-    const storageKey = `photos/${userId}/${id}.jpg`;
-    await this.storage.put(storageKey, image.data, 'image/jpeg');
+    const { storageKey, thumbKey } = await this.store(userId, id, image);
     let photo: UserPhoto;
     try {
       photo = await this.prisma.userPhoto.create({
@@ -75,17 +80,18 @@ export class PhotosService {
           id,
           userId,
           storageKey,
+          thumbKey,
           position: Math.max(-1, ...live.map((p) => p.position)) + 1,
           width: image.info.width,
           height: image.info.height,
-          mimeType: 'image/jpeg',
+          mimeType: IMAGE_FORMAT.contentType,
           sizeBytes: image.data.byteLength,
           contentHash: image.contentHash,
           moderationStatus: 'PENDING',
         },
       });
     } catch (error) {
-      await this.storage.delete(storageKey);
+      await this.deleteFiles({ storageKey, thumbKey });
       throw error;
     }
     await this.moderation.submit(photo.id, userId);
@@ -108,12 +114,13 @@ export class PhotosService {
     if (duplicate > 0 || existing.contentHash === image.contentHash) {
       throw new ConflictException('You have already added this photo.');
     }
-    const storageKey = `photos/${userId}/${crypto.randomUUID()}.jpg`;
-    await this.storage.put(storageKey, image.data, 'image/jpeg');
+    const { storageKey, thumbKey } = await this.store(userId, crypto.randomUUID(), image);
     const photo = await this.prisma.userPhoto.update({
       where: { id: photoId },
       data: {
         storageKey,
+        thumbKey,
+        mimeType: IMAGE_FORMAT.contentType,
         width: image.info.width,
         height: image.info.height,
         sizeBytes: image.data.byteLength,
@@ -124,7 +131,7 @@ export class PhotosService {
         appealRequestedAt: null,
       },
     });
-    await this.storage.delete(existing.storageKey);
+    await this.deleteFiles(existing);
     await this.moderation.submit(photo.id, userId);
     return this.toDto(photo);
   }
@@ -158,7 +165,7 @@ export class PhotosService {
     });
     if (!photo) throw new NotFoundException('Photo not found.');
     await this.prisma.userPhoto.delete({ where: { id: photo.id } });
-    await this.storage.delete(photo.storageKey);
+    await this.deleteFiles(photo);
     await this.moderation.event(userId, userId, 'PHOTO_REMOVED', photo.id, 'removed_by_owner');
   }
 
@@ -166,6 +173,28 @@ export class PhotosService {
   async purge(userId: string): Promise<void> {
     const photos = await this.prisma.userPhoto.findMany({ where: { userId } });
     await this.prisma.userPhoto.deleteMany({ where: { userId } });
-    await Promise.all(photos.map((photo) => this.storage.delete(photo.storageKey)));
+    await Promise.all(photos.map((photo) => this.deleteFiles(photo)));
+  }
+
+  /** Writes the full image and its thumbnail under fresh keys. */
+  private async store(
+    userId: string,
+    id: string,
+    image: ProcessedImage,
+  ): Promise<{ storageKey: string; thumbKey: string }> {
+    const storageKey = `photos/${userId}/${id}.${IMAGE_FORMAT.extension}`;
+    const thumbKey = `photos/${userId}/${id}.thumb.${IMAGE_FORMAT.extension}`;
+    await Promise.all([
+      this.storage.put(storageKey, image.data, IMAGE_FORMAT.contentType),
+      this.storage.put(thumbKey, image.thumb, IMAGE_FORMAT.contentType),
+    ]);
+    return { storageKey, thumbKey };
+  }
+
+  private async deleteFiles(photo: { storageKey: string; thumbKey: string | null }): Promise<void> {
+    await Promise.all([
+      this.storage.delete(photo.storageKey),
+      ...(photo.thumbKey ? [this.storage.delete(photo.thumbKey)] : []),
+    ]);
   }
 }

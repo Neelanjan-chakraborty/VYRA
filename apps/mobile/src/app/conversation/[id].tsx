@@ -45,6 +45,7 @@ import {
 import { sendTyping, useIsTyping } from '@/features/messaging/realtime';
 import { clock, useVoiceRecorder } from '@/features/messaging/voice';
 import { errorMessage } from '@/lib/api';
+import { prepareImageForUpload } from '@/lib/prepare-image';
 import { noBrowserFocusRing } from '@/lib/web-style';
 
 type Sheet = 'add' | 'plan' | 'wingman' | 'settings' | 'end' | 'block' | null;
@@ -135,11 +136,7 @@ export default function ConversationScreen() {
     });
     const asset = result.canceled ? undefined : result.assets[0];
     if (!asset) return;
-    sendPhoto.mutate({
-      uri: asset.uri,
-      ...(asset.mimeType ? { mimeType: asset.mimeType } : {}),
-      ...(asset.file ? { file: asset.file } : {}),
-    });
+    sendPhoto.mutate(await prepareImageForUpload(asset));
   }
 
   async function startVoice() {

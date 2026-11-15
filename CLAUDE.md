@@ -11,7 +11,11 @@ compatibility-first discovery, evidence-aware personas, user-controlled AI.
   its README. Pages are registered in `src/lib/routes.ts`.
 - `packages/validation` — Zod schemas and inferred types shared by API and clients.
 - `packages/design-system` — design tokens (colour, type, spacing, motion).
-- `packages/compatibility-engine` — pure, deterministic compatibility scoring (no I/O).
+- `packages/compatibility-engine` — TypeScript reference engine (pure, deterministic, no I/O).
+- `crates/vyra-engine` — the same engine in Rust (plus weight learning), used by the API
+  in-process through `crates/vyra-engine-node` → `packages/engine-native` (napi-rs).
+- `crates/vyra-realtime` — Rust WebSocket gateway (MessagePack): sockets, presence, typing.
+  The API publishes id-only events on Redis; Nest still owns every write.
 - `docs/` — product, architecture, decisions, status. `infrastructure/docker` — local services.
 
 ## Commands
@@ -25,6 +29,8 @@ pnpm check                   # format:check + lint + typecheck + unit tests
 pnpm test:e2e                # API end-to-end tests (needs the services)
 pnpm dev:api                 # API on :4000, OpenAPI at /docs
 pnpm dev:mobile              # Expo dev server
+pnpm dev:realtime            # Rust realtime gateway on :4001 (needed for live updates)
+pnpm rust:check              # cargo fmt --check + clippy -D warnings + cargo test
 pnpm --filter @vyra/mobile export:web && pnpm e2e:web <dir>   # browser run of the account lifecycle
 pnpm --filter @vyra/landing dev   # website on :3100; `seo:audit` and `visual:check` verify a build
 ```
@@ -46,7 +52,11 @@ pnpm --filter @vyra/landing dev   # website on :3100; `seo:audit` and `visual:ch
   testimonial or legal claim that has not been supplied.
 - UI work: follow the `vyra-design-system` skill. Tokens only, no raw hex or font sizes in screens.
 - Persona and anything sent to a model: follow the `persona-engineering` skill.
-- Scoring, gates or ranking: follow the `compatibility-engine` skill.
+- Scoring, gates or ranking: follow the `compatibility-engine` skill. **Change the TypeScript
+  reference and the Rust engine together**, then `pnpm engine:fixtures`; parity tests fail
+  otherwise. The persona catalogue for Rust is generated (`pnpm engine:catalogue`).
+- Rust: pinned by `rust-toolchain.toml`; `unsafe` is forbidden outside the napi bindings.
+  Speed or size claims must come from the bench scripts, not estimates.
 - AI output is untrusted data. Compatibility is computed deterministically, never by asking an
   LLM. Tests use the mock AI provider (`AI_PROVIDER=mock`).
 - Never log message bodies, imported content, tokens or OTPs.

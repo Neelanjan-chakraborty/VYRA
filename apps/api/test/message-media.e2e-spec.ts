@@ -1,4 +1,9 @@
+import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import sharp from 'sharp';
 import { connectionsSchema, messagePageSchema } from '@vyra/validation';
 import request from 'supertest';
 import { PrismaService } from '../src/database/prisma.service.js';
@@ -15,20 +20,39 @@ import { createPerson } from './support/people.js';
 
 type Person = TestUser & { id: string; photoId: string };
 
-/** A minimal M4A: an ftyp box and a moov box whose mvhd records the duration. */
+/** A real AAC voice-like recording of the given length, made with ffmpeg. */
 function m4a(durationMs: number): Buffer {
+  const dir = mkdtempSync(join(tmpdir(), 'vyra-test-audio-'));
+  const file = join(dir, 'v.m4a');
+  try {
+    execFileSync('ffmpeg', [
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-f',
+      'lavfi',
+      '-i',
+      `sine=frequency=220:duration=${durationMs / 1000}`,
+      '-c:a',
+      'aac',
+      '-b:a',
+      '128k',
+      '-ac',
+      '1',
+      file,
+    ]);
+    return readFileSync(file);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
+/** Valid M4A header, no decodable audio: must be refused, not stored. */
+function m4aWithoutAudio(): Buffer {
   const ftyp = Buffer.alloc(16);
   ftyp.writeUInt32BE(16, 0);
   ftyp.write('ftypM4A ', 4, 'latin1');
-  const mvhd = Buffer.alloc(8 + 100);
-  mvhd.writeUInt32BE(mvhd.length, 0);
-  mvhd.write('mvhd', 4, 'latin1');
-  mvhd.writeUInt32BE(1000, 8 + 12); // timescale: milliseconds
-  mvhd.writeUInt32BE(durationMs, 8 + 16);
-  const moov = Buffer.alloc(8);
-  moov.writeUInt32BE(8 + mvhd.length, 0);
-  moov.write('moov', 4, 'latin1');
-  return Buffer.concat([ftyp, moov, mvhd, Buffer.alloc(2000, 7)]);
+  return Buffer.concat([ftyp, Buffer.alloc(2000, 7)]);
 }
 
 describe('Photos, voice notes, reports and Wingman in conversations (e2e)', () => {
@@ -115,13 +139,24 @@ describe('Photos, voice notes, reports and Wingman in conversations (e2e)', () =
       const image = await http()
         .get(url.pathname + url.search)
         .expect(200);
-      expect(image.headers['content-type']).toBe('image/jpeg');
+      expect(image.headers['content-type']).toBe('image/avif');
+      // Other people's copies are cached briefly, so a block or report takes effect quickly.
+      expect(image.headers['cache-control']).toBe('private, max-age=60');
       expect((image.body as Buffer).includes(Buffer.from('secret-device-id'))).toBe(false);
+      const thumbUrl = new URL(ready?.media?.thumbUrl ?? '');
+      const thumb = await http()
+        .get(thumbUrl.pathname + thumbUrl.search)
+        .expect(200);
+      const thumbMeta = await sharp(thumb.body as Buffer).metadata();
+      expect(Math.max(thumbMeta.width ?? 0, thumbMeta.height ?? 0)).toBe(320);
 
       // The same URL stops working across a block.
       await http().post(`/v1/blocks/${a.id}`).set(b.auth).expect(204);
       await http()
         .get(url.pathname + url.search)
+        .expect(404);
+      await http()
+        .get(thumbUrl.pathname + thumbUrl.search)
         .expect(404);
     });
 
@@ -156,21 +191,37 @@ describe('Photos, voice notes, reports and Wingman in conversations (e2e)', () =
   });
 
   describe('voice notes', () => {
-    it('accept a real M4A up to a minute, using the duration recorded in the file', async () => {
+    it('are re-encoded to speech Opus (with a CAF copy for iOS), measured by the server', async () => {
       const { a, b, conversationId } = await connected();
-      const sent = await sendVoice(a, conversationId, m4a(12_345), 999).expect(201);
-      expect(sent.body.media).toMatchObject({ status: 'ready', durationMs: 12_345 });
+      const original = m4a(12_000);
+      const sent = await sendVoice(a, conversationId, original, 999).expect(201);
+      expect(sent.body.media.status).toBe('ready');
+      // The client said 999 ms; the server measures the real length.
+      expect(Math.abs(sent.body.media.durationMs - 12_000)).toBeLessThan(150);
       const [received] = await page(b, conversationId);
       const url = new URL(received?.media?.url ?? '');
       const audio = await http()
         .get(url.pathname + url.search)
         .expect(200);
-      expect(audio.headers['content-type']).toBe('audio/mp4');
+      expect(audio.headers['content-type']).toBe('audio/ogg');
+      const ogg = audio.body as Buffer;
+      expect(ogg.subarray(0, 4).toString('latin1')).toBe('OggS');
+      expect(ogg.includes(Buffer.from('OpusHead'))).toBe(true);
+      // ~24 kbps: 12 s is about 36 KB (+ container overhead), far below the 128 kbps upload.
+      expect(ogg.length).toBeLessThan(48_000);
+      expect(ogg.length).toBeLessThan(original.length / 3);
+      const alt = new URL(received?.media?.altUrl ?? '');
+      const caf = await http()
+        .get(alt.pathname + alt.search)
+        .expect(200);
+      expect(caf.headers['content-type']).toBe('audio/x-caf');
+      expect((caf.body as Buffer).subarray(0, 4).toString('latin1')).toBe('caff');
     });
 
     it('refuse long, oversized or disguised files', async () => {
       const { a, conversationId } = await connected();
-      await sendVoice(a, conversationId, m4a(61_000)).expect(400);
+      await sendVoice(a, conversationId, m4a(62_000)).expect(400);
+      await sendVoice(a, conversationId, m4aWithoutAudio()).expect(400);
       await sendVoice(
         a,
         conversationId,

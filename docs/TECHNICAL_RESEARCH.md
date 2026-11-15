@@ -93,6 +93,20 @@ Both are to be re-verified against current vendor documentation when the import 
   `isAndroidForegroundServiceEnabled`; Android `blockedPermissions` removes
   `ACCESS_FINE_LOCATION`; iOS `NSLocationDefaultAccuracyReduced` defaults to approximate.
 
+## Rust components (15 Nov 2026)
+
+- napi-rs 3.16 (`napi`, `napi-derive`, `@napi-rs/cli` 3.10) builds the engine addon; values
+  cross as JSON strings — measured: a single call costs ~40 µs of boundary overhead, so APIs
+  are batch-shaped (`recommend`).
+- V8's `Math.sin/cos/asin` are fdlibm-derived; the `libm` crate (musl, fdlibm-derived) gives
+  bit-identical distances. `Math.round` (halves to +∞) is reproduced exactly.
+- axum 0.8 WebSocket (tungstenite) defaults reserve ~128 KB read buffer per socket; size them
+  for the frames you send. jsonwebtoken 12 needs a crypto backend feature (`rust_crypto`).
+  sqlx 0.9 runtime queries (no compile-time DB). redis 1.2 pub/sub + `ConnectionManager`.
+- sharp's bundled libvips encodes AVIF; effort 0 ≈ JPEG speed at ~40 % of the size; higher
+  efforts take seconds. ffmpeg's `libopus` with `-application voip` at 24 kbps is the voice
+  codec; iOS's native player needs Opus in CAF (remux, no re-encode).
+
 ## Sources
 
 - npm registry metadata for every package above (`npm view <pkg>`), 13 Nov 2026

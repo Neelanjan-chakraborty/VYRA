@@ -8,7 +8,10 @@ import {
 } from '@nestjs/common';
 import { type MessageView, VOICE_MAX_BYTES, VOICE_MAX_MS } from '@vyra/validation';
 import { sniffAudio } from '../../common/audio.js';
-import { processImage, type UploadedImage } from '../../common/image.js';
+import { type TranscodedVoice, transcodeVoice } from '../../common/audio-transcode.js';
+import { IMAGE_FORMAT, processImage, type UploadedImage } from '../../common/image.js';
+import { ENV } from '../../config/config.module.js';
+import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { Message, Prisma } from '../../generated/prisma/client.js';
 import { ModerationService } from '../moderation/moderation.service.js';
@@ -17,10 +20,6 @@ import { type ConversationAccess, MessagingService } from './messaging.service.j
 
 /** Message photos can be smaller than profile photos. */
 const MESSAGE_PHOTO_MIN_EDGE = 200;
-const VOICE_TYPES = {
-  mp4: { ext: 'm4a', type: 'audio/mp4' },
-  webm: { ext: 'webm', type: 'audio/webm' },
-};
 
 /**
  * Photos and voice notes in conversations. Photos go through the same checks
@@ -36,6 +35,7 @@ export class MessageMediaService implements OnModuleInit {
     private readonly messaging: MessagingService,
     private readonly moderation: ModerationService,
     @Inject(OBJECT_STORAGE) private readonly storage: ObjectStorage,
+    @Inject(ENV) private readonly env: Env,
   ) {}
 
   onModuleInit(): void {
@@ -92,13 +92,19 @@ export class MessageMediaService implements OnModuleInit {
     if (repeat) return repeat;
     const image = await processImage(file, MESSAGE_PHOTO_MIN_EDGE);
     const id = randomUUID();
-    const mediaKey = `messages/${conversationId}/${id}.jpg`;
-    await this.storage.put(mediaKey, image.data, 'image/jpeg');
+    const mediaKey = `messages/${conversationId}/${id}.${IMAGE_FORMAT.extension}`;
+    const mediaThumbKey = `messages/${conversationId}/${id}.thumb.${IMAGE_FORMAT.extension}`;
+    await Promise.all([
+      this.storage.put(mediaKey, image.data, IMAGE_FORMAT.contentType),
+      this.storage.put(mediaThumbKey, image.thumb, IMAGE_FORMAT.contentType),
+    ]);
     const message = await this.save(access, userId, {
       id,
       clientId,
       kind: 'IMAGE',
       mediaKey,
+      mediaThumbKey,
+      mediaBytes: image.data.byteLength,
       mediaStatus: 'PENDING',
       mediaWidth: image.info.width,
       mediaHeight: image.info.height,
@@ -119,23 +125,37 @@ export class MessageMediaService implements OnModuleInit {
     if (repeat) return repeat;
     if (file.size > VOICE_MAX_BYTES)
       throw new BadRequestException('Voice notes can be up to 2 MB.');
-    const audio = sniffAudio(file.buffer);
-    if (!audio) throw new UnsupportedMediaTypeException('Send an M4A or WebM voice note.');
-    // Trust the file's own duration when it has one; otherwise the size limit bounds it.
-    const durationMs = audio.durationMs ?? declaredMs;
-    if (durationMs < 1 || durationMs > VOICE_MAX_MS + 500)
+    // Only recordings from the app's recorders are accepted (judged by content).
+    if (!sniffAudio(file.buffer))
+      throw new UnsupportedMediaTypeException('Send an M4A or WebM voice note.');
+    // Re-encode to speech-tuned Opus; the duration comes from the result, not the client.
+    let voice: TranscodedVoice;
+    try {
+      voice = await transcodeVoice(file.buffer, {
+        ffmpeg: this.env.FFMPEG_PATH,
+        ffprobe: this.env.FFPROBE_PATH,
+      });
+    } catch {
+      throw new BadRequestException('That voice note could not be read.');
+    }
+    if (voice.durationMs > VOICE_MAX_MS + 500)
       throw new BadRequestException('Voice notes can be up to a minute long.');
     const id = randomUUID();
-    const { ext, type } = VOICE_TYPES[audio.container];
-    const mediaKey = `messages/${conversationId}/${id}.${ext}`;
-    await this.storage.put(mediaKey, file.buffer, type);
+    const mediaKey = `messages/${conversationId}/${id}.ogg`;
+    const mediaAltKey = `messages/${conversationId}/${id}.caf`;
+    await Promise.all([
+      this.storage.put(mediaKey, voice.ogg, 'audio/ogg'),
+      this.storage.put(mediaAltKey, voice.caf, 'audio/x-caf'),
+    ]);
     const message = await this.save(access, userId, {
       id,
       clientId,
       kind: 'VOICE',
       mediaKey,
+      mediaAltKey,
+      mediaBytes: voice.ogg.byteLength,
       mediaStatus: 'APPROVED',
-      mediaDurationMs: Math.min(VOICE_MAX_MS, Math.max(1, Math.round(durationMs))),
+      mediaDurationMs: Math.min(VOICE_MAX_MS, Math.max(1, voice.durationMs || declaredMs)),
     });
     await this.messaging.notifyNewMessage(access, userId);
     return this.messaging.view(message, access, userId);

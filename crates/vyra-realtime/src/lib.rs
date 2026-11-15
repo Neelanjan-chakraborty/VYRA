@@ -42,6 +42,8 @@ const TYPING_INTERVAL: Duration = Duration::from_secs(2);
 /// Client frames allowed per second before the connection is closed.
 const MAX_FRAMES_PER_SECOND: u32 = 20;
 const OUTBOUND_QUEUE: usize = 64;
+/// How long to wait for a client to acknowledge a close we sent.
+const CLOSE_DRAIN: Duration = Duration::from_secs(2);
 
 pub struct AppState {
     pub config: Config,
@@ -206,6 +208,7 @@ async fn connection(mut socket: WebSocket, state: Shared) {
     let mut window_start = Instant::now();
     let mut frames_in_window = 0u32;
     let mut last_typing: HashMap<String, Instant> = HashMap::new();
+    let mut closing = false;
     while let Some(Ok(message)) = stream.next().await {
         let bytes = match message {
             Message::Binary(bytes) => bytes,
@@ -213,6 +216,7 @@ async fn connection(mut socket: WebSocket, state: Shared) {
             Message::Ping(_) | Message::Pong(_) => continue,
             Message::Text(_) => {
                 let _ = tx.try_send(Outbound::Close(close::BAD_FRAME));
+                closing = true;
                 break;
             }
         };
@@ -223,6 +227,7 @@ async fn connection(mut socket: WebSocket, state: Shared) {
         frames_in_window += 1;
         if frames_in_window > MAX_FRAMES_PER_SECOND {
             let _ = tx.try_send(Outbound::Close(close::TOO_MANY));
+            closing = true;
             break;
         }
         match decode(&bytes) {
@@ -250,6 +255,7 @@ async fn connection(mut socket: WebSocket, state: Shared) {
             }
             Some(ClientFrame::Auth { .. }) | None => {
                 let _ = tx.try_send(Outbound::Close(close::BAD_FRAME));
+                closing = true;
                 break;
             }
         }
@@ -258,6 +264,19 @@ async fn connection(mut socket: WebSocket, state: Shared) {
     state.hub.unregister(&user_id, connection_id);
     drop(tx);
     let _ = writer.await;
+    if closing {
+        // Keep reading (and ignoring) until the client acknowledges the close:
+        // dropping a socket with unread data makes the OS reset the connection,
+        // and the client would never see why it was closed.
+        let _ = tokio::time::timeout(CLOSE_DRAIN, async {
+            while let Some(Ok(message)) = stream.next().await {
+                if matches!(message, Message::Close(_)) {
+                    break;
+                }
+            }
+        })
+        .await;
+    }
     presence(&state, &user_id, -1).await;
 }
 

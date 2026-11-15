@@ -60,6 +60,8 @@ export interface LoadedPerson {
   readonly personaVersionId: string | null;
   /** Storage key of the first approved photo, if any. */
   readonly photoKey: string | null;
+  /** Its thumbnail, used on cards and in lists (null for older photos). */
+  readonly thumbKey: string | null;
 }
 
 /**
@@ -143,6 +145,7 @@ export class PeopleService {
         occupation: user.profile?.occupation ?? null,
         personaVersionId: version?.status === 'APPROVED' ? version.id : null,
         photoKey: user.photos[0]?.storageKey ?? null,
+        thumbKey: user.photos[0]?.thumbKey ?? null,
       });
     }
     return result;
@@ -154,11 +157,13 @@ export class PeopleService {
    */
   async approvedPhotos(
     userId: string,
-  ): Promise<{ id: string; storageKey: string; width: number; height: number }[]> {
+  ): Promise<
+    { id: string; storageKey: string; thumbKey: string | null; width: number; height: number }[]
+  > {
     return this.prisma.userPhoto.findMany({
       where: { userId, deletedAt: null, moderationStatus: 'APPROVED' },
       orderBy: { position: 'asc' },
-      select: { id: true, storageKey: true, width: true, height: true },
+      select: { id: true, storageKey: true, thumbKey: true, width: true, height: true },
     });
   }
 

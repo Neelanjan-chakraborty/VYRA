@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-Node 22.18+ (`.nvmrc`), pnpm 10 (`corepack enable`), and PostgreSQL 16 with pgvector plus
-Redis 7 — from Docker, or installed locally.
+Node 22.18+ (`.nvmrc`), pnpm 10 (`corepack enable`), Rust 1.97 (`rust-toolchain.toml`;
+the matchmaking engine and realtime gateway), ffmpeg with libopus (voice notes), and
+PostgreSQL 16 with pgvector plus Redis 7 — from Docker, or installed locally.
 
 ## First run
 
@@ -24,6 +25,10 @@ pnpm build
 | --------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `pnpm dev:api`                          | API with reload on `:4000`; OpenAPI UI at `/docs`                                                                                                         |
 | `pnpm dev:mobile`                       | Expo dev server (press `w` for web)                                                                                                                       |
+| `pnpm dev:realtime`                     | Rust realtime gateway on `:4001` (reads `apps/api/.env`; logs via `RUST_LOG`)                                                                             |
+| `pnpm rust:check`                       | `cargo fmt --check`, clippy (`-D warnings`), `cargo test` (engine parity, learning, gateway)                                                              |
+| `pnpm engine:fixtures`                  | Regenerate the Rust parity fixtures from the TypeScript engine (also `engine:catalogue`)                                                                  |
+| `node scripts/bench-engine.mjs`         | TypeScript vs Rust engine timings through Node; `scripts/bench-realtime.mjs` for gateway latency and memory                                               |
 | `pnpm build`                            | Build packages then the API                                                                                                                               |
 | `pnpm check`                            | Format check, lint, typecheck, unit tests                                                                                                                 |
 | `pnpm test:e2e`                         | API end-to-end tests against real PostgreSQL and Redis                                                                                                    |

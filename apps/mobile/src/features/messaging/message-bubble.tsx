@@ -1,7 +1,7 @@
 import { color, radius, space } from '@vyra/design-system';
 import type { MessageView } from '@vyra/validation';
 import { Image } from 'expo-image';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui/button';
 import { VoiceNote } from './voice';
@@ -65,7 +65,7 @@ export function MessageBubble({
       <View>
         {media.url ? (
           <Image
-            source={{ uri: media.url }}
+            source={{ uri: media.thumbUrl ?? media.url }}
             style={[styles.photo, { aspectRatio: ratio }, media.status !== 'ready' && styles.dim]}
             contentFit="cover"
             accessibilityLabel={mine ? 'Photo you sent' : `Photo from ${otherName}`}
@@ -86,9 +86,10 @@ export function MessageBubble({
       </View>
     );
   } else if (message.kind === 'voice' && message.media?.url) {
-    content = (
-      <VoiceNote url={message.media.url} durationMs={message.media.durationMs} mine={mine} />
-    );
+    // iOS's native player can't read Ogg; the server also stores the same audio as CAF.
+    const voiceUrl =
+      Platform.OS === 'ios' && message.media.altUrl ? message.media.altUrl : message.media.url;
+    content = <VoiceNote url={voiceUrl} durationMs={message.media.durationMs} mine={mine} />;
   } else if (message.kind === 'date_plan' && message.plan) {
     const { plan } = message;
     const tint = mine ? color.textOnAccent : color.textPrimary;

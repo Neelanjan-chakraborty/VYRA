@@ -201,23 +201,49 @@ describe('Profile, photos and account (e2e)', () => {
         .expect(422);
     });
 
+    it('compresses large JSON responses for clients that accept it', async () => {
+      const user = await registerUser(app);
+      const br = await http()
+        .get('/v1/interests')
+        .set(user.auth)
+        .set('accept-encoding', 'br, gzip')
+        .expect(200);
+      expect(br.headers['content-encoding']).toBe('br');
+      const plain = await http()
+        .get('/v1/interests')
+        .set(user.auth)
+        .set('accept-encoding', 'identity')
+        .expect(200);
+      expect(plain.headers['content-encoding']).toBeUndefined();
+      expect(br.body).toEqual(plain.body);
+    });
+
     it('the catalogue needs authentication', async () => {
       await http().get('/v1/interests').expect(401);
     });
   });
 
   describe('photos', () => {
-    it('re-encodes to JPEG, strips EXIF and GPS, and serves through a signed URL', async () => {
+    it('re-encodes to AVIF with a thumbnail, strips EXIF and GPS, and serves through signed URLs', async () => {
       const user = await registerUser(app);
-      const response = await upload(user, await makeImageWithGps());
+      const original = await makeImageWithGps();
+      const response = await upload(user, original);
       expect(response.status).toBe(201);
       const photo = response.body as Photo;
       const served = await fetchMedia(photo.url).expect(200);
-      expect(served.headers['content-type']).toBe('image/jpeg');
+      expect(served.headers['content-type']).toBe('image/avif');
+      // The owner's URL is immutable for its lifetime, so it may be cached for all of it.
+      expect(served.headers['cache-control']).toBe('private, max-age=600, immutable');
       const metadata = await sharp(served.body as Buffer).metadata();
-      expect(metadata.format).toBe('jpeg');
+      expect(metadata.format).toBe('heif');
       expect(metadata.exif).toBeUndefined();
       expect((served.body as Buffer).includes('secret-device-id')).toBe(false);
+      expect((served.body as Buffer).length).toBeLessThan(original.length);
+
+      const thumb = await fetchMedia(photo.thumbUrl as string).expect(200);
+      const thumbMeta = await sharp(thumb.body as Buffer).metadata();
+      expect(Math.max(thumbMeta.width ?? 0, thumbMeta.height ?? 0)).toBe(320);
+      expect((thumb.body as Buffer).length).toBeLessThan((served.body as Buffer).length);
     });
 
     it('accepts PNG and WebP and downsizes large images', async () => {
@@ -228,7 +254,7 @@ describe('Profile, photos and account (e2e)', () => {
         'a.png',
       );
       expect(png.status).toBe(201);
-      expect(Math.max(png.body.width, png.body.height)).toBe(2048);
+      expect(Math.max(png.body.width, png.body.height)).toBe(1600);
       const webp = await upload(user, await makeImage(2, { format: 'webp' }), 'b.webp');
       expect(webp.status).toBe(201);
     });
@@ -406,8 +432,10 @@ describe('Profile, photos and account (e2e)', () => {
         .expect(200);
       const photo = (await upload(user, await makeImage(60))).body as Photo;
       const before = await prisma.user.findUniqueOrThrow({ where: { email: user.email } });
-      const file = path.join(storageDir, `photos/${before.id}/${photo.id}.jpg`);
+      const file = path.join(storageDir, `photos/${before.id}/${photo.id}.avif`);
+      const thumbFile = path.join(storageDir, `photos/${before.id}/${photo.id}.thumb.avif`);
       expect(existsSync(file)).toBe(true);
+      expect(existsSync(thumbFile)).toBe(true);
 
       await http().delete('/v1/me').set(user.auth).send({ confirm: 'DELETE' }).expect(204);
 
@@ -436,6 +464,7 @@ describe('Profile, photos and account (e2e)', () => {
         after.relationshipIntents,
       ]).toEqual([null, [], [], [], []]);
       expect(existsSync(file)).toBe(false);
+      expect(existsSync(thumbFile)).toBe(false);
 
       await http().get('/v1/me').set(user.auth).expect(401);
       await http()

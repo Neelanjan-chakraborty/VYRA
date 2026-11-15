@@ -147,14 +147,34 @@ the weights version and the engine version. A new approval, weight set or engine
 changes the key, so stale rows are never read again. Scores are currently recomputed on every
 request (they take microseconds); the table serves analytics and the learning system.
 
-## 8. Learning
+## 8. Learning (Milestone 7, Rust)
 
-`discovery_events` records `IMPRESSION` (with rank and versions) and `COMPATIBILITY_VIEWED`.
-Requests, mutual connections and conversations are added in Milestones 5–6. Future weight
-sets will be judged against those outcomes — never time in app or volume of activity — and
-no accuracy is claimed without outcome data.
+`crates/vyra-engine/src/learning.rs`. One sample per (viewer, candidate): their latest
+decisive action in the last 180 days — `SAVED`, `CONNECT_REQUESTED`, `CONNECTION_ACCEPTED`
+(positive) or `PASSED`, `CONNECTION_DECLINED` (negative) — with the pair's six stored dimension
+scores. Nothing else enters: no age, gender, location, identity, time in app or activity
+volume.
+
+Deterministic L2-regularised logistic regression on centred scores (unknown dimensions add
+nothing) gives per-dimension coefficients; positive ones become candidate weights, which are
+then bounded: each in [0.05, 0.40], at most ±0.05 from the current weights, summing to 1. A
+deterministic 80/20 split checks ranking quality: the proposal is kept only if its held-out
+AUC beats the current weights'. Fewer than `LEARNING_MIN_SAMPLES` (500) decisions or
+`LEARNING_MIN_PER_CLASS` (50) of either kind → `insufficient_data`.
+
+A weekly job (and `POST /v1/admin/weights/fit`) stores a result as a `PROPOSED` weight set
+with its metrics. Nothing changes until an admin approves it (`/approve` makes it the single
+active set; the database enforces one active, approved set). Scores cached under older weights
+are naturally superseded by the weights version in the cache key.
 
 ## 9. Tests
+
+Rust: `crates/vyra-engine/tests/parity.rs` checks 2 000 seeded pairs (every gate and
+sufficiency level) and 60 rankings produced by the TypeScript engine — identical gates,
+results, highlights and order (`pnpm engine:fixtures` regenerates them; CI fails if stale).
+`packages/engine-native/parity.spec.js` compares the addon with TypeScript on 3 000 fresh
+random pairs, 40 pools and the full `recommend` pipeline. Learning has unit tests for direction,
+bounds, determinism, refusals and noise. All API e2e suites run on the Rust engine (asserted).
 
 `packages/compatibility-engine/src/engine.spec.ts` (synthetic people): every gate in both
 directions; identical vs opposite; no persona → no number; sparse agreement scores below full

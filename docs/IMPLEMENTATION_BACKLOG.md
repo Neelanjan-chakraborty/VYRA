@@ -60,7 +60,15 @@ Carried forward: verify push and native audio on a device build (needs an EAS pr
 audio moderation if a suitable open-source classifier is chosen; message retention job
 (Milestone 8); socket disconnect on sign-out.
 
-## Milestone 7 — Advanced intelligence
+## Milestone 7 — Advanced intelligence (part 1 ✅)
+
+Done: Rust matchmaking core in-process with parity tests · guarded weight learning with admin
+approval · Rust realtime gateway (WebSocket + MessagePack, Redis fan-out, presence) · AVIF/Opus
+media, client resize, brotli, caching.
+
+Next: AI archive import (ChatGPT/Gemini exports, consented, redacted, evidence-linked) ·
+outcome signals from conversations (`FIRST_MESSAGE`, `CONVERSATION_SUSTAINED`) into learning ·
+read-only DB role for the gateway · device verification of AVIF/Opus/CAF playback.
 
 ChatGPT export import and Gemini Takeout import (isolated worker, archive limits, redaction,
 approval UI, raw deletion) · BestPic · TrendSync · Astrology (deterministic ephemeris

@@ -77,6 +77,10 @@ export const messageMediaSchema = z.object({
   status: z.enum(['checking', 'ready', 'declined']),
   /** Short-lived signed URL, only when ready (or to the sender while it is checked). */
   url: z.string().nullable(),
+  /** IMAGE: a small version for the bubble. */
+  thumbUrl: z.string().nullable(),
+  /** VOICE: the same audio in a CAF container, for iOS's native player. */
+  altUrl: z.string().nullable(),
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
   durationMs: z.number().int().nullable(),

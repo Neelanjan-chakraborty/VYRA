@@ -185,6 +185,13 @@ export class MessagingService {
     )[message.kind];
     let media: MessageView['media'] = null;
     if (!removed && message.mediaKey && message.mediaStatus) {
+      // The sender sees their own media in any state; the other person only once approved.
+      const sign = (key: string) =>
+        mine
+          ? this.media.sign(key, 'owner')
+          : message.mediaStatus === 'APPROVED'
+            ? this.media.sign(key, 'conversation')
+            : null;
       const status =
         message.mediaStatus === 'APPROVED'
           ? 'ready'
@@ -193,11 +200,9 @@ export class MessagingService {
             : 'checking';
       media = {
         status,
-        url: mine
-          ? this.media.sign(message.mediaKey, 'owner')
-          : status === 'ready'
-            ? this.media.sign(message.mediaKey, 'conversation')
-            : null,
+        url: sign(message.mediaKey),
+        thumbUrl: message.mediaThumbKey ? sign(message.mediaThumbKey) : null,
+        altUrl: message.mediaAltKey ? sign(message.mediaAltKey) : null,
         width: message.mediaWidth,
         height: message.mediaHeight,
         durationMs: message.mediaDurationMs,
@@ -481,6 +486,9 @@ export class MessagingService {
         deletedAt: new Date(),
         body: null,
         mediaKey: null,
+        mediaThumbKey: null,
+        mediaAltKey: null,
+        mediaBytes: null,
         mediaStatus: null,
         mediaDurationMs: null,
         mediaWidth: null,
@@ -488,7 +496,8 @@ export class MessagingService {
         payload: Prisma.DbNull,
       },
     });
-    if (message.mediaKey) await this.storage.delete(message.mediaKey).catch(() => undefined);
+    for (const key of [message.mediaKey, message.mediaThumbKey, message.mediaAltKey])
+      if (key) await this.storage.delete(key).catch(() => undefined);
     this.changed(access, userId, 'removed');
   }
 

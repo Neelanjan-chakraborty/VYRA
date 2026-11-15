@@ -192,12 +192,37 @@ send). Shapes are in `packages/validation/src/messaging.ts`.
 
 `PATCH /v1/me/profile` also takes `notifyMessages` and `notifyRequests`.
 
-**Socket.IO** at path `/v1/socket`, `auth: {token: <access token>}`; refused with
-`unauthorized` otherwise. Server events carry ids only, never text: `conversation.changed`
-`{conversationId, reason: message|removed|read|media|plan|ended}`, `typing` `{conversationId}`
-and `list.changed` `{}`. The only client event is `typing` `{conversationId}` (at most every
-2 s, relayed only if the sender shares typing and the conversation is open to both). Redis
-adapter for several instances.
+**Realtime** — the Rust gateway (`crates/vyra-realtime`), `ws(s)://<host>/v1/realtime`
+(port 4001 in development). Binary WebSocket frames, MessagePack maps:
+
+| Direction     | Frame                             | Notes                                                                                                                                             |
+| ------------- | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| app → gateway | `{t:"auth", token}`               | Must be the first frame, within 5 s. Never put the token in the URL                                                                               |
+| app → gateway | `{t:"typing", c: conversationId}` | Relayed only if allowed (see below); 2 s per conversation                                                                                         |
+| app → gateway | `{t:"ping"}`                      | Optional app heartbeat                                                                                                                            |
+| gateway → app | `{t:"ready"}`                     | Authenticated                                                                                                                                     |
+| gateway → app | `{t:"event", e, d}`               | `e`: `conversation.changed` (`d: {conversationId, reason, by}`), `typing` (`d: {conversationId}`), `list.changed` (`d: {}`). Ids only, never text |
+| gateway → app | `{t:"pong"}`                      |                                                                                                                                                   |
+
+Close codes: `4000` signed out (that device, or all devices on deletion), `4001` token or
+session refused, `4002` malformed frame, `4008` no auth frame in time, `4029` more than 20
+frames a second. Browsers must send an allowed `Origin`. The API publishes events as JSON on
+Redis channel `<namespace>:realtime` (`{userIds, event, payload}`, `{disconnect: [userId]}`,
+`{disconnectSessions: [sessionId]}`); presence is `<namespace>:presence:<userId>`.
+
+**Media variants.** Photos come with `thumbUrl` (320 px AVIF; null for older JPEG photos).
+Message media has `thumbUrl` (images) and `altUrl` (voice: CAF for iOS); `url` is AVIF or
+Ogg Opus. Owner URLs are cacheable for their 10-minute life, others' for 60 s. JSON responses
+over 1 KB are brotli/gzip-compressed when the client accepts it.
+
+### Admin 🔒 (role `ADMIN`)
+
+| Method | Path                                 | Description                                                                                                                                                                              |
+| ------ | ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | `/v1/admin/weights`                  | `weightSetListSchema`: every weight set with status (`PROPOSED`, `APPROVED`, `REJECTED`), `isActive`, `basedOn`, metrics (sample counts, coefficients, held-out AUC current vs proposed) |
+| POST   | `/v1/admin/weights/fit`              | Run the Rust learner now (normally weekly): `{status: proposed \| insufficient_data \| no_improvement, version, metrics}`                                                                |
+| POST   | `/v1/admin/weights/:version/approve` | A `PROPOSED` set becomes the only active one (`409` if already decided)                                                                                                                  |
+| POST   | `/v1/admin/weights/:version/reject`  | `PROPOSED` → `REJECTED` (`404` otherwise)                                                                                                                                                |
 
 ## Planned
 
