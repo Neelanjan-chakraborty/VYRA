@@ -10,7 +10,7 @@ interface FormScreenProps {
   readonly eyebrow?: string;
   readonly title: string;
   readonly intro?: string;
-  readonly children: ReactNode;
+  readonly children?: ReactNode;
   /** Pinned above the keyboard: the screen's actions. */
   readonly footer?: ReactNode;
   /** Show a back control. Default true; pass false on the first screen of a flow. */

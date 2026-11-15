@@ -165,6 +165,10 @@ export const meSchema = z.object({
   profile: z
     .object({
       displayName: z.string(),
+      /** null until chosen. Lower-case; how people find and share this profile. */
+      username: z.string().nullable(),
+      /** When it can next be changed; null when it can be now. */
+      usernameChangeableAt: z.iso.datetime().nullable(),
       bio: z.string().nullable(),
       genderIdentity: genderIdentitySchema.nullable(),
       genderSelfDescription: z.string().nullable(),

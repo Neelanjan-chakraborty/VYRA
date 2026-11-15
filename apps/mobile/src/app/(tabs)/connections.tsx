@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Screen } from '@/components/screen';
+import { SearchButton } from '@/components/search-button';
 import { Text } from '@/components/text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
@@ -138,7 +139,7 @@ export default function ConnectionsScreen() {
   const items = connections.data?.[section] ?? [];
 
   return (
-    <Screen eyebrow="Connections" title="People you’re getting to know.">
+    <Screen eyebrow="Connections" title="People you’re getting to know." action={<SearchButton />}>
       <ModeSwitch label="Show" value={section} options={SECTIONS} onChange={setSection} />
       <View style={styles.list}>
         {connections.isPending ? <ActivityIndicator color={color.textSecondary} /> : null}

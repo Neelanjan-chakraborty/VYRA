@@ -163,6 +163,11 @@ model UserConsent {
 model UserProfile {
   userId                  String           @id @map("user_id") @db.Uuid
   displayName             String           @map("display_name") @db.VarChar(60)
+  /// How people find and share this profile. Lower-case; unique among people who have one.
+  /// Shape is enforced in the API and by a CHECK constraint.
+  username                String?          @db.VarChar(30)
+  /// Last change, for the cooldown between changes.
+  usernameChangedAt       DateTime?        @map("username_changed_at") @db.Timestamptz(3)
   bio                     String?          @db.VarChar(600)
   /// null = not answered. Never inferred.
   genderIdentity          GenderIdentity?  @map("gender_identity")

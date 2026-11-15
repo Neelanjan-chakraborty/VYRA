@@ -9,3 +9,4 @@ export * from './me.js';
 export * from './moderation.js';
 export * from './persona.js';
 export * from './messaging.js';
+export * from './username.js';

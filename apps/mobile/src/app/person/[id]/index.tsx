@@ -63,7 +63,7 @@ export default function PersonScreen() {
       footer={<PersonActions userId={person.userId} name={person.displayName} />}
     >
       <Text tone="textSecondary" style={styles.meta}>
-        {meta}
+        {[person.username ? `@${person.username}` : null, meta].filter(Boolean).join(' · ')}
       </Text>
       {lead ? (
         <Image

@@ -248,6 +248,8 @@ export const publicPhotoSchema = z.object({
 export const publicProfileSchema = z.object({
   userId: z.uuid(),
   displayName: z.string(),
+  /** How to find and share this profile; null if they haven't chosen one. */
+  username: z.string().nullable(),
   age: z.number().int(),
   city: z.string().nullable(),
   bio: z.string().nullable(),

@@ -320,3 +320,17 @@ token-only.
 | O-5 | Payment provider and plans                             | Milestone 8   | Store billing interfaces only                                            |
 | O-6 | Legal review of age verification and DPDP obligations  | Before launch | Date-of-birth self-declaration only                                      |
 | O-7 | Website production domain, contact address, legal text | Before launch | Site stays a non-indexable preview; legal and contact pages stay noindex |
+
+**D-077 · Usernames, QR sharing and people search follow the profile's own visibility rule.**
+A username is optional, lower-case, 3–30 characters, changeable once every 14 days, with a
+reserved-name list. Search never widens who can be seen: results are limited to people a profile
+view would also show (not blocked, not deleted, recommendable both ways, or already tied by a
+request or connection), and a miss never says why. Matching is tiered in SQL (exact username,
+username prefix, name or word prefix, substring, then typo-tolerant trigram) and re-ranked in the
+API by closeness to the searcher (connected, pending, same city, has a photo); the boosts are
+smaller than the gap between tiers. Queries are never logged or stored, need two characters,
+return at most 20 results, and are rate-limited. The QR code encodes `https://<api>/u/<username>`,
+a public page that always looks the same (so it can't be used to test whether a name exists) and
+opens `vyra://u/<username>`. In the app, `/u/[username]` resolves the name under the same rule.
+**Not built:** scanning a code inside the app (needs the camera module, so a new build); people
+scan with the phone's own camera.

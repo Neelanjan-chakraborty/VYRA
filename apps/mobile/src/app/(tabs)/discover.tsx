@@ -5,6 +5,7 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { Screen } from '@/components/screen';
+import { SearchButton } from '@/components/search-button';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui/button';
 import { ModeSwitch } from '@/components/ui/mode-switch';
@@ -153,7 +154,11 @@ export default function DiscoverScreen() {
   const shown = all.filter(FILTERS[active].test);
 
   return (
-    <Screen eyebrow="Discover" title="Read people, don’t flick past them.">
+    <Screen
+      eyebrow="Discover"
+      title="Read people, don’t flick past them."
+      action={<SearchButton />}
+    >
       <Text tone="textSecondary" style={styles.intro}>
         Ordered by estimated alignment — a starting point for getting to know someone, not a
         prediction.

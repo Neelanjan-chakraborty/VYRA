@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 15 November 2026, after chat features phase B (video, view once, timers, disappearing messages, blur, watermark, media consent, vault).
+Last updated: 16 November 2026, after usernames, QR sharing and people search (on top of chat features phase B).
 
 ## Summary
 
@@ -161,6 +161,15 @@ carries the recipient's name as a watermark. Photos and videos can be kept in a 
 (You → Your vault). You → Message privacy adds the media, blur and disappearing defaults.
 Device-only parts (native video playback, the iOS/Android pickers) are unverified on hardware.
 Also fixed on the way: bottom sheets now scroll when taller than the screen.
+
+**New — usernames, QR sharing and people search (built; API and OTA update).** Choose a
+username (You → Username), share a QR code and link (You → Share your profile), and search people
+by username or name from the search button on Orbit, Discover, Connections and You. Search is
+tiered and typo-tolerant, ranks people you already know first, and only returns people a profile
+view would show. Links open the profile in the app (`vyra://u/name`). Verified: 18 new end-to-end
+tests, unit tests for the rules and ranking, and the QR decoded with an independent reader.
+Not verified: on a physical phone. Not built: in-app QR scanning (needs a new build with the
+camera module).
 
 **New — conversation screen redesign.** The thread now reads as one composed room: a compact
 identity header, grouped message bursts with date and new-message rules, a raised composer that

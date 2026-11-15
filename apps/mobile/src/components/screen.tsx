@@ -11,6 +11,8 @@ const MAX_CONTENT_WIDTH = 560;
 interface ScreenProps {
   readonly eyebrow: string;
   readonly title: string;
+  /** Sits at the right of the eyebrow line, e.g. a search button. */
+  readonly action?: ReactNode;
   readonly children?: ReactNode;
 }
 
@@ -18,7 +20,7 @@ interface ScreenProps {
  * Standard tab screen: safe-area aware, scrollable so large text sizes never
  * clip, with the editorial eyebrow + serif title header.
  */
-export function Screen({ eyebrow, title, children }: ScreenProps) {
+export function Screen({ eyebrow, title, action, children }: ScreenProps) {
   const insets = useSafeAreaInsets();
   return (
     // The scroll view is pinned to its frame so it always scrolls internally.
@@ -36,9 +38,12 @@ export function Screen({ eyebrow, title, children }: ScreenProps) {
         ]}
       >
         <View style={styles.column}>
-          <Text variant="eyebrow" tone="textSecondary" accessibilityRole="header">
-            {eyebrow}
-          </Text>
+          <View style={styles.eyebrowRow}>
+            <Text variant="eyebrow" tone="textSecondary" accessibilityRole="header">
+              {eyebrow}
+            </Text>
+            {action}
+          </View>
           <Text variant="displayL" style={styles.title}>
             {title}
           </Text>
@@ -54,5 +59,6 @@ const styles = StyleSheet.create({
   root: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   content: { flexGrow: 1, paddingHorizontal: space.xl },
   column: { width: '100%', maxWidth: MAX_CONTENT_WIDTH, alignSelf: 'center' },
+  eyebrowRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   title: { marginTop: space.m, marginBottom: space.xl },
 });

@@ -25,6 +25,7 @@ import { StorageModule } from './modules/storage/storage.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
 import { SafetyModule } from './modules/safety/safety.module.js';
+import { SearchModule } from './modules/search/search.module.js';
 
 @Module({
   imports: [
@@ -58,6 +59,7 @@ import { SafetyModule } from './modules/safety/safety.module.js';
     MessagingModule,
     LearningModule,
     SafetyModule,
+    SearchModule,
   ],
   providers: [
     // Order matters: rate limiting runs before authentication (AuthModule's guard).

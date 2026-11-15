@@ -20,6 +20,7 @@ import type { RelationshipIntentKind } from '../../generated/prisma/client.js';
 import { AuditService } from '../audit/audit.service.js';
 import { AuthService } from '../auth/auth.service.js';
 import { PhotosService } from './photos.service.js';
+import { usernameChangeableAt } from './username-cooldown.js';
 
 type ProfileUpdate = z.output<typeof profileUpdateSchema>;
 type IntentsUpdate = z.output<typeof relationshipIntentsUpdateSchema>;
@@ -87,6 +88,12 @@ export class MeService {
       age: ageInYears(user.dateOfBirth.toISOString().slice(0, 10)),
       profile: profile && {
         displayName: profile.displayName,
+        username: profile.username,
+        usernameChangeableAt:
+          usernameChangeableAt(
+            profile.usernameChangedAt,
+            profile.username !== null,
+          )?.toISOString() ?? null,
         bio: profile.bio,
         genderIdentity: profile.genderIdentity,
         genderSelfDescription: profile.genderSelfDescription,

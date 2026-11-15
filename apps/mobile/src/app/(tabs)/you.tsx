@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { Screen } from '@/components/screen';
+import { SearchButton } from '@/components/search-button';
 import { ServiceStatus } from '@/components/service-status';
 import { Text } from '@/components/text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
@@ -125,7 +126,7 @@ export default function YouScreen() {
   const lead = me.photos[0];
 
   return (
-    <Screen eyebrow="You" title={`${profile.displayName}, ${me.age}`}>
+    <Screen eyebrow="You" title={`${profile.displayName}, ${me.age}`} action={<SearchButton />}>
       <View style={styles.hero}>
         {lead ? (
           <Image
@@ -149,6 +150,16 @@ export default function YouScreen() {
       <Text variant="eyebrow" tone="textSecondary" style={styles.section}>
         Profile
       </Text>
+      <LinkRow
+        label="Username"
+        value={profile.username ? `@${profile.username}` : 'Choose one so people can find you'}
+        href="/settings/username"
+      />
+      <LinkRow
+        label="Share your profile"
+        value={profile.username ? 'QR code and link' : 'Needs a username'}
+        href="/settings/share"
+      />
       <LinkRow
         label="About you"
         value={profile.bio ?? 'Add a few lines'}

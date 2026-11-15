@@ -1,6 +1,6 @@
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 
-export type TabIconName = 'orbit' | 'discover' | 'connections' | 'messages' | 'you';
+export type TabIconName = 'orbit' | 'discover' | 'connections' | 'messages' | 'you' | 'search';
 
 interface TabIconProps {
   readonly name: TabIconName;
@@ -31,6 +31,12 @@ export function TabIcon({ name, color, size = 24 }: TabIconProps) {
         <>
           <Circle cx="12" cy="12" r="9" {...stroke} />
           <Path d="M15.6 8.4l-2 5.2-5.2 2 2-5.2z" {...stroke} strokeLinejoin="round" />
+        </>
+      )}
+      {name === 'search' && (
+        <>
+          <Circle cx="10.5" cy="10.5" r="6.5" {...stroke} />
+          <Path d="M15.4 15.4L20 20" {...stroke} />
         </>
       )}
       {name === 'connections' && (

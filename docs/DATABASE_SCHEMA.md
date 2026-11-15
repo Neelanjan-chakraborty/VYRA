@@ -82,6 +82,14 @@ interests, consents and sessions immediately and blanks the contact details and 
 on the `users` row, which stays as an anonymous tombstone so safety reports and moderation
 history about that account survive.
 
+**Usernames and search.** `user_profiles.username` (nullable, lower-case, unique where set via the
+partial index `user_profiles_username_key`) and `username_changed_at` (14-day cooldown, enforced
+in the API). CHECK `user_profiles_username_shape`: 3–30 characters of `a-z 0-9 . _`, starting and
+ending with a letter or digit, no two separators in a row. Search uses the `pg_trgm` and
+`unaccent` extensions, the immutable wrapper `vyra_fold(text)` (lower-case, accents removed), and
+GIN trigram indexes on `username` and on `vyra_fold(display_name)`. Deleting an account deletes
+the profile row, which frees the username.
+
 **Location.** `user_profiles.location_source` (`DEVICE_APPROXIMATE`, `MANUAL`, or null),
 `latitude/longitude` on a 0.02° grid (CHECK enforced), `place_id` (GeoNames), `region`,
 `area` (label only), `city`, `country_code`. A CHECK keeps them consistent: no source, no

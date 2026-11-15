@@ -111,11 +111,16 @@ export class CompatibilityService {
     if (!pair) throw new NotFoundException(NOT_FOUND);
     const { viewer, target } = pair;
     const photos = await this.people.approvedPhotos(targetId);
+    const handle = await this.prisma.userProfile.findUnique({
+      where: { userId: targetId },
+      select: { username: true },
+    });
     await this.prisma.discoveryEvent.create({
       data: { userId: viewerId, targetUserId: targetId, type: 'PROFILE_OPENED', context: {} },
     });
     return {
       userId: targetId,
+      username: handle?.username ?? null,
       displayName: target.displayName,
       age: target.person.age,
       city: target.city,
