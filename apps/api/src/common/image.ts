@@ -18,7 +18,7 @@ const THUMB_EDGE = 320;
  * q86 at the same ~0.2 s encode time. Higher `effort` saves more but takes
  * seconds per upload, so it isn't used on the request path.
  */
-const AVIF = { quality: 55, effort: 0 } as const;
+export const AVIF = { quality: 55, effort: 0 } as const;
 const MAX_INPUT_EDGE = 8000;
 /** Refuse decompression bombs: at most 50 megapixels of input. */
 const MAX_INPUT_PIXELS = 50_000_000;

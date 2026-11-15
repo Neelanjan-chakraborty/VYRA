@@ -269,6 +269,37 @@ It lives on the conversation; either person can change it while the connection i
 system line ("Asha changed the theme to Dusk") tells both. Re-choosing the current theme adds no
 line. Per-person choices from before were cosmetic and were not carried over.
 
+**D-070 · Ephemeral media is enforced by the server, honestly labelled.** View once: the
+recipient sees only a blurred preview until they open it; "open" returns one-minute URLs once,
+and closing (or a deadline a minute or so later) erases the files. Timers start at first open
+(media) or first read (text). Disappearing messages are shared per conversation, either person
+sets them, both see a note; new conversations take the shorter of the two people's defaults.
+Every expiry is one `expires_at`: nothing past it is returned or served, and a minute-by-minute
+sweeper erases it. The app says plainly that a screen can still be photographed.
+
+**D-071 · Watermark protected media only** (product owner's choice). View-once, timed and
+sensitive photos and videos get the recipient's first name and the date tiled faintly into the
+pixels. Chats are one-to-one, so the mark is burned in once at processing time and both people
+see the same file — no per-request rendering. Ordinary photos stay clean.
+
+**D-072 · Ask before showing media** (product owner's choice). New conversations hold the other
+person's photos, videos and voice notes — no URLs at all — until the recipient allows media from
+them; the default can be changed to "allow". Existing conversations were set to allowed. The
+sender always sees their own media, with a note that it's waiting.
+
+**D-073 · Video is processed off the request path.** The upload is checked by its bytes and
+stored; a worker transcodes it (H.264/AAC, ≤ 720p, faststart), makes a poster and a blurred
+preview, and runs 5 frames through the same classifier as photos — all must pass. The other
+person sees nothing until then.
+
+**D-074 · The vault holds copies, not links.** Saving copies the files under the owner's own
+prefix, so they survive removal of the message and are deleted with the account. Never for
+view-once or timed media, and only where the sender allowed saving. Photos and videos only.
+
+**D-075 · Signed media URLs are stable for a few minutes.** Expiry is rounded up to a five-minute
+boundary, so re-signing after a refetch gives the same URL and image caches hit instead of
+downloading again (found in the browser run: every chat event reloaded every image).
+
 ## Open (need the product owner)
 
 | #   | Question                                               | Needed by     | Default if unanswered                                                    |

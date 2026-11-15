@@ -3,6 +3,8 @@ import {
   CHAT_THEMES,
   type ConversationSettings,
   DATE_PLAN_LIMITS,
+  DISAPPEAR_CHOICES,
+  TIMER_CHOICES,
   MAX_FORWARD_TARGETS,
   type MessageView,
   type Reaction,
@@ -13,6 +15,7 @@ import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
+import { ChoiceChip } from '@/components/ui/choice-chip';
 import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/notice';
 import { SelectRow } from '@/components/ui/select-row';
@@ -20,6 +23,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Toggle } from '@/components/ui/toggle';
 import { useConsents, useSetConsent } from '@/features/persona/persona-api';
 import { errorMessage } from '@/lib/api';
+import { timerLabel } from './media-views';
 import {
   useCancelScheduled,
   useConversations,
@@ -29,6 +33,8 @@ import {
   useScheduled,
   useScheduleMessage,
   useSendPlan,
+  type MediaProtection,
+  NO_PROTECTION,
   useWingman,
 } from './messaging-api';
 
@@ -60,15 +66,19 @@ export function AddSheet(props: {
   onPlan: () => void;
   onWingman: () => void;
   onSchedule: () => void;
+  onVideo: () => void;
+  onTextTimer: () => void;
 }) {
   return (
     <BottomSheet visible={props.visible} title="Add to the conversation" onClose={props.onClose}>
       <View style={styles.stack}>
         <Button label="Photo" variant="secondary" onPress={props.onPhoto} />
+        <Button label="Video (up to 30 s)" variant="secondary" onPress={props.onVideo} />
         <Button label="Voice note" variant="secondary" onPress={props.onVoice} />
         <Button label="Date idea" variant="secondary" onPress={props.onPlan} />
         <Button label="Ask Wingman for ideas" variant="secondary" onPress={props.onWingman} />
         <Button label="Send later" variant="secondary" onPress={props.onSchedule} />
+        <Button label="Self-destructing message" variant="secondary" onPress={props.onTextTimer} />
       </View>
     </BottomSheet>
   );
@@ -266,6 +276,29 @@ export function SettingsSheet(props: {
         onChange={(v) => props.onChange({ muted: v })}
       />
       <SettingRow
+        label={`Show media from ${props.name}`}
+        description="Photos, videos and voice notes. Off keeps new ones hidden until you allow them."
+        value={settings.mediaConsent === 'allowed'}
+        onChange={(v) => props.onChange({ mediaConsent: v ? 'allowed' : 'ask' })}
+      />
+      <View style={styles.themeBlock}>
+        <Text variant="bodyStrong">Disappearing messages</Text>
+        <Text variant="caption" tone="textSecondary">
+          New messages are erased for both of you this long after they’re sent. Either of you can
+          change it.
+        </Text>
+        <View style={styles.row} role="radiogroup" aria-label="Disappearing messages">
+          {([null, ...DISAPPEAR_CHOICES] as const).map((choice) => (
+            <ChoiceChip
+              key={choice ?? 'off'}
+              label={choice === null ? 'Off' : (DISAPPEAR_LABEL[choice] ?? '')}
+              selected={settings.disappearSeconds === choice}
+              onPress={() => props.onChange({ disappearSeconds: choice })}
+            />
+          ))}
+        </View>
+      </View>
+      <SettingRow
         label={`Restrict ${props.name}`}
         description="Their messages arrive quietly, with no notifications. They can’t see when you’ve read or are typing. They aren’t told."
         value={settings.restricted}
@@ -328,6 +361,7 @@ export function MessageActionsSheet(props: {
   onPin: (message: MessageView) => void;
   onEdit: (message: MessageView) => void;
   onForward: (message: MessageView) => void;
+  onSave: (message: MessageView) => void;
   onRemove: (message: MessageView) => void;
   onReport: (message: MessageView, reason: (typeof REPORT_REASONS)[number]['value']) => void;
 }) {
@@ -396,6 +430,13 @@ export function MessageActionsSheet(props: {
                 label="Forward"
                 variant="secondary"
                 onPress={() => props.onForward(message)}
+              />
+            ) : null}
+            {message.savable ? (
+              <Button
+                label="Save to your vault"
+                variant="secondary"
+                onPress={() => props.onSave(message)}
               />
             ) : null}
             {message.mine ? (
@@ -606,6 +647,115 @@ export function PinnedSheet(props: {
           ) : null}
         </View>
       ))}
+    </BottomSheet>
+  );
+}
+
+const DISAPPEAR_LABEL: Readonly<Record<number, string>> = {
+  86_400: '24 h',
+  604_800: '7 days',
+  7_776_000: '90 days',
+};
+
+/** Before a photo or video goes: view once, a timer, sensitive, and whether it can be saved. */
+export function MediaOptionsSheet(props: {
+  kind: 'image' | 'video' | null;
+  sending: boolean;
+  error: unknown;
+  otherName: string;
+  onClose: () => void;
+  onSend: (protection: MediaProtection) => void;
+}) {
+  const [p, setP] = useState<MediaProtection>(NO_PROTECTION);
+  const ephemeral = p.viewOnce || p.timerSeconds !== null;
+  const close = () => {
+    setP(NO_PROTECTION);
+    props.onClose();
+  };
+  return (
+    <BottomSheet
+      visible={props.kind !== null}
+      title={props.kind === 'video' ? 'Send video' : 'Send photo'}
+      onClose={close}
+    >
+      <SettingRow
+        label="View once"
+        description={`${props.otherName} can open it one time; then it’s erased for both of you.`}
+        value={p.viewOnce}
+        onChange={(v) => setP({ ...p, viewOnce: v, timerSeconds: v ? null : p.timerSeconds })}
+      />
+      <View style={styles.themeBlock}>
+        <Text variant="bodyStrong">Timer</Text>
+        <Text variant="caption" tone="textSecondary">
+          Erased this long after {props.otherName} first opens it.
+        </Text>
+        <View style={styles.row} role="radiogroup" aria-label="Timer">
+          {([null, ...TIMER_CHOICES] as const).map((t) => (
+            <ChoiceChip
+              key={t ?? 'off'}
+              label={t === null ? 'Off' : timerLabel(t)}
+              selected={p.timerSeconds === t}
+              disabled={p.viewOnce && t !== null}
+              onPress={() => setP({ ...p, timerSeconds: t })}
+            />
+          ))}
+        </View>
+      </View>
+      <SettingRow
+        label="Sensitive"
+        description="Blurred until tapped, and marked with their name."
+        value={p.sensitive}
+        onChange={(v) => setP({ ...p, sensitive: v })}
+      />
+      <SettingRow
+        label="Let them save it"
+        description={
+          ephemeral
+            ? 'View-once and timed media can’t be saved.'
+            : `${props.otherName} can keep a copy in their private vault.`
+        }
+        value={p.allowSave && !ephemeral}
+        onChange={(v) => setP({ ...p, allowSave: v })}
+      />
+      <Text variant="caption" tone="textSecondary" style={styles.footnote}>
+        VYRA erases it on time, but can’t stop someone photographing their screen.
+      </Text>
+      <ErrorNotice message={props.error ? errorMessage(props.error) : undefined} />
+      <Button
+        label="Send"
+        loading={props.sending}
+        style={styles.footnote}
+        onPress={() => {
+          props.onSend(p);
+          setP(NO_PROTECTION);
+        }}
+      />
+    </BottomSheet>
+  );
+}
+
+/** The next text erases itself this long after it's read. */
+export function TextTimerSheet(props: {
+  visible: boolean;
+  value: number | null;
+  onClose: () => void;
+  onChoose: (seconds: number | null) => void;
+}) {
+  return (
+    <BottomSheet visible={props.visible} title="Self-destructing message" onClose={props.onClose}>
+      <Text tone="textSecondary" style={styles.intro}>
+        Your next message is erased for both of you this long after they read it.
+      </Text>
+      <View style={styles.row} role="radiogroup" aria-label="Erase after">
+        {([null, ...TIMER_CHOICES] as const).map((t) => (
+          <ChoiceChip
+            key={t ?? 'off'}
+            label={t === null ? 'Off' : timerLabel(t)}
+            selected={props.value === t}
+            onPress={() => props.onChoose(t)}
+          />
+        ))}
+      </View>
     </BottomSheet>
   );
 }

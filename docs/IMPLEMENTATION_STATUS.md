@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 15 November 2026, after chat features phase A (replies, reactions, pins, edits, forwarding, scheduled messages, themes, restrict, privacy defaults).
+Last updated: 15 November 2026, after chat features phase B (video, view once, timers, disappearing messages, blur, watermark, media consent, vault).
 
 ## Summary
 
@@ -150,6 +150,18 @@ design-system presets; both see it, either can change it, with a note in the cha
 You → Message privacy sets read-receipt and typing defaults for new conversations. Phases B–E
 (ephemeral media and video, device protection, relationship tools, abuse rules) are next.
 
+**New — chat features, phase B.** Video messages up to 30 s (transcoded to ≤ 720p H.264 in the
+worker, poster frame, five frames checked by the classifier). Before a photo or video goes,
+the sender can choose view once, a timer after opening (10 s – 24 h), sensitive (blurred until
+tapped) and whether it can be saved. View-once and timed media arrive blurred and open in a
+full-screen viewer; view-once is erased when closed and shows "Opened". Text can self-destruct
+after it is read. Either person can turn on disappearing messages (24 h / 7 d / 90 d) with a
+note for both. New conversations ask before showing the other person's media. Protected media
+carries the recipient's name as a watermark. Photos and videos can be kept in a private vault
+(You → Your vault). You → Message privacy adds the media, blur and disappearing defaults.
+Device-only parts (native video playback, the iOS/Android pickers) are unverified on hardware.
+Also fixed on the way: bottom sheets now scroll when taller than the screen.
+
 ## What is deliberately not there
 
 - **Sign-in codes are not delivered.** The development sender returns the code to the app,
@@ -164,17 +176,17 @@ You → Message privacy sets read-receipt and typing defaults for new conversati
 
 ## Verification (run 15 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                                                                                                                                                                                                       |
-| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                         |
-| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                            |
-| `pnpm test`                       | Pass — validation 46, design-system, compatibility-engine, api 59 (incl. the real nsfwjs model, audio sniffing, Wingman prompt and filter), mobile 4                                                                                         |
-| `pnpm test:e2e`                   | Pass — 201 tests in 14 suites against real PostgreSQL, Redis, the queue, ffmpeg and the Rust gateway (new: `learning` 5, realtime rewritten for the gateway 7, compression, AVIF/Opus media)                                                 |
-| `prisma migrate diff --exit-code` | Pass — no drift, 11 migrations                                                                                                                                                                                                               |
-| `expo export --platform web`      | Pass                                                                                                                                                                                                                                         |
-| `pnpm e2e:web`                    | Pass — 47 screenshots, no browser errors, against the Rust gateway: live reply and typing over WebSocket + MessagePack, AVIF photo thumbnail, voice note from a fake microphone re-encoded to Opus, date idea, Wingman, settings, unread dot |
-| `pnpm rust:check`                 | Pass — fmt, clippy `-D warnings`, 13 Rust tests (engine 8 incl. learning 6, parity 2 over 2 000 pairs + 60 rankings, gateway 3)                                                                                                              |
-| Benchmarks                        | `scripts/bench-engine.mjs`, `cargo bench -p vyra-engine`, `scripts/bench-realtime.mjs` — numbers above                                                                                                                                       |
+| Check                             | Result                                                                                                                                                                                                                                |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                  |
+| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                     |
+| `pnpm test`                       | Pass — validation 46, design-system, compatibility-engine, api 59 (incl. the real nsfwjs model, audio sniffing, Wingman prompt and filter), mobile 4                                                                                  |
+| `pnpm test:e2e`                   | Pass — 222 tests in 15 suites against real PostgreSQL, Redis, the queue, ffmpeg and the Rust gateway (new: chat phase A 9, shared theme, `ephemeral` 11 incl. real video transcoding, range requests, watermark pixel check, sweeper) |
+| `prisma migrate diff --exit-code` | Pass — no drift, 13 migrations                                                                                                                                                                                                        |
+| `expo export --platform web`      | Pass                                                                                                                                                                                                                                  |
+| `pnpm e2e:web`                    | Pass — 55 screenshots, no browser errors: chat actions, send later, media send options, held media and allowing it, view-once open and close, vault, shared theme and disappearing-messages notes                                     |
+| `pnpm rust:check`                 | Pass — fmt, clippy `-D warnings`, 13 Rust tests (engine 8 incl. learning 6, parity 2 over 2 000 pairs + 60 rankings, gateway 3)                                                                                                       |
+| Benchmarks                        | `scripts/bench-engine.mjs`, `cargo bench -p vyra-engine`, `scripts/bench-realtime.mjs` — numbers above                                                                                                                                |
 
 Found and fixed while verifying Milestone 7: the addon was first _slower_ than TypeScript
 because whole result sets crossed the boundary twice (fixed with a single `recommend` call);

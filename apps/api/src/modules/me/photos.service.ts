@@ -170,10 +170,18 @@ export class PhotosService {
   }
 
   /** Removes every photo and file for an account that is being deleted. */
+  /** Account deletion: profile photos and every file in the person's private vault. */
   async purge(userId: string): Promise<void> {
     const photos = await this.prisma.userPhoto.findMany({ where: { userId } });
     await this.prisma.userPhoto.deleteMany({ where: { userId } });
     await Promise.all(photos.map((photo) => this.deleteFiles(photo)));
+    const vault = await this.prisma.mediaVaultItem.findMany({ where: { ownerId: userId } });
+    await this.prisma.mediaVaultItem.deleteMany({ where: { ownerId: userId } });
+    await Promise.all(
+      vault.map((item) =>
+        this.deleteFiles({ storageKey: item.storageKey, thumbKey: item.thumbKey }),
+      ),
+    );
   }
 
   /** Writes the full image and its thumbnail under fresh keys. */

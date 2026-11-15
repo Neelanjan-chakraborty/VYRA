@@ -12,11 +12,18 @@ import {
   type SendMessage,
   SOCKET_EVENTS,
   chatThemeSchema,
+  disappearSecondsSchema,
   EDIT_WINDOW_MINUTES,
+  OPEN_URL_SECONDS,
   reactionSchema,
 } from '@vyra/validation';
 import { PrismaService } from '../../database/prisma.service.js';
-import { type Message, type MessageReaction, Prisma } from '../../generated/prisma/client.js';
+import {
+  type MediaConsent,
+  type Message,
+  type MessageReaction,
+  Prisma,
+} from '../../generated/prisma/client.js';
 import { CompatibilityService } from '../compatibility/compatibility.service.js';
 import { PeopleService } from '../compatibility/people.service.js';
 import { MediaUrlService } from '../storage/media-url.service.js';
@@ -25,6 +32,8 @@ import { NotificationService } from './notification.service.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 
 const NOT_FOUND = 'Not found.';
+
+const MEDIA_KINDS: ReadonlySet<Message['kind']> = new Set(['IMAGE', 'VOICE', 'VIDEO']);
 
 /** What `view()` needs besides the row itself. */
 export const VIEW_INCLUDE = { reactions: true, replyTo: true } as const;
@@ -41,6 +50,7 @@ export interface ConversationAccess {
   readonly conversationId: string;
   readonly matchId: string;
   readonly me: {
+    mediaConsent: MediaConsent;
     lastReadAt: Date | null;
     sendsReadReceipts: boolean;
     sharesTyping: boolean;
@@ -55,11 +65,17 @@ export interface ConversationAccess {
     sharesTyping: boolean;
     /** The other person restricted the viewer. */
     restricted: boolean;
+    /** Whether the other person sees the viewer's media yet. */
+    mediaConsent: MediaConsent;
   };
   /** Active connection, nobody blocked, both accounts usable. */
   readonly writable: boolean;
   /** The conversation's shared theme. */
   readonly theme: string;
+  /** Shared disappearing-messages timer (null = off). */
+  readonly disappearSeconds: number | null;
+  /** The viewer blurs every photo and video from others until tapped. */
+  readonly blurIncoming: boolean;
 }
 
 /**
@@ -93,7 +109,13 @@ export class MessagingService {
     // New conversations start from each person's privacy defaults.
     const profiles = await tx.userProfile.findMany({
       where: { userId: { in: [userAId, userBId] } },
-      select: { userId: true, defaultReadReceipts: true, defaultSharesTyping: true },
+      select: {
+        userId: true,
+        defaultReadReceipts: true,
+        defaultSharesTyping: true,
+        defaultMediaConsent: true,
+        defaultDisappearSeconds: true,
+      },
     });
     const defaults = (userId: string) => {
       const profile = profiles.find((p) => p.userId === userId);
@@ -101,12 +123,18 @@ export class MessagingService {
         userId,
         sendsReadReceipts: profile?.defaultReadReceipts ?? true,
         sharesTyping: profile?.defaultSharesTyping ?? true,
-      };
+        // Ask first unless this person chose to allow media by default.
+        mediaConsent: profile?.defaultMediaConsent === 'allow' ? 'ALLOWED' : 'ASK',
+      } as const;
     };
+    // Disappearing messages: the shorter of the two defaults wins (the more private choice).
+    const timers = profiles.flatMap((p) => p.defaultDisappearSeconds ?? []);
+    const disappearSeconds = timers.length > 0 ? Math.min(...timers) : null;
     const conversation = await tx.conversation.upsert({
       where: { matchId },
       create: {
         matchId,
+        disappearSeconds,
         participants: { create: [defaults(userAId), defaults(userBId)] },
       },
       update: {},
@@ -150,6 +178,10 @@ export class MessagingService {
     if (await this.people.isBlocked(userId, other.userId)) throw new NotFoundException(NOT_FOUND);
     const loaded = await this.people.load([other.userId]);
     if (!loaded.get(other.userId)?.reachable) throw new NotFoundException(NOT_FOUND);
+    const profile = await this.prisma.userProfile.findUnique({
+      where: { userId },
+      select: { blurIncomingMedia: true },
+    });
     return {
       conversationId,
       matchId: conversation.matchId,
@@ -158,6 +190,8 @@ export class MessagingService {
       other,
       writable: conversation.match.endedAt === null,
       theme: conversation.theme,
+      disappearSeconds: conversation.disappearSeconds,
+      blurIncoming: profile?.blurIncomingMedia ?? false,
     };
   }
 
@@ -180,7 +214,7 @@ export class MessagingService {
   // ─────────────────────────── reading ───────────────────────────
 
   preview(message: Message, viewerId: string): string {
-    if (message.deletedAt) return 'Message removed';
+    if (message.deletedAt || this.expired(message)) return 'Message removed';
     if (message.reportedAt && message.senderId !== viewerId) return 'Message reported';
     switch (message.kind) {
       case 'TEXT': {
@@ -191,25 +225,49 @@ export class MessagingService {
         return 'Photo';
       case 'VOICE':
         return 'Voice note';
+      case 'VIDEO':
+        return 'Video';
       case 'DATE_PLAN':
         return 'Date idea';
       case 'SYSTEM':
-        return this.systemEvent(message).event === 'theme'
-          ? message.senderId === viewerId
-            ? 'You changed the theme'
-            : 'Theme changed'
-          : 'You’re connected';
+        switch (this.systemEvent(message).event) {
+          case 'theme':
+            return message.senderId === viewerId ? 'You changed the theme' : 'Theme changed';
+          case 'disappear':
+            return 'Disappearing messages changed';
+          default:
+            return 'You’re connected';
+        }
     }
   }
 
   /** What a system message records: a connection, or a theme change. */
-  private systemEvent(message: Message): Pick<MessageView, 'event' | 'theme'> {
-    const payload = (message.payload ?? {}) as { event?: unknown; theme?: unknown };
+  private systemEvent(message: Message): Pick<MessageView, 'event' | 'theme' | 'disappearSeconds'> {
+    const payload = (message.payload ?? {}) as {
+      event?: unknown;
+      theme?: unknown;
+      seconds?: unknown;
+    };
     if (payload.event === 'theme') {
       const theme = chatThemeSchema.safeParse(payload.theme);
-      return { event: 'theme', theme: theme.success ? theme.data : 'default' };
+      return {
+        event: 'theme',
+        theme: theme.success ? theme.data : 'default',
+        disappearSeconds: null,
+      };
     }
-    return { event: 'connected', theme: null };
+    if (payload.event === 'disappear')
+      return {
+        event: 'disappear',
+        theme: null,
+        disappearSeconds: typeof payload.seconds === 'number' ? payload.seconds : null,
+      };
+    return { event: 'connected', theme: null, disappearSeconds: null };
+  }
+
+  /** Past its expiry but not swept yet: treated as gone everywhere. */
+  expired(message: Pick<Message, 'expiresAt'>, now = Date.now()): boolean {
+    return message.expiresAt !== null && message.expiresAt.getTime() <= now;
   }
 
   /** Media the viewer may not see yet is left out entirely, not shown as a placeholder. */
@@ -218,38 +276,78 @@ export class MessagingService {
     return message.mediaStatus !== 'REJECTED';
   }
 
-  view(message: ViewableMessage, access: ConversationAccess, viewerId: string): MessageView {
+  /**
+   * One message as this viewer may see it. `opened` signs view-once and timed
+   * media for the recipient (only the open endpoint passes it).
+   */
+  view(
+    message: ViewableMessage,
+    access: ConversationAccess,
+    viewerId: string,
+    opened = false,
+  ): MessageView {
     const mine = message.senderId === viewerId;
-    const removed = message.deletedAt !== null || (!mine && message.reportedAt !== null);
+    const expiredNow = message.deletedAt === null && this.expired(message);
+    const removed =
+      message.deletedAt !== null || expiredNow || (!mine && message.reportedAt !== null);
     const kind = (
       {
         TEXT: 'text',
         IMAGE: 'image',
         VOICE: 'voice',
+        VIDEO: 'video',
         DATE_PLAN: 'date_plan',
         SYSTEM: 'system',
       } as const
     )[message.kind];
+    const isMedia = MEDIA_KINDS.has(message.kind);
+    const timed = message.timerSeconds !== null && message.kind !== 'TEXT';
+    const protectedMedia = isMedia && (message.viewOnce || timed);
+    // Media waits for the recipient's consent; the sender sees that it is waiting.
+    const held =
+      isMedia &&
+      !removed &&
+      (mine ? access.other.mediaConsent === 'ASK' : access.me.mediaConsent === 'ASK');
+    const removedReason: MessageView['removedReason'] = !removed
+      ? null
+      : expiredNow ||
+          (message.expiresAt !== null &&
+            message.deletedAt !== null &&
+            message.expiresAt <= message.deletedAt)
+        ? 'expired'
+        : message.viewOnce && message.openedAt !== null
+          ? 'opened'
+          : 'sender';
     let media: MessageView['media'] = null;
-    if (!removed && message.mediaKey && message.mediaStatus) {
-      // The sender sees their own media in any state; the other person only once approved.
-      const sign = (key: string) =>
-        mine
-          ? this.media.sign(key, 'owner')
-          : message.mediaStatus === 'APPROVED'
-            ? this.media.sign(key, 'conversation')
-            : null;
-      const status =
-        message.mediaStatus === 'APPROVED'
-          ? 'ready'
-          : message.mediaStatus === 'REJECTED'
-            ? 'declined'
-            : 'checking';
+    if (!removed && message.mediaStatus && (message.mediaKey || message.kind === 'VIDEO')) {
+      const approved = message.mediaStatus === 'APPROVED';
+      // Who gets which URLs: the sender everything; the recipient nothing while
+      // held, only the blurred preview for unopened protected media, and
+      // one-minute "opened" URLs from the open endpoint.
+      const full = (key: string | null) => {
+        // A video still being processed has only its raw upload: nothing to show yet.
+        if (!key || key.startsWith('uploads/')) return null;
+        if (mine) return this.media.sign(key, 'owner');
+        if (!approved || held) return null;
+        if (protectedMedia)
+          return opened ? this.media.sign(key, 'opened', Date.now(), OPEN_URL_SECONDS) : null;
+        return this.media.sign(key, 'conversation');
+      };
+      const preview = (key: string | null) =>
+        !key
+          ? null
+          : mine
+            ? this.media.sign(key, 'owner')
+            : approved && !held
+              ? this.media.sign(key, 'conversation')
+              : null;
       media = {
-        status,
-        url: sign(message.mediaKey),
-        thumbUrl: message.mediaThumbKey ? sign(message.mediaThumbKey) : null,
-        altUrl: message.mediaAltKey ? sign(message.mediaAltKey) : null,
+        status: approved ? 'ready' : message.mediaStatus === 'REJECTED' ? 'declined' : 'checking',
+        url: full(message.mediaKey),
+        thumbUrl: full(message.mediaThumbKey),
+        altUrl: full(message.mediaAltKey),
+        posterUrl: full(message.mediaPosterKey),
+        previewUrl: preview(message.mediaPreviewKey),
         width: message.mediaWidth,
         height: message.mediaHeight,
         durationMs: message.mediaDurationMs,
@@ -288,7 +386,33 @@ export class MessagingService {
       removed,
       media,
       plan,
-      ...(message.kind === 'SYSTEM' ? this.systemEvent(message) : { event: null, theme: null }),
+      ...(message.kind === 'SYSTEM'
+        ? this.systemEvent(message)
+        : { event: null, theme: null, disappearSeconds: null }),
+      removedReason,
+      viewOnce: message.viewOnce,
+      timerSeconds: message.timerSeconds,
+      sensitive: message.sensitive,
+      // Your own media can always be kept; theirs only if they allowed it and you can see it.
+      savable:
+        (message.kind === 'IMAGE' || message.kind === 'VIDEO') &&
+        !removed &&
+        message.mediaStatus === 'APPROVED' &&
+        (mine || (!held && message.allowSave && !protectedMedia)),
+      blurred:
+        !removed &&
+        (message.kind === 'IMAGE' || message.kind === 'VIDEO') &&
+        (protectedMedia || message.sensitive || (!mine && access.blurIncoming)),
+      held,
+      openable:
+        !mine &&
+        protectedMedia &&
+        !removed &&
+        !held &&
+        message.mediaStatus === 'APPROVED' &&
+        !(message.viewOnce && message.openedAt !== null),
+      openedAt: message.openedAt?.toISOString() ?? null,
+      expiresAt: removed ? null : (message.expiresAt?.toISOString() ?? null),
       read:
         mine &&
         bothShare &&
@@ -319,6 +443,11 @@ export class MessagingService {
       muted: access.me.mutedAt !== null,
       restricted: access.me.restricted,
       theme: chatThemeSchema.catch('default').parse(access.theme),
+      disappearSeconds: disappearSecondsSchema
+        .nullable()
+        .catch(null)
+        .parse(access.disappearSeconds),
+      mediaConsent: access.me.mediaConsent === 'ALLOWED' ? 'allowed' : 'ask',
     };
   }
 
@@ -351,6 +480,8 @@ export class MessagingService {
         other,
         writable: row.conversation.match.endedAt === null,
         theme: row.conversation.theme,
+        disappearSeconds: row.conversation.disappearSeconds,
+        blurIncoming: false, // the list never shows media
       };
       const last = await this.prisma.message.findFirst({
         where: {
@@ -457,6 +588,7 @@ export class MessagingService {
             body: input.body,
             aiAssisted: input.aiAssisted ?? false,
             replyToId: await this.replyTarget(conversationId, input.replyToId),
+            timerSeconds: input.timerSeconds ?? null,
           }
         : {
             conversationId,
@@ -485,6 +617,18 @@ export class MessagingService {
   /** Writes a message and moves the conversation to the top of both lists. */
   async store(data: Prisma.MessageUncheckedCreateInput) {
     return this.prisma.$transaction(async (tx) => {
+      // Disappearing messages: everything people send (not system lines) gets an expiry.
+      if (data.kind !== 'SYSTEM') {
+        const conversation = await tx.conversation.findUniqueOrThrow({
+          where: { id: data.conversationId },
+          select: { disappearSeconds: true },
+        });
+        if (conversation.disappearSeconds)
+          data = {
+            ...data,
+            expiresAt: new Date(Date.now() + conversation.disappearSeconds * 1000),
+          };
+      }
       const message = await tx.message.create({ data, include: VIEW_INCLUDE });
       await tx.conversation.update({
         where: { id: data.conversationId },
@@ -536,6 +680,15 @@ export class MessagingService {
       data: { lastReadAt: message.createdAt },
     });
     if (updated.count === 0) return;
+    // Self-destructing text starts its timer once read (never extending an earlier expiry).
+    await this.prisma.$executeRaw`
+      update messages
+         set expires_at = least(coalesce(expires_at, 'infinity'),
+                                now() + timer_seconds * interval '1 second')
+       where conversation_id = ${conversationId}::uuid
+         and sender_id = ${access.otherId}::uuid
+         and kind = 'TEXT' and timer_seconds is not null and deleted_at is null
+         and created_at <= ${message.createdAt}`;
     // The other person only hears about it when this person shares read receipts.
     // Nor when this person restricted them.
     if (access.me.sendsReadReceipts && !access.me.restricted) this.changed(access, userId, 'read');
@@ -566,6 +719,26 @@ export class MessagingService {
       });
       this.changed(access, userId, 'message');
     }
+    // Disappearing messages are shared too, with a note for both.
+    let disappearSeconds = access.disappearSeconds;
+    if (
+      update.disappearSeconds !== undefined &&
+      update.disappearSeconds !== access.disappearSeconds
+    ) {
+      if (!access.writable) throw new ConflictException('This connection has ended.');
+      disappearSeconds = update.disappearSeconds;
+      await this.prisma.conversation.update({
+        where: { id: conversationId },
+        data: { disappearSeconds },
+      });
+      await this.store({
+        conversationId,
+        senderId: userId,
+        kind: 'SYSTEM',
+        payload: { event: 'disappear', seconds: disappearSeconds },
+      });
+      this.changed(access, userId, 'message');
+    }
     const row = await this.prisma.conversationParticipant.update({
       where: { conversationId_userId: { conversationId, userId } },
       data: {
@@ -578,12 +751,17 @@ export class MessagingService {
           : { wingmanContextEnabled: update.wingmanContextEnabled }),
         ...(update.muted === undefined ? {} : { mutedAt: update.muted ? new Date() : null }),
         ...(update.restricted === undefined ? {} : { restricted: update.restricted }),
+        ...(update.mediaConsent === undefined
+          ? {}
+          : { mediaConsent: update.mediaConsent === 'allowed' ? 'ALLOWED' : 'ASK' }),
       },
     });
+    // The sender's "waiting for them to allow media" changes with consent.
+    if (update.mediaConsent !== undefined) this.changed(access, userId, 'settings');
     // Read receipts are reciprocal (and restriction hides them), so the other side's ticks may change too.
     if (update.sendsReadReceipts !== undefined || update.restricted !== undefined)
       this.changed(access, userId, 'read');
-    return this.settings({ ...access, me: row, theme });
+    return this.settings({ ...access, me: row, theme, disappearSeconds });
   }
 
   /** The sender removes a message for both people. Text and media are erased, not hidden. */
@@ -593,14 +771,26 @@ export class MessagingService {
     });
     if (!message) throw new NotFoundException(NOT_FOUND);
     const access = await this.access(userId, message.conversationId);
-    await this.prisma.message.update({
-      where: { id: messageId },
+    await this.erase(message);
+    this.changed(access, userId, 'removed');
+  }
+
+  /**
+   * Erases a message's content for good: text, payload and every stored file.
+   * Used for removal, view-once after opening, timers and disappearing messages.
+   * Returns false if it was already erased.
+   */
+  async erase(message: Message, at = new Date()): Promise<boolean> {
+    const erased = await this.prisma.message.updateMany({
+      where: { id: message.id, deletedAt: null },
       data: {
-        deletedAt: new Date(),
+        deletedAt: at,
         body: null,
         mediaKey: null,
         mediaThumbKey: null,
         mediaAltKey: null,
+        mediaPosterKey: null,
+        mediaPreviewKey: null,
         mediaBytes: null,
         mediaStatus: null,
         mediaDurationMs: null,
@@ -608,12 +798,19 @@ export class MessagingService {
         mediaHeight: null,
         payload: Prisma.DbNull,
         pinnedAt: null,
-        reactions: { deleteMany: {} },
       },
     });
-    for (const key of [message.mediaKey, message.mediaThumbKey, message.mediaAltKey])
-      if (key) await this.storage.delete(key).catch(() => undefined);
-    this.changed(access, userId, 'removed');
+    if (erased.count === 0) return false;
+    await this.prisma.messageReaction.deleteMany({ where: { messageId: message.id } });
+    const keys = [
+      message.mediaKey,
+      message.mediaThumbKey,
+      message.mediaAltKey,
+      message.mediaPosterKey,
+      message.mediaPreviewKey,
+    ];
+    for (const key of keys) if (key) await this.storage.delete(key).catch(() => undefined);
+    return true;
   }
 
   // ─────────────────────────── date plans ───────────────────────────

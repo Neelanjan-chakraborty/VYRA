@@ -3,7 +3,7 @@
 ## Prerequisites
 
 Node 22.18+ (`.nvmrc`), pnpm 10 (`corepack enable`), Rust 1.97 (`rust-toolchain.toml`;
-the matchmaking engine and realtime gateway), ffmpeg with libopus (voice notes), and
+the matchmaking engine and realtime gateway), ffmpeg with libopus, libx264 and AAC (voice notes and video), a system font (watermarks), and
 PostgreSQL 16 with pgvector plus Redis 7 — from Docker, or installed locally.
 
 ## First run

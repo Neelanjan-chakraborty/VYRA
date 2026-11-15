@@ -91,6 +91,58 @@ export class ModerationService {
     for (const listener of this.messageListeners) await listener(messageId);
   }
 
+  /**
+   * A video message: frames sampled across the clip each go through the same
+   * classifier as photos, and every one must pass. Decides the message the way
+   * assessMessage does, records the decision and tells listeners.
+   */
+  async assessVideoFrames(messageId: string, frames: readonly Buffer[]): Promise<void> {
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.kind !== 'VIDEO' || message.mediaStatus !== 'PENDING') return;
+    let reason = 'All sampled frames passed the classifier';
+    let status: PhotoModerationStatus = 'APPROVED';
+    for (const frame of frames) {
+      const result = await this.provider.assess(frame);
+      if (result.verdict !== 'approve') {
+        status = 'REJECTED';
+        reason = result.reason;
+        break;
+      }
+    }
+    await this.decideMessage(messageId, message.senderId, status, reason);
+  }
+
+  /** A video that couldn't be processed is declined like a photo the classifier refused. */
+  async failVideo(messageId: string): Promise<void> {
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message || message.mediaStatus !== 'PENDING') return;
+    await this.decideMessage(messageId, message.senderId, 'REJECTED', 'Video could not be read');
+  }
+
+  private async decideMessage(
+    messageId: string,
+    senderId: string | null,
+    status: PhotoModerationStatus,
+    reason: string,
+  ): Promise<void> {
+    const updated = await this.prisma.message.updateMany({
+      where: { id: messageId, mediaStatus: 'PENDING' },
+      data: { mediaStatus: status },
+    });
+    if (updated.count === 0) return;
+    if (senderId)
+      await this.prisma.moderationEvent.create({
+        data: {
+          subjectUserId: senderId,
+          action: STATUS_ACTION[status as Exclude<PhotoModerationStatus, 'PENDING'>],
+          targetType: 'message',
+          targetId: messageId,
+          reason,
+        },
+      });
+    for (const listener of this.messageListeners) await listener(messageId);
+  }
+
   /** Records a new or replaced upload and queues it for the automated pass. */
   async submit(photoId: string, ownerId: string): Promise<void> {
     await this.event(ownerId, null, 'PHOTO_SUBMITTED', photoId, null);

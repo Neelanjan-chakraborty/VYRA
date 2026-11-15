@@ -128,3 +128,19 @@ within the disclosed window.
   migration `shared_theme` moved it from participants).
 - `user_profiles`: `notify_preview` (CHECK `name` / `hidden`), `default_read_receipts`,
   `default_shares_typing` (copied into new conversations).
+
+### Ephemeral media (migration `ephemeral_media`)
+
+- `MessageKind` gains `VIDEO`; enum `MediaConsent` (`ASK`, `ALLOWED`).
+- `messages`: `view_once`, `timer_seconds` (CHECK 10/30/60/3600/86400; TEXT, IMAGE, VIDEO
+  only; never with view once), `opened_at` (only on protected media), `expires_at` (indexed;
+  the sweeper's work list), `sensitive`, `allow_save`, `media_poster_key`, `media_preview_key`.
+  The media-status CHECK now covers VIDEO; durations: voice ≤ 60 s, video ≤ 30 s. A video
+  waiting to be processed points `media_key` at its upload until the worker replaces it.
+- `conversations.disappear_seconds` (CHECK null/86400/604800/7776000).
+- `conversation_participants.media_consent` (default `ASK`; existing rows were set to
+  `ALLOWED` so nothing already visible disappeared).
+- `user_profiles`: `default_media_consent` (`ask`/`allow`), `blur_incoming_media`,
+  `default_disappear_seconds`.
+- `media_vault_items`: owner, kind (IMAGE/VIDEO), own storage and thumbnail keys, size,
+  dimensions, duration, source message id (unique per owner); cascades with the user.

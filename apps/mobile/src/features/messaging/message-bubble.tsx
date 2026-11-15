@@ -1,10 +1,25 @@
 import { type ChatTheme, chatThemes, color, radius, space } from '@vyra/design-system';
 import type { MessageView, Reaction } from '@vyra/validation';
 import { Image } from 'expo-image';
+import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { Button } from '@/components/ui/button';
+import {
+  BlurredMedia,
+  HeldMedia,
+  remaining,
+  timerLabel,
+  useNow,
+  VideoMessage,
+} from './media-views';
 import { VoiceNote } from './voice';
+
+const DISAPPEAR_WORDS: Readonly<Record<number, string>> = {
+  86_400: '24 hours',
+  604_800: '7 days',
+  7_776_000: '90 days',
+};
 
 const PLAN_STATUS: Readonly<Record<string, string>> = {
   proposed: 'Waiting for an answer',
@@ -27,6 +42,10 @@ interface BubbleProps {
   readonly onPlan: (message: MessageView, action: 'accept' | 'decline' | 'withdraw') => void;
   /** Tapping a reaction chip: yours toggles off, another replaces yours. */
   readonly onReact: (message: MessageView, emoji: Reaction | null) => void;
+  /** View-once or timed media: ask the server for it. */
+  readonly onOpen: (message: MessageView) => void;
+  /** Allow photos, video and voice from the other person (null when not possible). */
+  readonly onAllowMedia: (() => void) | null;
   readonly theme: ChatTheme;
 }
 
@@ -39,13 +58,27 @@ export function MessageBubble({
   onActions,
   onPlan,
   onReact,
+  onOpen,
+  onAllowMedia,
   theme,
 }: BubbleProps) {
+  const [revealed, setRevealed] = useState(false);
+  const now = useNow(Boolean(message.expiresAt) && !message.removed);
   if (message.kind === 'system' && message.event === 'theme') {
     const label = chatThemes[message.theme ?? 'default'].label;
     return (
       <Text variant="caption" tone="textSecondary" style={styles.system}>
         {message.mine ? 'You' : otherName} changed the theme to {label}
+      </Text>
+    );
+  }
+  if (message.kind === 'system' && message.event === 'disappear') {
+    const who = message.mine ? 'You' : otherName;
+    return (
+      <Text variant="caption" tone="textSecondary" style={styles.system}>
+        {message.disappearSeconds
+          ? `${who} turned on disappearing messages: new messages go after ${DISAPPEAR_WORDS[message.disappearSeconds] ?? 'a while'}`
+          : `${who} turned off disappearing messages`}
       </Text>
     );
   }
@@ -59,20 +92,88 @@ export function MessageBubble({
   const mine = message.mine;
   const palette = chatThemes[theme];
   const ink = mine ? palette.mineText : color.textPrimary;
+  const left = remaining(message.expiresAt, now);
   const status = [
     message.pinned ? 'Pinned' : null,
     message.edited ? 'Edited' : null,
+    message.kind === 'text' && message.timerSeconds && !message.expiresAt && !message.removed
+      ? `Disappears ${timerLabel(message.timerSeconds)} after it’s read`
+      : null,
+    mine && message.viewOnce && !message.removed
+      ? message.openedAt
+        ? 'Opened'
+        : 'View once'
+      : null,
+    mine && message.timerSeconds && message.kind !== 'text' && !message.openedAt && !message.removed
+      ? `${timerLabel(message.timerSeconds)} after opening`
+      : null,
+    mine && message.held ? `${otherName} hasn’t allowed media yet` : null,
+    left ? `Disappears in ${left}` : null,
     pending ? 'Sending…' : mine && message.read ? 'Read' : null,
   ]
     .filter(Boolean)
     .join(' · ');
   let content;
+  const protectedTheirs =
+    !mine && (message.viewOnce || (message.timerSeconds !== null && message.kind !== 'text'));
   if (message.removed) {
     content = (
       <Text tone="textSecondary" style={styles.removed}>
-        {mine ? 'You removed this message' : 'Message removed'}
+        {message.removedReason === 'opened'
+          ? 'Opened'
+          : message.removedReason === 'expired'
+            ? 'Disappeared'
+            : mine
+              ? 'You removed this message'
+              : 'Message removed'}
       </Text>
     );
+  } else if (message.held && !mine) {
+    content = <HeldMedia message={message} otherName={otherName} onAllow={onAllowMedia} />;
+  } else if (protectedTheirs) {
+    const what =
+      { image: 'Photo', video: 'Video', voice: 'Voice note' }[message.kind as 'image'] ?? 'Media';
+    const ready = message.media?.status === 'ready';
+    content = (
+      <BlurredMedia
+        message={message}
+        label={
+          !ready
+            ? `${what} being checked`
+            : message.viewOnce
+              ? `${what} · view once`
+              : `${what} · ${timerLabel(message.timerSeconds ?? 0)} · tap to open`
+        }
+        onPress={ready && message.openable ? () => onOpen(message) : null}
+      />
+    );
+  } else if (message.blurred && !revealed && message.media?.status === 'ready') {
+    content = (
+      <BlurredMedia
+        message={message}
+        label={message.sensitive ? 'Sensitive · tap to view' : 'Tap to view'}
+        onPress={() => setRevealed(true)}
+      />
+    );
+  } else if (message.kind === 'video' && message.media) {
+    const { media } = message;
+    content =
+      media.url && media.status === 'ready' ? (
+        <VideoMessage
+          url={media.url}
+          posterUrl={media.posterUrl}
+          width={media.width}
+          height={media.height}
+          durationMs={media.durationMs}
+          label={mine ? 'video you sent' : `video from ${otherName}`}
+        />
+      ) : (
+        <Text variant="caption" style={{ color: mine ? ink : color.textSecondary }}>
+          {media.status === 'declined'
+            ? 'This video couldn’t be sent. Try another.'
+            : 'Video being prepared and checked'}
+        </Text>
+      );
   } else if (message.kind === 'text') {
     content = (
       <Text selectable style={{ color: ink }}>
@@ -86,6 +187,7 @@ export function MessageBubble({
       <View>
         {media.url ? (
           <Image
+            draggable={false}
             source={{ uri: media.thumbUrl ?? media.url }}
             style={[styles.photo, { aspectRatio: ratio }, media.status !== 'ready' && styles.dim]}
             contentFit="cover"
@@ -176,7 +278,7 @@ export function MessageBubble({
         style={[
           styles.bubble,
           mine ? [styles.mine, { backgroundColor: palette.mine }] : styles.theirs,
-          message.kind === 'image' && styles.mediaBubble,
+          (message.kind === 'image' || message.kind === 'video') && styles.mediaBubble,
           pending && styles.dim,
         ]}
       >

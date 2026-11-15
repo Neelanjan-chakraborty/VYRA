@@ -7,6 +7,18 @@ export const MESSAGES_PAGE_SIZE = 40;
 export const VOICE_MAX_MS = 60_000;
 export const VOICE_MAX_BYTES = 2 * 1024 * 1024;
 export const MESSAGE_PHOTO_MAX_BYTES = 10 * 1024 * 1024;
+/** Video messages: at most 30 seconds and 25 MB as uploaded. */
+export const VIDEO_MAX_MS = 30_000;
+export const VIDEO_MAX_BYTES = 25 * 1024 * 1024;
+
+/** How long timed media stays after it is opened, or timed text after it is read. */
+export const TIMER_CHOICES = [10, 30, 60, 3600, 86400] as const;
+export const timerSecondsSchema = z.union(TIMER_CHOICES.map((t) => z.literal(t)));
+/** Disappearing messages: 24 hours, 7 days or 90 days after sending. */
+export const DISAPPEAR_CHOICES = [86_400, 604_800, 7_776_000] as const;
+export const disappearSecondsSchema = z.union(DISAPPEAR_CHOICES.map((t) => z.literal(t)));
+/** A view-once or timed item's media URL works for this long after opening. */
+export const OPEN_URL_SECONDS = 60;
 export const DATE_PLAN_LIMITS = { idea: 120, when: 80, area: 80 } as const;
 export const WINGMAN_SUGGESTION_MAX = 300;
 export const WINGMAN_MAX_SUGGESTIONS = 3;
@@ -54,24 +66,47 @@ export const sendMessageSchema = z.discriminatedUnion('kind', [
     aiAssisted: z.boolean().default(false),
     /** A message in the same conversation this one answers. */
     replyToId: z.uuid().optional(),
+    /** Self-destruct: erased this many seconds after the other person reads it. */
+    timerSeconds: timerSecondsSchema.optional(),
   }),
   z.object({ kind: z.literal('date_plan'), clientId: z.uuid(), plan: datePlanInputSchema }),
 ]);
 export type SendMessage = z.input<typeof sendMessageSchema>;
 
-/** Multipart fields that accompany an uploaded photo or voice note. */
-export const mediaMessageSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('image'), clientId: z.uuid() }),
-  z.object({
-    kind: z.literal('voice'),
-    clientId: z.uuid(),
-    /** As measured by the recorder. The file's own duration wins when it has one. */
-    durationMs: z.coerce.number().int().min(1).max(VOICE_MAX_MS),
-  }),
-]);
+/** Multipart fields arrive as strings: "true" / "false". */
+const formFlag = z.stringbool().default(false);
+/**
+ * Protection a sender can put on media: view once, or a timer after opening
+ * (not both); sensitive blurs it until tapped; allowSave lets the recipient keep
+ * a copy in their vault (never for view-once or timed media).
+ */
+const protection = {
+  viewOnce: formFlag,
+  sensitive: formFlag,
+  allowSave: z.stringbool().default(true),
+};
+const timerField = { timerSeconds: z.coerce.number().pipe(timerSecondsSchema).optional() };
+
+/** Multipart fields that accompany an uploaded photo, video or voice note. */
+export const mediaMessageSchema = z
+  .discriminatedUnion('kind', [
+    z.object({ kind: z.literal('image'), clientId: z.uuid(), ...protection, ...timerField }),
+    z.object({ kind: z.literal('video'), clientId: z.uuid(), ...protection, ...timerField }),
+    z.object({
+      kind: z.literal('voice'),
+      clientId: z.uuid(),
+      /** As measured by the recorder. The file's own duration wins when it has one. */
+      durationMs: z.coerce.number().int().min(1).max(VOICE_MAX_MS),
+      ...protection,
+    }),
+  ])
+  .refine((v) => !(v.viewOnce && 'timerSeconds' in v && v.timerSeconds), {
+    message: 'Choose view once or a timer, not both',
+    path: ['timerSeconds'],
+  });
 export type MediaMessageFields = z.input<typeof mediaMessageSchema>;
 
-export const messageKindSchema = z.enum(['text', 'image', 'voice', 'date_plan', 'system']);
+export const messageKindSchema = z.enum(['text', 'image', 'voice', 'video', 'date_plan', 'system']);
 export type MessageKindView = z.infer<typeof messageKindSchema>;
 
 export const messageMediaSchema = z.object({
@@ -83,6 +118,10 @@ export const messageMediaSchema = z.object({
   thumbUrl: z.string().nullable(),
   /** VOICE: the same audio in a CAF container, for iOS's native player. */
   altUrl: z.string().nullable(),
+  /** VIDEO: a still frame to show before playing. */
+  posterUrl: z.string().nullable(),
+  /** IMAGE and VIDEO: a tiny blurred version, shown while media is blurred or not yet opened. */
+  previewUrl: z.string().nullable(),
   width: z.number().int().nullable(),
   height: z.number().int().nullable(),
   durationMs: z.number().int().nullable(),
@@ -146,10 +185,32 @@ export const messageSchema = z.object({
   removed: z.boolean(),
   media: messageMediaSchema.nullable(),
   plan: datePlanPayloadSchema.nullable(),
-  /** System messages only: "connected", or "theme" when someone changed the shared theme. */
-  event: z.enum(['connected', 'theme']).nullable(),
+  /** System messages only: connected, a theme change, or disappearing messages set. */
+  event: z.enum(['connected', 'theme', 'disappear']).nullable(),
   /** The theme chosen, for "theme" events. */
   theme: chatThemeSchema.nullable(),
+  /** The timer chosen for "disappear" events (null = turned off). */
+  disappearSeconds: z.number().int().nullable(),
+  /** Why a removed message is gone: the sender removed it, it was opened once, or it expired. */
+  removedReason: z.enum(['sender', 'opened', 'expired']).nullable(),
+  /** Protection the sender chose. */
+  viewOnce: z.boolean(),
+  timerSeconds: z.number().int().nullable(),
+  sensitive: z.boolean(),
+  /** The recipient may save this to their vault. */
+  savable: z.boolean(),
+  /** Shown blurred until tapped (protected media, or the viewer blurs incoming media). */
+  blurred: z.boolean(),
+  /**
+   * The viewer hasn't allowed media from this person yet: no URLs, just what kind it is.
+   * For the sender: the other person hasn't allowed it yet.
+   */
+  held: z.boolean(),
+  /** View-once or timed media: needs POST /messages/:id/open to get its URL. */
+  openable: z.boolean(),
+  openedAt: z.iso.datetime().nullable(),
+  /** When it will be erased (timers, disappearing messages). */
+  expiresAt: z.iso.datetime().nullable(),
   /** The viewer's own messages only: the other person has read it (when both share receipts). */
   read: z.boolean(),
   replyTo: replyPreviewSchema.nullable(),
@@ -183,6 +244,10 @@ export const conversationSettingsSchema = z.object({
   restricted: z.boolean(),
   /** Shared: both people see it, and either can change it. */
   theme: chatThemeSchema,
+  /** Shared: new messages disappear this long after sending (null = off). */
+  disappearSeconds: disappearSecondsSchema.nullable(),
+  /** Whether you see the other person's photos, video and voice notes. */
+  mediaConsent: z.enum(['ask', 'allowed']),
 });
 export type ConversationSettings = z.infer<typeof conversationSettingsSchema>;
 export const conversationSettingsUpdateSchema = conversationSettingsSchema
@@ -246,6 +311,9 @@ export const conversationChangedEventSchema = z.object({
     'reaction',
     'edited',
     'pinned',
+    'opened',
+    'expired',
+    'settings',
   ]),
   /** Who caused it (an id only), so an app can tell its own actions from the other person's. */
   by: z.uuid().optional(),
@@ -257,3 +325,18 @@ export type TypingEvent = z.infer<typeof typingEventSchema>;
 /** The conversation's pinned messages, most recently pinned first. */
 export const pinnedListSchema = z.object({ messages: z.array(messageSchema).max(MAX_PINNED) });
 export type PinnedList = z.infer<typeof pinnedListSchema>;
+
+/** Something kept in a person's private vault. */
+export const vaultItemSchema = z.object({
+  id: z.uuid(),
+  kind: z.enum(['image', 'video', 'voice']),
+  url: z.string(),
+  thumbUrl: z.string().nullable(),
+  width: z.number().int().nullable(),
+  height: z.number().int().nullable(),
+  durationMs: z.number().int().nullable(),
+  createdAt: z.iso.datetime(),
+});
+export type VaultItem = z.infer<typeof vaultItemSchema>;
+export const vaultListSchema = z.object({ items: z.array(vaultItemSchema) });
+export type VaultList = z.infer<typeof vaultListSchema>;

@@ -24,11 +24,13 @@ import { PersonAvatar } from '@/features/discovery/person-avatar';
 import {
   AddSheet,
   ForwardSheet,
+  MediaOptionsSheet,
   MessageActionsSheet,
   PinnedSheet,
   PlanSheet,
   ScheduleSheet,
   SettingsSheet,
+  TextTimerSheet,
   WingmanSheet,
 } from '@/features/messaging/conversation-sheets';
 import { MessageBubble } from '@/features/messaging/message-bubble';
@@ -48,7 +50,15 @@ import {
   useSendPhoto,
   useSendText,
   useSendVoice,
+  useSendVideo,
+  useOpenMedia,
+  useCloseMedia,
+  useSaveToVault,
+  type MediaProtection,
+  type PickedMedia,
 } from '@/features/messaging/messaging-api';
+import { timerLabel } from '@/features/messaging/media-views';
+import { ProtectedViewer } from '@/features/messaging/protected-viewer';
 import { sendTyping, useIsTyping } from '@/features/messaging/realtime';
 import { clock, useVoiceRecorder } from '@/features/messaging/voice';
 import { errorMessage } from '@/lib/api';
@@ -56,7 +66,22 @@ import { prepareImageForUpload } from '@/lib/prepare-image';
 import { noBrowserFocusRing } from '@/lib/web-style';
 
 type Sheet =
-  'add' | 'plan' | 'wingman' | 'settings' | 'schedule' | 'pinned' | 'end' | 'block' | null;
+  | 'add'
+  | 'plan'
+  | 'wingman'
+  | 'settings'
+  | 'schedule'
+  | 'pinned'
+  | 'textTimer'
+  | 'end'
+  | 'block'
+  | null;
+
+/** A photo or video picked and waiting for its send options. */
+interface PendingMedia {
+  readonly kind: 'image' | 'video';
+  readonly media: PickedMedia;
+}
 
 const TYPING_SIGNAL_MS = 2000;
 
@@ -74,6 +99,13 @@ export default function ConversationScreen() {
   const sendText = useSendText(id);
   const sendPhoto = useSendPhoto(id);
   const sendVoice = useSendVoice(id);
+  const sendVideo = useSendVideo(id);
+  const openMedia = useOpenMedia(id);
+  const closeMedia = useCloseMedia(id);
+  const saveToVault = useSaveToVault();
+  const [pendingMedia, setPendingMedia] = useState<PendingMedia | null>(null);
+  const [viewing, setViewing] = useState<MessageView | null>(null);
+  const [textTimer, setTextTimer] = useState<number | null>(null);
   const markRead = useMarkRead(id);
   const settings = useConversationSettings(id);
   const remove = useRemoveMessage(id);
@@ -127,6 +159,7 @@ export default function ConversationScreen() {
     sendText,
     sendPhoto,
     sendVoice,
+    saveToVault,
     remove,
     report,
     plan,
@@ -156,6 +189,7 @@ export default function ConversationScreen() {
         body,
         clientId: newClientId(),
         aiAssisted,
+        ...(textTimer ? { timerSeconds: textTimer } : {}),
         ...(replyTo
           ? {
               replyToId: replyTo.id,
@@ -164,6 +198,7 @@ export default function ConversationScreen() {
           : {}),
       });
       setReplyTo(null);
+      setTextTimer(null);
     }
     setDraft('');
     setAiAssisted(false);
@@ -198,7 +233,47 @@ export default function ConversationScreen() {
     });
     const asset = result.canceled ? undefined : result.assets[0];
     if (!asset) return;
-    sendPhoto.mutate(await prepareImageForUpload(asset));
+    setPendingMedia({ kind: 'image', media: await prepareImageForUpload(asset) });
+  }
+
+  async function pickVideo() {
+    setSheet(null);
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['videos'],
+      videoMaxDuration: 30,
+      videoQuality: ImagePicker.UIImagePickerControllerQualityType.Medium,
+    });
+    const asset = result.canceled ? undefined : result.assets[0];
+    if (!asset) return;
+    setPendingMedia({
+      kind: 'video',
+      media: {
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? 'video/mp4',
+        ...(asset.file ? { file: asset.file } : {}),
+      },
+    });
+  }
+
+  function sendPending(protection: MediaProtection) {
+    if (!pendingMedia) return;
+    const mutation = pendingMedia.kind === 'video' ? sendVideo : sendPhoto;
+    mutation.mutate(
+      { media: pendingMedia.media, protection },
+      { onSuccess: () => setPendingMedia(null) },
+    );
+  }
+
+  function open(message: MessageView) {
+    setViewing(null);
+    openMedia.mutate(message.id, { onSuccess: (opened) => setViewing(opened) });
+  }
+
+  function closeViewer() {
+    // A view-once item is erased as soon as it is closed.
+    if (viewing?.viewOnce) closeMedia.mutate(viewing.id);
+    setViewing(null);
+    openMedia.reset();
   }
 
   async function startVoice() {
@@ -323,6 +398,8 @@ export default function ConversationScreen() {
             onPlan={(message, action) => plan.mutate({ messageId: message.id, action })}
             onReact={(message, emoji) => react.mutate({ messageId: message.id, emoji })}
             theme={theme}
+            onOpen={open}
+            onAllowMedia={readOnly ? null : () => settings.mutate({ mediaConsent: 'allowed' })}
           />
         )}
         onEndReached={() => {
@@ -426,7 +503,15 @@ export default function ConversationScreen() {
                 style={styles.send}
               />
             </View>
-            {sendPhoto.isPending || sendVoice.isPending ? (
+            {textTimer ? (
+              <View style={styles.contextBar}>
+                <Text variant="caption" tone="chemistryText" style={styles.grow}>
+                  Your next message disappears {timerLabel(textTimer)} after it’s read
+                </Text>
+                <Button label="Cancel" variant="quiet" onPress={() => setTextTimer(null)} />
+              </View>
+            ) : null}
+            {sendPhoto.isPending || sendVoice.isPending || sendVideo.isPending ? (
               <Text variant="caption" tone="textSecondary">
                 Sending…
               </Text>
@@ -443,6 +528,37 @@ export default function ConversationScreen() {
         onPlan={() => setSheet('plan')}
         onWingman={() => setSheet('wingman')}
         onSchedule={() => setSheet('schedule')}
+        onVideo={() => void pickVideo()}
+        onTextTimer={() => setSheet('textTimer')}
+      />
+      <TextTimerSheet
+        visible={sheet === 'textTimer'}
+        value={textTimer}
+        onClose={() => setSheet(null)}
+        onChoose={(seconds) => {
+          setTextTimer(seconds);
+          setSheet(null);
+          inputRef.current?.focus();
+        }}
+      />
+      <MediaOptionsSheet
+        kind={pendingMedia?.kind ?? null}
+        otherName={name}
+        sending={sendPhoto.isPending || sendVideo.isPending}
+        error={sendPhoto.error ?? sendVideo.error}
+        onClose={() => {
+          setPendingMedia(null);
+          sendPhoto.reset();
+          sendVideo.reset();
+        }}
+        onSend={sendPending}
+      />
+      <ProtectedViewer
+        message={viewing}
+        loading={openMedia.isPending}
+        error={openMedia.error}
+        otherName={name}
+        onClose={closeViewer}
       />
       <ScheduleSheet
         conversationId={id}
@@ -504,6 +620,9 @@ export default function ConversationScreen() {
           )
         }
         onEdit={startEdit}
+        onSave={(message) =>
+          saveToVault.mutate(message.id, { onSuccess: () => setActionsFor(null) })
+        }
         onForward={(message) => {
           setActionsFor(null);
           setForwarding(message);

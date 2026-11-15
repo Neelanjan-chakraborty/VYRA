@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { categoryListSchema, criteriaListSchema, genderIdentitySchema } from './compatibility.js';
 import { relationshipIntentSchema } from './domain.js';
 import { locationViewSchema } from './location.js';
+import { disappearSecondsSchema } from './messaging.js';
 
 const trimmed = (max: number) => z.string().trim().min(1).max(max);
 /** Optional text field: empty string or null clears it. */
@@ -44,6 +45,12 @@ export const profileUpdateSchema = z
     /** Defaults for new conversations. */
     defaultReadReceipts: z.boolean(),
     defaultSharesTyping: z.boolean(),
+    /** "ask" holds a new connection's media until you allow it. */
+    defaultMediaConsent: z.enum(['ask', 'allow']),
+    /** Blur every photo and video from others until tapped. */
+    blurIncomingMedia: z.boolean(),
+    /** Disappearing-message timer new conversations start with. */
+    defaultDisappearSeconds: disappearSecondsSchema.nullable(),
   })
   .partial();
 export type ProfileUpdate = z.input<typeof profileUpdateSchema>;
@@ -173,6 +180,9 @@ export const meSchema = z.object({
       notifyPreview: z.enum(['name', 'hidden']),
       defaultReadReceipts: z.boolean(),
       defaultSharesTyping: z.boolean(),
+      defaultMediaConsent: z.enum(['ask', 'allow']),
+      blurIncomingMedia: z.boolean(),
+      defaultDisappearSeconds: z.number().int().nullable(),
     })
     .nullable(),
   photos: z.array(photoSchema),

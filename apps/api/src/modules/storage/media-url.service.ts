@@ -4,6 +4,7 @@ import type { Env } from '../../config/env.js';
 import { hmacHex, safeEqualHex } from '../auth/crypto.js';
 
 export const MEDIA_URL_TTL_SECONDS = 10 * 60;
+const URL_STEP_SECONDS = 5 * 60;
 
 /**
  * Who a media URL was issued to. The scope is part of the signature, so a URL
@@ -14,13 +15,17 @@ export const MEDIA_URL_TTL_SECONDS = 10 * 60;
  * - `moderator`: someone reviewing it — any status.
  * - `conversation`: the other participant of a conversation — message media
  *   only, while APPROVED, not removed or reported, and nobody has blocked.
+ *   For view-once and timed media only the blurred preview.
+ * - `opened`: the recipient of view-once or timed media, issued by "open" and
+ *   valid for a minute; served only while the message is open and unexpired.
  */
-export type MediaScope = 'public' | 'owner' | 'moderator' | 'conversation';
+export type MediaScope = 'public' | 'owner' | 'moderator' | 'conversation' | 'opened';
 const SCOPE_CODES: Readonly<Record<MediaScope, string>> = {
   public: 'p',
   owner: 'o',
   moderator: 'm',
   conversation: 'c',
+  opened: 'x',
 };
 const SCOPES_BY_CODE = new Map(
   Object.entries(SCOPE_CODES).map(([scope, code]) => [code, scope as MediaScope]),
@@ -35,8 +40,21 @@ export class MediaUrlService {
     return hmacHex(this.env.MEDIA_URL_SECRET, `${key}:${scope}:${expires}`);
   }
 
-  sign(key: string, scope: MediaScope, now: number = Date.now()): string {
-    const expires = Math.floor(now / 1000) + MEDIA_URL_TTL_SECONDS;
+  sign(
+    key: string,
+    scope: MediaScope,
+    now: number = Date.now(),
+    ttlSeconds: number = MEDIA_URL_TTL_SECONDS,
+  ): string {
+    // Default-length URLs end on a five-minute boundary, so signing the same
+    // file again a moment later gives the same URL and the app's image cache
+    // (keyed by URL) is reused instead of downloading it again. They then live
+    // 10–15 minutes. Short-lived URLs ("opened") keep their exact length.
+    const raw = Math.floor(now / 1000) + ttlSeconds;
+    const expires =
+      ttlSeconds === MEDIA_URL_TTL_SECONDS
+        ? Math.ceil(raw / URL_STEP_SECONDS) * URL_STEP_SECONDS
+        : raw;
     const code = SCOPE_CODES[scope];
     return `${this.env.PUBLIC_API_URL}/v1/media/${key}?s=${code}&exp=${expires}&sig=${this.signature(key, code, expires)}`;
   }

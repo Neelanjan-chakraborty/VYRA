@@ -83,6 +83,7 @@ model User {
   pushDevices       PushDevice[]
   reactions         MessageReaction[]
   scheduledMessages ScheduledMessage[]
+  vaultItems        MediaVaultItem[]
 
   @@index([status])
   @@map("users")
@@ -160,46 +161,52 @@ model UserConsent {
 // ───────────────────────────── Profile ─────────────────────────────
 
 model UserProfile {
-  userId                String           @id @map("user_id") @db.Uuid
-  displayName           String           @map("display_name") @db.VarChar(60)
-  bio                   String?          @db.VarChar(600)
+  userId                  String           @id @map("user_id") @db.Uuid
+  displayName             String           @map("display_name") @db.VarChar(60)
+  bio                     String?          @db.VarChar(600)
   /// null = not answered. Never inferred.
-  genderIdentity        GenderIdentity?  @map("gender_identity")
+  genderIdentity          GenderIdentity?  @map("gender_identity")
   /// Kept only with SELF_DESCRIBE (CHECK constraint).
-  genderSelfDescription String?          @map("gender_self_description") @db.VarChar(40)
+  genderSelfDescription   String?          @map("gender_self_description") @db.VarChar(40)
   /// Show the gender on the profile. Private unless turned on.
-  genderVisible         Boolean          @default(false) @map("gender_visible")
+  genderVisible           Boolean          @default(false) @map("gender_visible")
   /// SELF_DESCRIBE only: searches to appear in (WOMAN, MAN, NON_BINARY).
-  discoverableAs        GenderIdentity[] @default([]) @map("discoverable_as")
-  pronouns              String?          @db.VarChar(40)
-  occupation            String?          @db.VarChar(80)
-  city                  String?          @db.VarChar(80)
+  discoverableAs          GenderIdentity[] @default([]) @map("discoverable_as")
+  pronouns                String?          @db.VarChar(40)
+  occupation              String?          @db.VarChar(80)
+  city                    String?          @db.VarChar(80)
   /// ISO 3166-1 alpha-2.
-  countryCode           String?          @map("country_code") @db.Char(2)
+  countryCode             String?          @map("country_code") @db.Char(2)
   /// Coordinates on a 0.02° grid (~2 km), used only for distance. Never returned by the API.
-  latitude              Float?
-  longitude             Float?
+  latitude                Float?
+  longitude               Float?
   /// How the location was set; null = no location.
-  locationSource        LocationSource?  @map("location_source")
+  locationSource          LocationSource?  @map("location_source")
   /// GeoNames id of a manually chosen place, e.g. "gn:1277333".
-  placeId               String?          @map("place_id") @db.VarChar(40)
+  placeId                 String?          @map("place_id") @db.VarChar(40)
   /// Admin region label of the place, e.g. "Karnataka".
-  region                String?          @db.VarChar(80)
+  region                  String?          @db.VarChar(80)
   /// Neighbourhood label typed by the person. Never used for distance.
-  area                  String?          @db.VarChar(80)
+  area                    String?          @db.VarChar(80)
   /// Last completed onboarding stage key.
-  onboardingStep        String?          @map("onboarding_step") @db.VarChar(40)
-  isDiscoverable        Boolean          @default(false) @map("is_discoverable")
+  onboardingStep          String?          @map("onboarding_step") @db.VarChar(40)
+  isDiscoverable          Boolean          @default(false) @map("is_discoverable")
   /// Push notifications for new messages and for connection requests.
-  notifyMessages        Boolean          @default(true) @map("notify_messages")
-  notifyRequests        Boolean          @default(true) @map("notify_requests")
+  notifyMessages          Boolean          @default(true) @map("notify_messages")
+  notifyRequests          Boolean          @default(true) @map("notify_requests")
   /// Notification text: "name" ("New message from Asha") or "hidden" ("New message").
-  notifyPreview         String           @default("name") @map("notify_preview") @db.VarChar(10)
+  notifyPreview           String           @default("name") @map("notify_preview") @db.VarChar(10)
   /// Defaults for new conversations; each conversation can override them.
-  defaultReadReceipts   Boolean          @default(true) @map("default_read_receipts")
-  defaultSharesTyping   Boolean          @default(true) @map("default_shares_typing")
-  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
+  defaultReadReceipts     Boolean          @default(true) @map("default_read_receipts")
+  defaultSharesTyping     Boolean          @default(true) @map("default_shares_typing")
+  /// "ask" holds a new connection's media until allowed; "allow" shows it straight away.
+  defaultMediaConsent     String           @default("ask") @map("default_media_consent") @db.VarChar(10)
+  /// Blur every photo and video from others until tapped.
+  blurIncomingMedia       Boolean          @default(false) @map("blur_incoming_media")
+  /// Disappearing-message timer new conversations start with (null = off).
+  defaultDisappearSeconds Int?             @map("default_disappear_seconds")
+  createdAt               DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt               DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -672,12 +679,14 @@ model Match {
 // ───────────────────────────── Messaging ─────────────────────────────
 
 model Conversation {
-  id            String    @id @default(uuid()) @db.Uuid
-  matchId       String    @unique @map("match_id") @db.Uuid
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
-  lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(3)
+  id               String    @id @default(uuid()) @db.Uuid
+  matchId          String    @unique @map("match_id") @db.Uuid
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastMessageAt    DateTime? @map("last_message_at") @db.Timestamptz(3)
   /// Chat theme preset both people see (design-system key). Either can change it.
-  theme         String    @default("default") @db.VarChar(20)
+  theme            String    @default("default") @db.VarChar(20)
+  /// New messages disappear this many seconds after sending (null = off). Either can set it.
+  disappearSeconds Int?      @map("disappear_seconds")
 
   match        Match                     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
@@ -689,19 +698,21 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  conversationId        String    @map("conversation_id") @db.Uuid
-  userId                String    @map("user_id") @db.Uuid
-  lastReadAt            DateTime? @map("last_read_at") @db.Timestamptz(3)
+  conversationId        String       @map("conversation_id") @db.Uuid
+  userId                String       @map("user_id") @db.Uuid
+  lastReadAt            DateTime?    @map("last_read_at") @db.Timestamptz(3)
   /// Whether this person shares read receipts in this conversation.
-  sendsReadReceipts     Boolean   @default(true) @map("sends_read_receipts")
+  sendsReadReceipts     Boolean      @default(true) @map("sends_read_receipts")
   /// Explicit opt-in for Wingman to read this conversation's recent messages.
-  wingmanContextEnabled Boolean   @default(false) @map("wingman_context_enabled")
+  wingmanContextEnabled Boolean      @default(false) @map("wingman_context_enabled")
   /// Whether the other person sees when this person is typing.
-  sharesTyping          Boolean   @default(true) @map("shares_typing")
-  mutedAt               DateTime? @map("muted_at") @db.Timestamptz(3)
+  sharesTyping          Boolean      @default(true) @map("shares_typing")
+  mutedAt               DateTime?    @map("muted_at") @db.Timestamptz(3)
   /// This person restricted the other: no notifications from them, and no read
   /// receipts or typing sent to them. The other person isn't told.
-  restricted            Boolean   @default(false)
+  restricted            Boolean      @default(false)
+  /// Whether this person sees the other's media. ASK holds it until they allow it.
+  mediaConsent          MediaConsent @default(ASK) @map("media_consent")
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -717,6 +728,13 @@ enum MessageKind {
   VOICE
   DATE_PLAN
   SYSTEM
+  VIDEO
+}
+
+/// Whether one person sees the other's photos, video and voice in a conversation.
+enum MediaConsent {
+  ASK
+  ALLOWED
 }
 
 model Message {
@@ -755,6 +773,22 @@ model Message {
   pinnedAt        DateTime?              @map("pinned_at") @db.Timestamptz(3)
   /// Forwarded by its sender from another of their conversations.
   forwarded       Boolean                @default(false)
+  /// Media the recipient can open once; erased after.
+  viewOnce        Boolean                @default(false) @map("view_once")
+  /// Media: seconds it stays after the recipient first opens it. Text: after they read it.
+  timerSeconds    Int?                   @map("timer_seconds")
+  /// When the recipient first opened protected media.
+  openedAt        DateTime?              @map("opened_at") @db.Timestamptz(3)
+  /// Erased at this time (timers, disappearing messages). The sweeper enforces it.
+  expiresAt       DateTime?              @map("expires_at") @db.Timestamptz(3)
+  /// The sender marked it sensitive: blurred until tapped, watermarked.
+  sensitive       Boolean                @default(false)
+  /// The recipient may save it to their vault (never view-once or timed media).
+  allowSave       Boolean                @default(true) @map("allow_save")
+  /// VIDEO: poster frame (AVIF).
+  mediaPosterKey  String?                @map("media_poster_key")
+  /// IMAGE and VIDEO: a tiny blurred preview shown until the media is opened.
+  mediaPreviewKey String?                @map("media_preview_key")
   createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   deletedAt       DateTime?              @map("deleted_at") @db.Timestamptz(3)
 
@@ -767,6 +801,7 @@ model Message {
   @@unique([conversationId, clientId])
   @@index([conversationId, createdAt])
   @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)], map: "messages_conversation_created_desc_idx")
+  @@index([expiresAt], map: "messages_expires_idx")
   @@map("messages")
 }
 
@@ -1046,4 +1081,25 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([action, createdAt])
   @@map("audit_logs")
+}
+
+/// A person's private copies of media: their own, or what someone let them save.
+model MediaVaultItem {
+  id              String      @id @default(uuid()) @db.Uuid
+  ownerId         String      @map("owner_id") @db.Uuid
+  kind            MessageKind
+  storageKey      String      @map("storage_key")
+  thumbKey        String?     @map("thumb_key")
+  bytes           Int
+  width           Int?
+  height          Int?
+  durationMs      Int?        @map("duration_ms")
+  sourceMessageId String?     @map("source_message_id") @db.Uuid
+  createdAt       DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, sourceMessageId])
+  @@index([ownerId, createdAt])
+  @@map("media_vault_items")
 }

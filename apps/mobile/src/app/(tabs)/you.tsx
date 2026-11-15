@@ -1,5 +1,6 @@
 import { color, radius, space } from '@vyra/design-system';
-import type { Me } from '@vyra/validation';
+import { DISAPPEAR_CHOICES, type Me } from '@vyra/validation';
+
 import { Image } from 'expo-image';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
@@ -11,12 +12,19 @@ import { Text } from '@/components/text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/notice';
+import { ChoiceChip } from '@/components/ui/choice-chip';
 import { Toggle } from '@/components/ui/toggle';
 import { signOut } from '@/features/auth/auth-api';
 import { useBlocked } from '@/features/discovery/discovery-api';
 import { usePersona } from '@/features/persona/persona-api';
 import { useDeleteAccount, useMe, useUpdateProfile } from '@/features/profile/profile-api';
 import { errorMessage } from '@/lib/api';
+
+const DISAPPEAR_WORDS: Readonly<Record<number, string>> = {
+  86_400: '24 h',
+  604_800: '7 days',
+  7_776_000: '90 days',
+};
 
 const INTENT_LABELS = {
   serious: 'Something serious',
@@ -259,6 +267,64 @@ export default function YouScreen() {
           />
         </View>
       ))}
+      {(
+        [
+          [
+            'askMedia',
+            'Ask before showing media',
+            'New connections’ photos, videos and voice notes stay hidden until you allow them.',
+            profile.defaultMediaConsent !== 'allow',
+            (value: boolean) =>
+              updateProfile.mutate({ defaultMediaConsent: value ? 'ask' : 'allow' }),
+          ],
+          [
+            'blur',
+            'Blur photos and videos',
+            'Everything from others stays blurred until you tap it.',
+            profile.blurIncomingMedia,
+            (value: boolean) => updateProfile.mutate({ blurIncomingMedia: value }),
+          ],
+        ] as const
+      ).map(([key, label, description, value, onChange]) => (
+        <View key={key} style={styles.row}>
+          <View style={styles.rowCopy}>
+            <Text variant="bodyStrong">{label}</Text>
+            <Text variant="caption" tone="textSecondary" style={styles.rowValue}>
+              {description}
+            </Text>
+          </View>
+          <Toggle
+            label={label}
+            value={value}
+            disabled={updateProfile.isPending}
+            onChange={onChange}
+          />
+        </View>
+      ))}
+      <View style={styles.row}>
+        <View style={styles.rowCopy}>
+          <Text variant="bodyStrong">Disappearing messages</Text>
+          <Text variant="caption" tone="textSecondary" style={styles.rowValue}>
+            For new conversations. If you both set one, the shorter applies.
+          </Text>
+          <View
+            style={styles.chips}
+            role="radiogroup"
+            aria-label="Disappearing messages by default"
+          >
+            {([null, ...DISAPPEAR_CHOICES] as const).map((choice) => (
+              <ChoiceChip
+                key={choice ?? 'off'}
+                label={choice === null ? 'Off' : (DISAPPEAR_WORDS[choice] ?? '')}
+                selected={profile.defaultDisappearSeconds === choice}
+                disabled={updateProfile.isPending}
+                onPress={() => updateProfile.mutate({ defaultDisappearSeconds: choice })}
+              />
+            ))}
+          </View>
+        </View>
+      </View>
+      <LinkRow label="Your vault" value="Photos and videos you kept" href="/settings/vault" />
       <ErrorNotice
         message={updateProfile.isError ? errorMessage(updateProfile.error) : undefined}
       />
@@ -326,6 +392,7 @@ const styles = StyleSheet.create({
   },
   rowCopy: { flex: 1, paddingRight: space.l },
   rowValue: { marginTop: space.xxs },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, marginTop: space.s },
   accountActions: { marginTop: space.l, gap: space.s },
   sheetBody: { marginBottom: space.l },
   sheetActions: { gap: space.m },

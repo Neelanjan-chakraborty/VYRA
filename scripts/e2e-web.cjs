@@ -672,6 +672,20 @@ async function main() {
         reject(new Error(`gateway closed ${event.code}`)),
       );
     });
+    const kabirSendsPhoto = async (fields = {}) => {
+      const form = new FormData();
+      form.append('kind', 'image');
+      form.append('clientId', require('node:crypto').randomUUID());
+      for (const [key, value] of Object.entries(fields)) form.append(key, value);
+      form.append('file', new Blob([fs.readFileSync(photoPath)], { type: 'image/png' }), 'p.png');
+      const response = await fetch(`${API}/conversations/${conversationId}/media`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${token}` },
+        body: form,
+      });
+      if (!response.ok) throw new Error(`photo upload: ${response.status}`);
+      return response.json();
+    };
     const kabirSays = (body) =>
       call(
         `/conversations/${conversationId}/messages`,
@@ -710,6 +724,13 @@ async function main() {
       const chooser = page.waitForEvent('filechooser');
       await button('Photo').click();
       await (await chooser).setFiles(photoPath);
+      // Send options: view once, timer, sensitive, saving. Defaults here.
+      await page.getByRole('dialog', { name: 'Send photo' }).waitFor();
+      await snap('media-options');
+      await page
+        .getByRole('dialog', { name: 'Send photo' })
+        .getByRole('button', { name: 'Send', exact: true })
+        .click();
       await page.getByRole('img', { name: 'Photo you sent' }).waitFor({ timeout: 15000 });
       await page.getByText('Photo being checked').waitFor({ state: 'detached', timeout: 30000 });
 
@@ -794,8 +815,45 @@ async function main() {
       await page.getByText('Waiting to send').waitFor({ state: 'detached', timeout: 10000 });
       await page.mouse.click(195, 60);
 
+      // Kabir's media waits until Asha allows it; then a view-once photo, opened once.
+      await kabirSendsPhoto();
+      await page.getByText(`${kabir} sent a photo.`).waitFor({ timeout: 10000 });
+      await snap('media-held');
+      await button(`Allow media from ${kabir}`).click();
+      await page
+        .getByRole('img', { name: `Photo from ${kabir}` })
+        .first()
+        .waitFor({ timeout: 30000 });
+      // Kabir let it be saved (the default), so Asha keeps his photo in her vault.
+      await page
+        .getByRole('img', { name: `Photo from ${kabir}` })
+        .first()
+        .click({ delay: 900 });
+      await page.getByRole('dialog', { name: 'Message' }).first().waitFor({ timeout: 10000 });
+      await button('Save to your vault').click();
+      await button('Save to your vault').waitFor({ state: 'detached' });
+      await kabirSendsPhoto({ viewOnce: 'true' });
+      await button('Photo · view once').waitFor({ timeout: 30000 });
+      await snap('view-once-closed');
+      await button('Photo · view once').click();
+      await page.getByText('This is removed for both of you when you close it.').waitFor();
+      await snap('view-once-open');
+      await button('Close').click();
+      await page.getByText('Opened', { exact: true }).waitFor({ timeout: 10000 });
+
+      // After closing the viewer, long-press still works.
+      await hold('Saturday works for me!');
+      await page.getByRole('dialog', { name: 'Your message' }).first().waitFor({ timeout: 10000 });
+      await page.keyboard.press('Escape');
+      await page
+        .getByRole('dialog', { name: 'Your message' })
+        .first()
+        .waitFor({ state: 'detached' });
+
       // Privacy settings for this conversation.
       await button('Conversation settings').click();
+      await page.getByRole('radio', { name: '24 h' }).click();
+      await page.getByRole('radio', { name: '24 h', checked: true }).waitFor({ timeout: 10000 });
       await page.getByRole('radio', { name: 'Dusk' }).click();
       await page.getByRole('radio', { name: 'Dusk', checked: true }).waitFor({ timeout: 10000 });
       await page.getByRole('switch', { name: 'Read receipts', checked: true }).click();
@@ -805,6 +863,9 @@ async function main() {
       await page.keyboard.press('Escape');
       await page.getByText('Conversation settings', { exact: true }).waitFor({ state: 'detached' });
       await snap('conversation-theme');
+      await page
+        .getByText('You turned on disappearing messages: new messages go after 24 hours')
+        .waitFor({ timeout: 10000 });
 
       // Back in the list; a new message shows a quiet dot, not a count.
       await button('Back').click();
@@ -816,6 +877,11 @@ async function main() {
       await page.getByRole('link', { name: new RegExp(`^${kabir}, new message`) }).waitFor();
       await snap('messages-list');
       await page.getByRole('tab', { name: 'You' }).click();
+      await page.getByRole('link', { name: /^Your vault/ }).click();
+      await heading('Your vault').waitFor();
+      await page.getByRole('button', { name: /^Photo saved/ }).waitFor({ timeout: 10000 });
+      await snap('vault');
+      await button('Back').click();
     } finally {
       kabirSocket.close();
     }

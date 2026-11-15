@@ -102,6 +102,9 @@ export class MeService {
         notifyPreview: profile.notifyPreview === 'hidden' ? 'hidden' : 'name',
         defaultReadReceipts: profile.defaultReadReceipts,
         defaultSharesTyping: profile.defaultSharesTyping,
+        defaultMediaConsent: profile.defaultMediaConsent === 'allow' ? 'allow' : 'ask',
+        blurIncomingMedia: profile.blurIncomingMedia,
+        defaultDisappearSeconds: profile.defaultDisappearSeconds,
       },
       photos,
       relationshipIntents: user.relationshipIntents.map((intent) => ({

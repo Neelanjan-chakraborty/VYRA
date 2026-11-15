@@ -1,6 +1,6 @@
 import { color, easing, radius, resolveDuration, space } from '@vyra/design-system';
 import { type ReactNode, useEffect } from 'react';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -18,7 +18,10 @@ interface BottomSheetProps {
   readonly children: ReactNode;
 }
 
-/** Modal sheet for a focused decision. Slides up; fades only under reduced motion. */
+/**
+ * Modal sheet for a focused decision. Slides up; fades only under reduced
+ * motion. Never taller than 90 % of the screen: longer content scrolls.
+ */
 export function BottomSheet({ visible, title, onClose, children }: BottomSheetProps) {
   const insets = useSafeAreaInsets();
   const reduceMotion = useReducedMotion();
@@ -47,7 +50,7 @@ export function BottomSheet({ visible, title, onClose, children }: BottomSheetPr
       <View style={styles.root}>
         <Pressable style={styles.scrim} onPress={onClose} aria-label="Close" role="button" />
         <Animated.View
-          style={[styles.sheet, { paddingBottom: insets.bottom + space.xl }, sheetStyle]}
+          style={[styles.sheet, sheetStyle]}
           role="dialog"
           aria-modal
           aria-label={title}
@@ -56,7 +59,14 @@ export function BottomSheet({ visible, title, onClose, children }: BottomSheetPr
           <Text variant="displayM" style={styles.title} accessibilityRole="header">
             {title}
           </Text>
-          {children}
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={{ paddingBottom: insets.bottom + space.xl }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>
@@ -81,8 +91,10 @@ const styles = StyleSheet.create({
     paddingTop: space.m,
     width: '100%',
     maxWidth: 560,
+    maxHeight: '90%',
     alignSelf: 'center',
   },
+  scroll: { flexGrow: 0 },
   handle: {
     alignSelf: 'center',
     width: 36,

@@ -33,8 +33,11 @@ Primary region should be in India for the first market (latency and data-residen
 - Secrets come from the platform's secret manager; nothing is baked into images.
 - `NODE_ENV=production` (JSON logs, OpenAPI UI disabled), `CORS_ORIGINS` set explicitly.
 - The API refuses to start without the Rust engine addon (`ENGINE_IMPL=native` is required).
-- `ffmpeg` and `ffprobe` with libopus in the API image (voice notes), or `FFMPEG_PATH` /
-  `FFPROBE_PATH` pointing at them.
+- `ffmpeg` and `ffprobe` with libopus, libx264 and AAC in the API image (voice notes and
+  video messages), or `FFMPEG_PATH` / `FFPROBE_PATH` pointing at them. Video transcoding runs in
+  the worker one clip at a time; give the worker CPU for it.
+- A font package (for example `fonts-dejavu-core`) in the API image: recipient watermarks are
+  drawn as text by sharp/librsvg and come out blank without fonts.
 - The realtime gateway gets `DATABASE_URL` (a read-only role is enough), `REDIS_URL`,
   `JWT_ACCESS_SECRET` (same as the API), `CORS_ORIGINS`, and `RUST_LOG`; idle timeout on the load
   balancer above the 25 s heartbeat.

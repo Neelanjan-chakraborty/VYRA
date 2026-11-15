@@ -56,7 +56,15 @@ export class WingmanService {
       this.compatibility.reasonsFor(userId, access.otherId),
       useMessages
         ? this.prisma.message.findMany({
-            where: { conversationId, kind: 'TEXT', deletedAt: null, reportedAt: null },
+            // Never self-destructing text, nor anything past its time.
+            where: {
+              conversationId,
+              kind: 'TEXT',
+              deletedAt: null,
+              reportedAt: null,
+              timerSeconds: null,
+              OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+            },
             orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
             take: WINGMAN_CONTEXT_MESSAGES,
             select: { senderId: true, body: true },

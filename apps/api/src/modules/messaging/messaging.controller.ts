@@ -28,9 +28,11 @@ import {
   scheduleMessageSchema,
   type ScheduledList,
   type ScheduledMessageView,
+  type VaultItem,
+  type VaultList,
+  VIDEO_MAX_BYTES,
   type ConversationSummary,
   markReadSchema,
-  MESSAGE_PHOTO_MAX_BYTES,
   mediaMessageSchema,
   type MessagePage,
   MESSAGES_PAGE_SIZE,
@@ -44,9 +46,11 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { getRequestId } from '../../common/request-id.middleware.js';
 import { type AuthContext, CurrentUser } from '../auth/auth.decorators.js';
+import { EphemeralService } from './ephemeral.service.js';
 import { MessageActionsService } from './message-actions.service.js';
 import { MessageMediaService } from './message-media.service.js';
 import { MessagingService } from './messaging.service.js';
+import { VaultService } from './vault.service.js';
 import { WingmanService } from './wingman.service.js';
 import { NotificationService } from './notification.service.js';
 
@@ -67,6 +71,8 @@ export class MessagingController {
     private readonly mediaMessages: MessageMediaService,
     private readonly wingman: WingmanService,
     private readonly actions: MessageActionsService,
+    private readonly ephemeral: EphemeralService,
+    private readonly vault: VaultService,
   ) {}
 
   @Get('conversations')
@@ -108,11 +114,10 @@ export class MessagingController {
   @Throttle({ default: { limit: 20, ttl: 60_000 } })
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
-    summary: 'Send a photo (checked before the other person sees it) or a voice note (≤ 60 s)',
+    summary:
+      'Send a photo or video (checked before the other person sees it) or a voice note. Optional view once, timer, sensitive, allowSave',
   })
-  @UseInterceptors(
-    FileInterceptor('file', { limits: { fileSize: MESSAGE_PHOTO_MAX_BYTES, files: 1 } }),
-  )
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: VIDEO_MAX_BYTES, files: 1 } }))
   sendMedia(
     @CurrentUser() user: AuthContext,
     @Param('id', { schema: id }) conversationId: string,
@@ -120,15 +125,21 @@ export class MessagingController {
     @UploadedFile() file: Express.Multer.File | undefined,
   ): Promise<MessageView> {
     if (!file) throw new BadRequestException('Attach the file in the "file" field.');
-    return body.kind === 'image'
-      ? this.mediaMessages.sendPhoto(user.userId, conversationId, body.clientId, file)
-      : this.mediaMessages.sendVoice(
+    switch (body.kind) {
+      case 'image':
+        return this.mediaMessages.sendPhoto(user.userId, conversationId, body.clientId, file, body);
+      case 'video':
+        return this.mediaMessages.sendVideo(user.userId, conversationId, body.clientId, file, body);
+      case 'voice':
+        return this.mediaMessages.sendVoice(
           user.userId,
           conversationId,
           body.clientId,
           file,
           body.durationMs,
+          body,
         );
+    }
   }
 
   @Post('conversations/:id/read')
@@ -276,6 +287,52 @@ export class MessagingController {
     @Param('id', { schema: id }) scheduledId: string,
   ): Promise<void> {
     await this.actions.cancel(user.userId, scheduledId);
+  }
+
+  @Post('messages/:id/open')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 30, ttl: 60_000 } })
+  @ApiOperation({
+    summary: 'Open view-once or timed media: returns one-minute URLs. View once works once',
+  })
+  open(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+  ): Promise<MessageView> {
+    return this.ephemeral.open(user.userId, messageId);
+  }
+
+  @Post('messages/:id/close')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Closed a view-once item: it is erased now' })
+  async close(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+  ): Promise<void> {
+    await this.ephemeral.close(user.userId, messageId);
+  }
+
+  @Post('messages/:id/save')
+  @ApiOperation({ summary: 'Keep a photo or video in your private vault (if allowed)' })
+  save(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+  ): Promise<VaultItem> {
+    return this.vault.save(user.userId, messageId);
+  }
+
+  @Get('me/vault')
+  vaultList(@CurrentUser() user: AuthContext): Promise<VaultList> {
+    return this.vault.list(user.userId);
+  }
+
+  @Delete('me/vault/:id')
+  @HttpCode(204)
+  async vaultRemove(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) itemId: string,
+  ): Promise<void> {
+    await this.vault.remove(user.userId, itemId);
   }
 
   @Put('me/push-devices')

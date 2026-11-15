@@ -8,6 +8,8 @@ export const PERSONA_QUEUE = 'persona';
 export const PHOTO_MODERATION_QUEUE = 'photo-moderation';
 export const LEARNING_QUEUE = 'learning';
 export const SCHEDULED_MESSAGES_QUEUE = 'scheduled-messages';
+export const VIDEO_QUEUE = 'video';
+export const EPHEMERAL_QUEUE = 'ephemeral';
 
 /** BullMQ takes connection options rather than a URL. */
 export function redisConnection(url: string): ConnectionOptions {
@@ -41,6 +43,8 @@ export function redisConnection(url: string): ConnectionOptions {
       { name: PHOTO_MODERATION_QUEUE },
       { name: LEARNING_QUEUE },
       { name: SCHEDULED_MESSAGES_QUEUE },
+      { name: VIDEO_QUEUE },
+      { name: EPHEMERAL_QUEUE },
     ),
   ],
   exports: [BullModule],

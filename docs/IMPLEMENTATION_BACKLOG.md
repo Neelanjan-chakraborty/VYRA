@@ -79,8 +79,10 @@ library) · advanced scenarios.
 Phase A ✅: replies, reactions, pins, edits (15 min), forwarding (own text only), scheduled
 messages, chat themes, restrict, privacy defaults, hidden notification previews.
 
-Next: B — video messages, view once, timed media and text, disappearing messages, blur,
-recipient watermark, media consent, private vault · C — screen-capture protection, screenshot
+Phase B ✅: video messages, view once, timed media and text, disappearing messages, blur,
+recipient watermark (protected media), media consent (ask first), private vault.
+
+Next: C — screen-capture protection (and a biometric lock for the vault), screenshot
 notes, locked conversations, secure cache · D — Deep Talk, shared-interest prompts, insights,
 translation, availability overlap, date check-ins, temporary location · E — spam and abuse
 rules. Not this round: group chats, calls, end-to-end encryption.

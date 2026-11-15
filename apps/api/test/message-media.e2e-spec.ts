@@ -87,6 +87,13 @@ describe('Photos, voice notes, reports and Wingman in conversations (e2e)', () =
       (await http().get('/v1/connections').set(a.auth)).body,
     ).mutual[0]?.conversationId;
     if (!conversationId) throw new Error('no conversation');
+    // New conversations ask before showing media; these tests are about delivery itself.
+    for (const user of [a, b])
+      await http()
+        .patch(`/v1/conversations/${conversationId}/settings`)
+        .set(user.auth)
+        .send({ mediaConsent: 'allowed' })
+        .expect(200);
     return { a, b, conversationId };
   }
   const page = async (user: TestUser, conversationId: string) =>

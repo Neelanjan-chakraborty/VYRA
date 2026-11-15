@@ -12,6 +12,8 @@ import {
   type Reaction,
   scheduledListSchema,
   scheduledMessageSchema,
+  vaultItemSchema,
+  vaultListSchema,
   type WingmanPurpose,
   wingmanSuggestionsSchema,
 } from '@vyra/validation';
@@ -93,6 +95,17 @@ function pendingMessage(
     plan: null,
     event: null,
     theme: null,
+    disappearSeconds: null,
+    removedReason: null,
+    viewOnce: false,
+    timerSeconds: null,
+    sensitive: false,
+    savable: false,
+    blurred: false,
+    held: false,
+    openable: false,
+    openedAt: null,
+    expiresAt: null,
     read: false,
     replyTo: null,
     reactions: [],
@@ -116,6 +129,7 @@ export function useSendText(conversationId: string) {
       aiAssisted?: boolean;
       replyToId?: string;
       replyTo?: MessageView['replyTo'];
+      timerSeconds?: number;
     }) =>
       api(`/conversations/${conversationId}/messages`, {
         method: 'POST',
@@ -170,15 +184,119 @@ function mediaForm(
   return form;
 }
 
+/** What a sender can put on a photo or video. */
+export interface MediaProtection {
+  readonly viewOnce: boolean;
+  /** Seconds after opening; not with view once. */
+  readonly timerSeconds: number | null;
+  readonly sensitive: boolean;
+  readonly allowSave: boolean;
+}
+
+export const NO_PROTECTION: MediaProtection = {
+  viewOnce: false,
+  timerSeconds: null,
+  sensitive: false,
+  allowSave: true,
+};
+
+function protectionFields(p: MediaProtection): Record<string, string> {
+  return {
+    viewOnce: String(p.viewOnce),
+    sensitive: String(p.sensitive),
+    allowSave: String(p.allowSave),
+    ...(p.timerSeconds && !p.viewOnce ? { timerSeconds: String(p.timerSeconds) } : {}),
+  };
+}
+
 export function useSendPhoto(conversationId: string) {
   return useMutation({
-    mutationFn: (image: PickedMedia) =>
+    mutationFn: ({
+      media,
+      protection = NO_PROTECTION,
+    }: {
+      media: PickedMedia;
+      protection?: MediaProtection;
+    }) =>
       api(`/conversations/${conversationId}/media`, {
         method: 'POST',
-        body: mediaForm(image, { kind: 'image', clientId: newClientId() }, 'photo.jpg'),
+        body: mediaForm(
+          media,
+          { kind: 'image', clientId: newClientId(), ...protectionFields(protection) },
+          'photo.jpg',
+        ),
         schema: messageSchema,
       }),
     onSettled: () => refreshConversation(conversationId),
+  });
+}
+
+/** Up to 30 seconds; the server transcodes and checks it before the other person sees it. */
+export function useSendVideo(conversationId: string) {
+  return useMutation({
+    mutationFn: ({
+      media,
+      protection = NO_PROTECTION,
+    }: {
+      media: PickedMedia;
+      protection?: MediaProtection;
+    }) =>
+      api(`/conversations/${conversationId}/media`, {
+        method: 'POST',
+        body: mediaForm(
+          media,
+          { kind: 'video', clientId: newClientId(), ...protectionFields(protection) },
+          media.mimeType?.includes('webm')
+            ? 'video.webm'
+            : media.mimeType?.includes('quicktime')
+              ? 'video.mov'
+              : 'video.mp4',
+        ),
+        schema: messageSchema,
+      }),
+    onSettled: () => refreshConversation(conversationId),
+  });
+}
+
+/** View-once or timed media: one-minute URLs, and the timer starts. */
+export function useOpenMedia(conversationId: string) {
+  return useMutation({
+    mutationFn: (messageId: string) =>
+      api(`/messages/${messageId}/open`, { method: 'POST', schema: messageSchema }),
+    onSettled: () => refreshConversation(conversationId),
+  });
+}
+
+/** Closing a view-once item erases it at once. */
+export function useCloseMedia(conversationId: string) {
+  return useMutation({
+    mutationFn: (messageId: string) => api(`/messages/${messageId}/close`, { method: 'POST' }),
+    onSettled: () => refreshConversation(conversationId),
+  });
+}
+
+export const VAULT_KEY = ['vault'] as const;
+
+export function useVault() {
+  return useQuery({
+    queryKey: VAULT_KEY,
+    queryFn: () => api('/me/vault', { schema: vaultListSchema }),
+    staleTime: 3 * 60_000,
+  });
+}
+
+export function useSaveToVault() {
+  return useMutation({
+    mutationFn: (messageId: string) =>
+      api(`/messages/${messageId}/save`, { method: 'POST', schema: vaultItemSchema }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: VAULT_KEY }),
+  });
+}
+
+export function useRemoveFromVault() {
+  return useMutation({
+    mutationFn: (itemId: string) => api(`/me/vault/${itemId}`, { method: 'DELETE' }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: VAULT_KEY }),
   });
 }
 
