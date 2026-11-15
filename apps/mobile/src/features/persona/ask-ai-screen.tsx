@@ -20,6 +20,7 @@ import { ErrorNotice } from '@/components/ui/notice';
 import { SelectRow } from '@/components/ui/select-row';
 import { TextField } from '@/components/ui/text-field';
 import { errorMessage } from '@/lib/api';
+import { type OpenedVia, openAssistantWithPrompt } from './open-assistant';
 import { hasConsent, useAssistantReflection, useConsents, useSetConsent } from './persona-api';
 
 const CODE_FONT = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' });
@@ -39,6 +40,7 @@ export function AskAiScreen({ mode }: { readonly mode: 'onboarding' | 'settings'
   const [stage, setStage] = useState<Stage>('pick');
   const [assistant, setAssistant] = useState<AssistantId | null>(null);
   const [copied, setCopied] = useState(false);
+  const [openedVia, setOpenedVia] = useState<OpenedVia | null>(null);
   const [showPrompt, setShowPrompt] = useState(false);
   const [reply, setReply] = useState('');
   const [agree, setAgree] = useState(false);
@@ -51,12 +53,11 @@ export function AskAiScreen({ mode }: { readonly mode: 'onboarding' | 'settings'
     setCopied(true);
   }
 
-  /** Copies the questions, then opens the assistant with them pre-filled where it can. */
+  /** Copies the questions, then opens the app if it's installed, else the website. */
   async function openWithQuestions() {
     if (!assistant) return;
     await copyPrompt();
-    const url = assistantPromptUrl(assistant, prompt);
-    if (url) await Linking.openURL(url);
+    setOpenedVia(await openAssistantWithPrompt(assistant, prompt));
   }
 
   async function pasteFromClipboard() {
@@ -140,7 +141,11 @@ export function AskAiScreen({ mode }: { readonly mode: 'onboarding' | 'settings'
               onPress={() => void openWithQuestions()}
             />
             <Text variant="caption" tone="textSecondary">
-              The questions are copied too. If they don’t appear in the message box, paste them.
+              {openedVia === 'app'
+                ? `Sent to the ${info.name} app. If the questions aren’t in the message box, paste them: they’re copied.`
+                : openedVia === 'web'
+                  ? `Opened ${info.name} in your browser. If the questions aren’t in the message box, paste them: they’re copied.`
+                  : `Opens the ${info.name} app if you have it, otherwise its website. The questions are copied too.`}
             </Text>
           </>
         ) : info.url ? (
