@@ -44,3 +44,5 @@ next-env.d.ts
 # Rust
 /target/
 *.node
+packages/engine-native/binding.cjs
+packages/engine-native/binding.d.ts

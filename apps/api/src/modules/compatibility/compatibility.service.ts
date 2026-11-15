@@ -1,14 +1,8 @@
-import { ConflictException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { ConflictException, Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
-  ENGINE_VERSION,
   failsMustHaves,
   type Person,
-  highlights,
-  ineligibility,
-  rankWithDiversity,
-  score,
   sharedInterestLabels,
-  type Ranked,
   type Weights,
 } from '@vyra/compatibility-engine';
 import {
@@ -28,6 +22,7 @@ import {
 } from '@vyra/validation';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { Prisma } from '../../generated/prisma/client.js';
+import { ENGINE, type Engine } from './engine.js';
 import { MediaUrlService } from '../storage/media-url.service.js';
 import { type LoadedPerson, PeopleService } from './people.service.js';
 
@@ -47,6 +42,7 @@ export class CompatibilityService {
     private readonly prisma: PrismaService,
     private readonly people: PeopleService,
     private readonly media: MediaUrlService,
+    @Inject(ENGINE) private readonly engine: Engine,
   ) {}
 
   /** The active, validated weight set. Cached briefly; a bad row fails loudly. */
@@ -71,14 +67,14 @@ export class CompatibilityService {
     if (!pair) throw new NotFoundException(NOT_FOUND);
     const { viewer, target } = pair;
 
-    const result = score(viewer.person, target.person, weights, version);
+    const result = this.engine.score(viewer.person, target.person, weights, version);
     await this.persist(viewer, target, result);
     await this.prisma.discoveryEvent.create({
       data: {
         userId: viewerId,
         targetUserId: targetId,
         type: 'COMPATIBILITY_VIEWED',
-        context: { engineVersion: ENGINE_VERSION, weightsVersion: version },
+        context: { engineVersion: this.engine.version, weightsVersion: version },
       },
     });
     return { userId: targetId, result };
@@ -97,8 +93,11 @@ export class CompatibilityService {
     const viewer = loaded.get(viewerId);
     const target = loaded.get(targetId);
     if (!viewer || !target) return { highlights: [], sharedInterests: [] };
-    const result = score(viewer.person, target.person, weights, version);
-    return { highlights: highlights(result, weights), sharedInterests: result.sharedInterests };
+    const result = this.engine.score(viewer.person, target.person, weights, version);
+    return {
+      highlights: this.engine.highlights(result, weights),
+      sharedInterests: result.sharedInterests,
+    };
   }
 
   /** Another person's profile as the viewer may see it. Same visibility rules as `forPair`. */
@@ -144,7 +143,7 @@ export class CompatibilityService {
     for (const id of ids) {
       const target = loaded.get(id);
       if (!target?.reachable) continue;
-      const result = score(viewer.person, target.person, weights, version);
+      const result = this.engine.score(viewer.person, target.person, weights, version);
       out.set(id, {
         userId: id,
         displayName: target.displayName,
@@ -176,9 +175,12 @@ export class CompatibilityService {
       },
     };
     const loaded = await this.people.load(await this.candidatePool(viewerId, viewer, IMPACT_POOL));
-    const base = [...loaded.values()].filter(
-      (c) => c.eligible && ineligibility(withoutMust, c.person) === null,
+    const pool = [...loaded.values()].filter((c) => c.eligible);
+    const gates = this.engine.ineligibilityMany(
+      withoutMust,
+      pool.map((c) => c.person),
     );
+    const base = pool.filter((_, i) => gates[i] === null);
     const kept = base.filter((c) => failsMustHaves(viewer.person, c.person) === null);
     const musts = viewer.person.preferences.criteria.filter((c) => c.mode === 'must');
     return {
@@ -202,16 +204,23 @@ export class CompatibilityService {
 
     const ids = await this.candidatePool(viewerId, viewer);
     const loaded = await this.people.load(ids);
-    const scored: Ranked<LoadedPerson>[] = [];
-    for (const id of ids) {
+    const candidates = ids.flatMap((id) => {
       const candidate = loaded.get(id);
-      if (!candidate?.eligible || ineligibility(viewer.person, candidate.person) !== null) continue;
-      scored.push({
-        item: candidate,
-        result: score(viewer.person, candidate.person, weights, version),
+      return candidate?.eligible ? [candidate] : [];
+    });
+    // One call into the engine: gates both ways, scores, ranks, explains the top `limit`.
+    const ranked = this.engine
+      .recommend(
+        viewer.person,
+        candidates.map((c) => c.person),
+        weights,
+        version,
+        limit,
+      )
+      .flatMap(({ index, result, highlights }) => {
+        const item = candidates[index];
+        return item ? [{ item, result, highlights }] : [];
       });
-    }
-    const ranked = rankWithDiversity(scored, weights, (c) => c.person.id).slice(0, limit);
 
     await Promise.all(ranked.map(({ item, result }) => this.persist(viewer, item, result)));
     if (ranked.length > 0) {
@@ -223,7 +232,7 @@ export class CompatibilityService {
           context: {
             surface: 'recommendations',
             rank,
-            engineVersion: ENGINE_VERSION,
+            engineVersion: this.engine.version,
             weightsVersion: version,
           },
         })),
@@ -231,10 +240,10 @@ export class CompatibilityService {
     }
 
     return {
-      engineVersion: ENGINE_VERSION,
+      engineVersion: this.engine.version,
       weightsVersion: version,
       distanceFilter: distanceFilterStatus(viewer),
-      recommendations: ranked.map(({ item, result }): Recommendation => ({
+      recommendations: ranked.map(({ item, result, highlights }): Recommendation => ({
         userId: item.person.id,
         displayName: item.displayName,
         age: item.person.age,
@@ -244,7 +253,7 @@ export class CompatibilityService {
         overall: result.overall,
         confidence: result.confidence,
         sufficiency: result.sufficiency,
-        highlights: highlights(result, weights),
+        highlights,
         sharedInterests: result.sharedInterests,
       })),
     };

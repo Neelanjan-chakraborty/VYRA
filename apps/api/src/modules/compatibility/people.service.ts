@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { ineligibility, type Person } from '@vyra/compatibility-engine';
+import { Inject, Injectable } from '@nestjs/common';
+import type { Person } from '@vyra/compatibility-engine';
 import {
   ageInYears,
   criteriaListSchema,
@@ -12,6 +12,7 @@ import {
 } from '@vyra/validation';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { RelationshipIntentKind } from '../../generated/prisma/client.js';
+import { ENGINE, type Engine } from './engine.js';
 
 const INTENT_FROM_DB: Readonly<Record<RelationshipIntentKind, RelationshipIntent>> = {
   SERIOUS: 'serious',
@@ -67,7 +68,10 @@ export interface LoadedPerson {
  */
 @Injectable()
 export class PeopleService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(ENGINE) private readonly engine: Engine,
+  ) {}
 
   async load(ids: readonly string[]): Promise<Map<string, LoadedPerson>> {
     if (ids.length === 0) return new Map();
@@ -194,7 +198,7 @@ export class PeopleService {
     const target = loaded.get(targetId);
     if (!viewer || !target || !target.reachable) return null;
     if (await this.isBlocked(viewerId, targetId)) return null;
-    if (target.eligible && ineligibility(viewer.person, target.person) === null)
+    if (target.eligible && this.engine.ineligibility(viewer.person, target.person) === null)
       return { viewer, target };
     return (await this.hasActiveTie(viewerId, targetId)) ? { viewer, target } : null;
   }

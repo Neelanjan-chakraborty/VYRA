@@ -5,6 +5,7 @@ import {
 } from '@vyra/validation';
 import request from 'supertest';
 import { PrismaService } from '../src/database/prisma.service.js';
+import { ENGINE, type Engine } from '../src/modules/compatibility/engine.js';
 import { createTestApp, registerUser, type TestApp, type TestUser } from './support/app.js';
 import { createPerson, QUIET_HOMEBODY, SOCIAL_PLANNER } from './support/people.js';
 
@@ -21,6 +22,11 @@ describe('Compatibility and recommendations (e2e)', () => {
     // Earlier suites leave many active people behind; hide them so this
     // suite's rankings are about the people it creates.
     await prisma.userProfile.updateMany({ data: { isDiscoverable: false } });
+  });
+
+  it('runs on the Rust engine', () => {
+    // The TypeScript engine is only a reference and a development fallback.
+    expect(app.get<Engine>(ENGINE).impl).toBe('native');
   });
   afterAll(async () => {
     await app.close();

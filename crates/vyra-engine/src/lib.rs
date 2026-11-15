@@ -57,3 +57,56 @@ pub fn score_many(
         })
         .collect()
 }
+
+/// One recommended candidate, in ranked order.
+#[derive(Debug, Clone, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Recommended {
+    /// Index into the candidates passed in.
+    pub index: usize,
+    pub result: CompatibilityResult,
+    pub highlights: Vec<String>,
+}
+
+/// The whole recommendation step in one call: gate both ways, score, rank with
+/// diversity and explain, returning only the top `limit` — so callers across a
+/// language boundary never ship results they will throw away.
+pub fn recommend(
+    viewer: &Person,
+    candidates: &[Person],
+    weights: &Weights,
+    weights_version: &str,
+    limit: usize,
+) -> Vec<Recommended> {
+    let mut eligible: Vec<(usize, CompatibilityResult)> = Vec::new();
+    for (index, candidate) in candidates.iter().enumerate() {
+        if ineligibility(viewer, candidate).is_none() {
+            eligible.push((index, score(viewer, candidate, weights, weights_version)));
+        }
+    }
+    let keyed: Vec<(String, CompatibilityResult)> = eligible
+        .iter()
+        .map(|(index, result)| (candidates[*index].id.clone(), result.clone()))
+        .collect();
+    rank_with_diversity(&keyed, weights)
+        .into_iter()
+        .take(limit)
+        .map(|position| {
+            let (index, result) = eligible[position].clone();
+            let highlights = highlights(&result, weights, 3);
+            Recommended {
+                index,
+                result,
+                highlights,
+            }
+        })
+        .collect()
+}
+
+/// Gate reasons for many candidates at once (None = eligible).
+pub fn ineligibility_many(viewer: &Person, candidates: &[Person]) -> Vec<Option<&'static str>> {
+    candidates
+        .iter()
+        .map(|candidate| ineligibility(viewer, candidate))
+        .collect()
+}

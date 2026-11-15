@@ -5,12 +5,52 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 /// A persona attribute value: a 0–1 scale, an option, or a list of options.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize)]
 #[serde(untagged)]
 pub enum TraitValue {
     Number(f64),
     Text(String),
     List(Vec<String>),
+}
+
+/// Hand-written instead of `#[serde(untagged)]`, which buffers every value
+/// before trying each variant; this reads the JSON once.
+impl<'de> Deserialize<'de> for TraitValue {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Visitor;
+        impl<'de> serde::de::Visitor<'de> for Visitor {
+            type Value = TraitValue;
+            fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                f.write_str("a number, a string or a list of strings")
+            }
+            fn visit_f64<E>(self, v: f64) -> Result<TraitValue, E> {
+                Ok(TraitValue::Number(v))
+            }
+            fn visit_u64<E>(self, v: u64) -> Result<TraitValue, E> {
+                Ok(TraitValue::Number(v as f64))
+            }
+            fn visit_i64<E>(self, v: i64) -> Result<TraitValue, E> {
+                Ok(TraitValue::Number(v as f64))
+            }
+            fn visit_str<E>(self, v: &str) -> Result<TraitValue, E> {
+                Ok(TraitValue::Text(v.to_string()))
+            }
+            fn visit_string<E>(self, v: String) -> Result<TraitValue, E> {
+                Ok(TraitValue::Text(v))
+            }
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut seq: A,
+            ) -> Result<TraitValue, A::Error> {
+                let mut list = Vec::with_capacity(seq.size_hint().unwrap_or(0));
+                while let Some(item) = seq.next_element::<String>()? {
+                    list.push(item);
+                }
+                Ok(TraitValue::List(list))
+            }
+        }
+        deserializer.deserialize_any(Visitor)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]

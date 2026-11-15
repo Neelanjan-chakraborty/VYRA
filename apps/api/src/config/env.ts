@@ -52,6 +52,11 @@ export const envSchema = z
     RUN_QUEUE_WORKERS: z.enum(['true', 'false']).default('true'),
     /** nsfwjs = open-source classifier (default); manual = every photo to a person; mock = tests only. */
     PHOTO_MODERATION_PROVIDER: z.enum(['nsfwjs', 'manual', 'mock']).default('nsfwjs'),
+    /**
+     * native = the Rust engine (crates/vyra-engine) in-process; ts = the TypeScript
+     * reference. Production requires native.
+     */
+    ENGINE_IMPL: z.enum(['native', 'ts']).default('native'),
     /** log = record that a push would be sent (dev/test); expo = Expo's push service. */
     PUSH_PROVIDER: z.enum(['log', 'expo']).default('log'),
   })

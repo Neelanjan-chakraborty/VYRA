@@ -34,6 +34,7 @@
     "@socket.io/redis-adapter": "^8.3.0",
     "@tensorflow/tfjs": "^4.22.0",
     "@vyra/compatibility-engine": "workspace:*",
+    "@vyra/engine-native": "workspace:*",
     "@vyra/validation": "workspace:*",
     "bullmq": "^6.7.6",
     "dotenv": "^18.0.10",

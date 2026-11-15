@@ -1,0 +1,39 @@
+{
+  "name": "@vyra/engine-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The Rust compatibility engine (crates/vyra-engine) as an in-process Node.js addon.",
+  "type": "module",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./index.d.ts",
+      "default": "./index.js"
+    }
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "binding.cjs",
+    "*.node"
+  ],
+  "scripts": {
+    "build": "napi build --platform --release --manifest-path ../../crates/vyra-engine-node/Cargo.toml --output-dir . --js binding.cjs --dts binding.d.ts",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@napi-rs/cli": "^3.10.12",
+    "vitest": "^5.1.0"
+  },
+  "napi": {
+    "binaryName": "vyra-engine",
+    "targets": [
+      "x86_64-unknown-linux-gnu"
+    ]
+  },
+  "dependencies": {
+    "@vyra/compatibility-engine": "workspace:*",
+    "@vyra/validation": "workspace:*"
+  }
+}
