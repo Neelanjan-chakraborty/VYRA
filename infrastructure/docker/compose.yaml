@@ -25,5 +25,24 @@ services:
       interval: 5s
       timeout: 3s
       retries: 10
+  # The Rust realtime gateway. Usually run with `pnpm dev:realtime` instead;
+  # start this with `docker compose --profile realtime up` to run it in a container.
+  realtime:
+    profiles: ['realtime']
+    build:
+      context: ../..
+      dockerfile: crates/vyra-realtime/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://vyra:vyra@postgres:5432/vyra_dev
+      REDIS_URL: redis://redis:6379
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET to the API's value}
+      CORS_ORIGINS: http://localhost:8081,http://localhost:8099
+    ports:
+      - '4001:4001'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
 volumes:
   postgres-data:

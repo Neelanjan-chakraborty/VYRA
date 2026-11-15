@@ -57,6 +57,11 @@ export const envSchema = z
      * reference. Production requires native.
      */
     ENGINE_IMPL: z.enum(['native', 'ts']).default('native'),
+    /** Redis namespace shared with the realtime gateway ("vyra-test" is forced in tests). */
+    REALTIME_NAMESPACE: z
+      .string()
+      .regex(/^[\w-]{1,40}$/)
+      .default('vyra'),
     /** Weight learning refuses to propose anything from fewer decisions than this. */
     LEARNING_MIN_SAMPLES: z.coerce.number().int().min(10).default(500),
     LEARNING_MIN_PER_CLASS: z.coerce.number().int().min(5).default(50),

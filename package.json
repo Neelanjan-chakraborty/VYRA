@@ -26,7 +26,8 @@
     "e2e:web": "node scripts/e2e-web.cjs",
     "engine:catalogue": "node scripts/engine-catalogue.mjs",
     "engine:fixtures": "node scripts/engine-fixtures.mjs",
-    "rust:check": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
+    "rust:check": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace",
+    "dev:realtime": "cd apps/api && cargo run --manifest-path ../../Cargo.toml -p vyra-realtime"
   },
   "devDependencies": {
     "oxlint": "^1.93.0",

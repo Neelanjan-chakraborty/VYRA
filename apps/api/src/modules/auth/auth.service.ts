@@ -21,6 +21,7 @@ import type { Env } from '../../config/env.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { AuditService } from '../audit/audit.service.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 import { hmacHex, randomOtp, randomToken, safeEqualHex, sha256Hex } from './crypto.js';
 import { OTP_SENDER, type OtpSender } from './otp-sender.js';
 import { TokenService } from './token.service.js';
@@ -59,6 +60,7 @@ export class AuthService {
     private readonly prisma: PrismaService,
     private readonly tokens: TokenService,
     private readonly audit: AuditService,
+    private readonly realtime: RealtimeService,
   ) {}
 
   private destinationHash(contact: Contact): string {
@@ -252,6 +254,7 @@ export class AuthService {
       where: { id: sessionId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    this.realtime.disconnectSession(sessionId);
   }
 
   async revokeAllSessions(userId: string): Promise<void> {
@@ -259,6 +262,7 @@ export class AuthService {
       where: { userId, revokedAt: null },
       data: { revokedAt: new Date() },
     });
+    this.realtime.disconnectUsers([userId]);
   }
 
   private async startSession(userId: string, context: RequestContext): Promise<AuthTokens> {

@@ -1,11 +1,16 @@
 import { conversationChangedEventSchema, SOCKET_EVENTS, typingEventSchema } from '@vyra/validation';
 import { useEffect } from 'react';
-import { io, type Socket } from 'socket.io-client';
 import { create } from 'zustand';
 import { API_BASE_URL, refreshSession } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import { useSession } from '@/lib/session';
+import { GatewayClient } from './gateway-client';
 import { CONVERSATIONS_KEY, messagesKey } from './messaging-api';
+
+/** The Rust realtime gateway (crates/vyra-realtime). */
+const REALTIME_URL =
+  process.env.EXPO_PUBLIC_REALTIME_URL ??
+  `${API_BASE_URL.replace(/^http/, 'ws').replace(/:4000$/, ':4001')}/v1/realtime`;
 
 /** How long "typing…" stays up after the last signal. */
 const TYPING_VISIBLE_MS = 4000;
@@ -35,11 +40,11 @@ const useTypingStore = create<TypingState>((set, get) => ({
   },
 }));
 
-let socket: Socket | null = null;
+let client: GatewayClient | null = null;
 
-/** Tells the other person you're typing, if you share that. The server decides. */
+/** Tells the other person you're typing, if you share that. The gateway decides. */
 export function sendTyping(conversationId: string): void {
-  socket?.emit(SOCKET_EVENTS.typing, { conversationId });
+  client?.send({ t: 'typing', c: conversationId });
 }
 
 /** True for a few seconds after the other person typed. */
@@ -61,39 +66,35 @@ export function useRealtime(): void {
   const accessToken = useSession((s) => s.accessToken);
   useEffect(() => {
     if (!accessToken) return undefined;
-    const current = io(API_BASE_URL, {
-      path: '/v1/socket',
-      transports: ['websocket'],
-      auth: { token: accessToken },
-      reconnectionDelayMax: 10_000,
+    const current = new GatewayClient(REALTIME_URL, accessToken, {
+      onReady: refreshPeopleLists, // catch up on anything missed while disconnected
+      onUnauthorized: () => void refreshSession(), // a new token starts a new client
+      onEvent(name, payload) {
+        if (name === SOCKET_EVENTS.conversationChanged) {
+          const event = conversationChangedEventSchema.safeParse(payload);
+          if (!event.success) return;
+          void queryClient.invalidateQueries({ queryKey: messagesKey(event.data.conversationId) });
+          void queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY });
+          // Their new message ends "typing…" (your own message doesn't).
+          const me = queryClient.getQueryData<{ id: string }>(['me'])?.id;
+          if (
+            event.data.reason === 'message' &&
+            event.data.by !== undefined &&
+            event.data.by !== me
+          )
+            useTypingStore.getState().clear(event.data.conversationId);
+        } else if (name === SOCKET_EVENTS.typing) {
+          const event = typingEventSchema.safeParse(payload);
+          if (event.success) useTypingStore.getState().mark(event.data.conversationId);
+        } else if (name === SOCKET_EVENTS.listChanged) {
+          refreshPeopleLists();
+        }
+      },
     });
-    socket = current;
-    current.on(SOCKET_EVENTS.conversationChanged, (payload: unknown) => {
-      const event = conversationChangedEventSchema.safeParse(payload);
-      if (!event.success) return;
-      void queryClient.invalidateQueries({ queryKey: messagesKey(event.data.conversationId) });
-      void queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY });
-      // A new message ends "typing…".
-      if (event.data.reason === 'message')
-        useTypingStore.getState().clear(event.data.conversationId);
-    });
-    current.on(SOCKET_EVENTS.typing, (payload: unknown) => {
-      const event = typingEventSchema.safeParse(payload);
-      if (event.success) useTypingStore.getState().mark(event.data.conversationId);
-    });
-    current.on(SOCKET_EVENTS.listChanged, refreshPeopleLists);
-    // Catch up on anything missed while disconnected.
-    current.on('connect', refreshPeopleLists);
-    current.on('connect_error', (error: Error) => {
-      // An expired access token: refreshing it changes accessToken and reconnects.
-      if (error.message === 'unauthorized') {
-        current.disconnect();
-        void refreshSession();
-      }
-    });
+    client = current;
     return () => {
-      current.disconnect();
-      if (socket === current) socket = null;
+      current.stop();
+      if (client === current) client = null;
     };
   }, [accessToken]);
 }

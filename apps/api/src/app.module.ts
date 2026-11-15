@@ -20,6 +20,7 @@ import { MeModule } from './modules/me/me.module.js';
 import { MessagingModule } from './modules/messaging/messaging.module.js';
 import { ModerationModule } from './modules/moderation/moderation.module.js';
 import { PersonaModule } from './modules/persona/persona.module.js';
+import { RealtimeModule } from './modules/realtime/realtime.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
 import { QueueModule } from './queue/queue.module.js';
 import { RedisModule } from './redis/redis.module.js';
@@ -53,6 +54,7 @@ import { SafetyModule } from './modules/safety/safety.module.js';
     PersonaModule,
     CompatibilityModule,
     ConnectionsModule,
+    RealtimeModule,
     MessagingModule,
     LearningModule,
     SafetyModule,

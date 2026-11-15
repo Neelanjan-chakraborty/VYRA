@@ -7,6 +7,8 @@ export default defineConfig({
     root: './',
     include: ['test/**/*.e2e-spec.ts'],
     fileParallelism: false,
+    // Builds and runs the Rust realtime gateway (crates/vyra-realtime).
+    globalSetup: ['./test/support/realtime-gateway.ts'],
     // Deterministic photo moderation: approves unless a test says otherwise.
     // The real classifier is exercised by src/modules/moderation/*.spec.ts.
     env: { PHOTO_MODERATION_PROVIDER: 'mock' },

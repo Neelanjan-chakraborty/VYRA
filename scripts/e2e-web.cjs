@@ -655,17 +655,22 @@ async function main() {
 
   await step('messaging: text, live reply, read, photo, voice, date idea, Wingman', async () => {
     const { name: kabir, token } = kabirForMessages;
-    const { io } = require(require.resolve('socket.io-client', { paths: ['apps/mobile'] }));
+    const msgpack = require(require.resolve('@msgpack/msgpack', { paths: ['apps/mobile'] }));
     const [conversation] = (await call('/conversations', null, token, 'GET')).conversations;
     const conversationId = conversation.id;
-    const kabirSocket = io('http://localhost:4000', {
-      path: '/v1/socket',
-      transports: ['websocket'],
-      auth: { token },
-    });
+    // Kabir connects to the Rust gateway the way the app does: WebSocket + MessagePack.
+    const kabirSocket = new WebSocket('ws://localhost:4001/v1/realtime');
+    kabirSocket.binaryType = 'arraybuffer';
     await new Promise((resolve, reject) => {
-      kabirSocket.on('connect', resolve);
-      kabirSocket.on('connect_error', reject);
+      kabirSocket.addEventListener('open', () =>
+        kabirSocket.send(msgpack.encode({ t: 'auth', token })),
+      );
+      kabirSocket.addEventListener('message', (event) => {
+        if (msgpack.decode(new Uint8Array(event.data)).t === 'ready') resolve();
+      });
+      kabirSocket.addEventListener('close', (event) =>
+        reject(new Error(`gateway closed ${event.code}`)),
+      );
     });
     const kabirSays = (body) =>
       call(
@@ -686,7 +691,7 @@ async function main() {
       await page.getByLabel('Message', { exact: true }).fill('Hi Kabir! Chai sounds good.');
       await button('Send').click();
       await page.getByText('Hi Kabir! Chai sounds good.', { exact: true }).waitFor();
-      kabirSocket.emit('typing', { conversationId });
+      kabirSocket.send(msgpack.encode({ t: 'typing', c: conversationId }));
       await page.getByText('typing…', { exact: true }).waitFor({ timeout: 5000 });
       await snap('conversation-typing');
       await kabirSays('Great — Saturday?');
@@ -767,7 +772,7 @@ async function main() {
       await snap('messages-list');
       await page.getByRole('tab', { name: 'You' }).click();
     } finally {
-      kabirSocket.disconnect();
+      kabirSocket.close();
     }
   });
 

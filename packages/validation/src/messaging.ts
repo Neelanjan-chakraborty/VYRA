@@ -170,6 +170,8 @@ export const SOCKET_EVENTS = {
 export const conversationChangedEventSchema = z.object({
   conversationId: z.uuid(),
   reason: z.enum(['message', 'removed', 'read', 'media', 'plan', 'ended']),
+  /** Who caused it (an id only), so an app can tell its own actions from the other person's. */
+  by: z.uuid().optional(),
 });
 export type ConversationChangedEvent = z.infer<typeof conversationChangedEventSchema>;
 export const typingEventSchema = z.object({ conversationId: z.uuid() });

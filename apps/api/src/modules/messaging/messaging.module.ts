@@ -8,8 +8,6 @@ import { MessagingController } from './messaging.controller.js';
 import { MessagingService } from './messaging.service.js';
 import { NotificationService } from './notification.service.js';
 import { ExpoPushProvider, LogPushProvider, PUSH_PROVIDER } from './push-provider.js';
-import { RealtimeGateway } from './realtime.gateway.js';
-import { RealtimeService } from './realtime.service.js';
 import { WingmanService } from './wingman.service.js';
 
 @Module({
@@ -19,8 +17,6 @@ import { WingmanService } from './wingman.service.js';
     MessagingService,
     MessageMediaService,
     NotificationService,
-    RealtimeService,
-    RealtimeGateway,
     WingmanService,
     {
       provide: PUSH_PROVIDER,
@@ -29,6 +25,6 @@ import { WingmanService } from './wingman.service.js';
         env.PUSH_PROVIDER === 'expo' ? new ExpoPushProvider() : new LogPushProvider(),
     },
   ],
-  exports: [MessagingService, NotificationService, RealtimeService],
+  exports: [MessagingService, NotificationService],
 })
 export class MessagingModule {}

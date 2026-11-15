@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { PUSH_PROVIDER, type PushProvider } from './push-provider.js';
-import { RealtimeService } from './realtime.service.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 
 export type NotificationKind = 'message' | 'request' | 'connected';
 

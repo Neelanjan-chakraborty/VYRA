@@ -19,7 +19,7 @@ import { PeopleService } from '../compatibility/people.service.js';
 import { MediaUrlService } from '../storage/media-url.service.js';
 import { OBJECT_STORAGE, type ObjectStorage } from '../storage/storage.js';
 import { NotificationService } from './notification.service.js';
-import { RealtimeService } from './realtime.service.js';
+import { RealtimeService } from '../realtime/realtime.service.js';
 
 const NOT_FOUND = 'Not found.';
 const PREVIEW_LENGTH = 80;
@@ -136,7 +136,11 @@ export class MessagingService {
 
   /** Tells both participants' apps that something changed. Ids only. */
   changed(access: ConversationAccess, userId: string, reason: ConversationChangedEvent['reason']) {
-    const event: ConversationChangedEvent = { conversationId: access.conversationId, reason };
+    const event: ConversationChangedEvent = {
+      conversationId: access.conversationId,
+      reason,
+      by: userId,
+    };
     this.realtime.emit([userId, access.otherId], SOCKET_EVENTS.conversationChanged, event);
   }
 
@@ -520,19 +524,6 @@ export class MessagingService {
     });
     this.changed(access, userId, 'plan');
     return this.view(updated, access, userId);
-  }
-
-  // ─────────────────────────── typing ───────────────────────────
-
-  /** Relays "typing" to the other participant if this person shares it. */
-  async relayTyping(userId: string, conversationId: string): Promise<void> {
-    try {
-      const access = await this.writable(userId, conversationId);
-      if (!access.me.sharesTyping) return;
-      this.realtime.emit([access.otherId], SOCKET_EVENTS.typing, { conversationId });
-    } catch {
-      // Not a participant, ended or blocked: say nothing.
-    }
   }
 
   /** Called when a connection ends or someone blocks: both apps refresh. */

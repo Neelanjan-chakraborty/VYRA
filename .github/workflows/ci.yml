@@ -44,6 +44,11 @@ jobs:
       NODE_ENV: test
     steps:
       - uses: actions/checkout@v4
+      # The matchmaking engine (native addon) and the realtime gateway are Rust.
+      - uses: dtolnay/rust-toolchain@1.97
+        with:
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -52,6 +57,10 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm format:check
       - run: pnpm lint
+      - name: Rust format, lints and tests (engine parity, learning, gateway)
+        run: pnpm rust:check
+      - name: Engine fixtures and catalogue are current
+        run: pnpm --filter @vyra/validation --filter @vyra/compatibility-engine build && pnpm engine:catalogue --check && pnpm engine:fixtures --check
       - run: pnpm db:deploy
       - name: Schema matches migrations
         run: pnpm --filter @vyra/api exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code
