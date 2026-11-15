@@ -1,5 +1,5 @@
-import { color, MIN_TOUCH_TARGET, radius, space, typography } from '@vyra/design-system';
-import { MESSAGE_BODY_MAX, type MessageView } from '@vyra/validation';
+import { color, space } from '@vyra/design-system';
+import type { MessageView } from '@vyra/validation';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
@@ -7,20 +7,27 @@ import {
   ActivityIndicator,
   FlatList,
   KeyboardAvoidingView,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   Platform,
   Pressable,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
+import { useReducedMotion } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Circle, Path } from 'react-native-svg';
 import { Text } from '@/components/text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
 import { ErrorNotice } from '@/components/ui/notice';
 import { useBlock, useEndConnection, useRelationship } from '@/features/discovery/discovery-api';
-import { PersonAvatar } from '@/features/discovery/person-avatar';
+import { ChatComposer } from '@/features/messaging/chat-composer';
+import { ChatDateSeparator, ChatNewSeparator } from '@/features/messaging/chat-date-separator';
+import { ChatEmpty } from '@/features/messaging/chat-empty';
+import { ChatHeader } from '@/features/messaging/chat-header';
+import { ChatIcon } from '@/features/messaging/chat-icons';
+import { ChatSkeleton } from '@/features/messaging/chat-skeleton';
 import {
   AddSheet,
   ForwardSheet,
@@ -57,13 +64,13 @@ import {
   type MediaProtection,
   type PickedMedia,
 } from '@/features/messaging/messaging-api';
-import { timerLabel } from '@/features/messaging/media-views';
+import { PinnedBanner } from '@/features/messaging/pinned-banner';
 import { ProtectedViewer } from '@/features/messaging/protected-viewer';
 import { sendTyping, useIsTyping } from '@/features/messaging/realtime';
-import { clock, useVoiceRecorder } from '@/features/messaging/voice';
+import { buildChatRows, type ChatRow } from '@/features/messaging/chat-timeline';
+import { useVoiceRecorder } from '@/features/messaging/voice';
 import { errorMessage } from '@/lib/api';
 import { prepareImageForUpload } from '@/lib/prepare-image';
-import { noBrowserFocusRing } from '@/lib/web-style';
 
 type Sheet =
   | 'add'
@@ -84,12 +91,15 @@ interface PendingMedia {
 }
 
 const TYPING_SIGNAL_MS = 2000;
+const NEAR_BOTTOM_PX = 72;
 
 /** A conversation between two mutual connections. */
 export default function ConversationScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const reduceMotion = useReducedMotion();
+  const listRef = useRef<FlatList<ChatRow>>(null);
   const conversation = useConversation(id);
   const summary = conversation.data;
   // Set as soon as a block is confirmed, so nothing re-fetches a conversation that is now hidden.
@@ -127,31 +137,63 @@ export default function ConversationScreen() {
   const [replyTo, setReplyTo] = useState<MessageView | null>(null);
   const [editing, setEditing] = useState<MessageView | null>(null);
   const [forwarding, setForwarding] = useState<MessageView | null>(null);
+  const [awayCount, setAwayCount] = useState(0);
+  const [newSinceId, setNewSinceId] = useState<string | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const lastTyping = useRef(0);
   const lastRead = useRef<string | null>(null);
+  const newestTheirId = useRef<string | null>(null);
+  const nearBottom = useRef(true);
 
   const list = useMemo(
     () => messages.data?.pages.flatMap((page) => page.messages) ?? [],
     [messages.data],
   );
-  const pendingIds = new Set(
-    sendText.isPending && sendText.variables ? [sendText.variables.clientId] : [],
+  const pendingIds = useMemo(
+    () => new Set(sendText.isPending && sendText.variables ? [sendText.variables.clientId] : []),
+    [sendText.isPending, sendText.variables],
+  );
+  const rows = useMemo(
+    () => buildChatRows(list, { newSinceId, pendingIds }),
+    [list, newSinceId, pendingIds],
   );
 
-  // Reading the newest message from them marks the conversation read.
+  // Seeing the newest message from them marks the conversation read. A reader
+  // who is up the history has not seen it yet.
   const newestTheirs = list.find((m) => !m.mine && m.kind !== 'system');
   useEffect(() => {
-    if (!newestTheirs || lastRead.current === newestTheirs.id) return;
+    if (!atBottom || !newestTheirs || lastRead.current === newestTheirs.id) return;
     lastRead.current = newestTheirs.id;
     markRead.mutate(newestTheirs.id);
-  }, [newestTheirs, markRead]);
+  }, [atBottom, newestTheirs, markRead]);
 
   // Stop recording at the one-minute limit and send what there is.
   useEffect(() => {
     if (recorder.atLimit) void finishVoice();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only when the limit is reached
   }, [recorder.atLimit]);
+
+  // If something arrives while the reader is up the history, leave a marker.
+  useEffect(() => {
+    const newest = list.find((m) => !m.mine && m.kind !== 'system');
+    if (!newest) return;
+    const previous = newestTheirId.current;
+    if (!previous) {
+      newestTheirId.current = newest.id;
+      return;
+    }
+    if (previous === newest.id) return;
+    const index = list.findIndex((m) => m.id === previous);
+    const fresh =
+      index > 0 ? list.slice(0, index).filter((m) => !m.mine && m.kind !== 'system') : [];
+    newestTheirId.current = newest.id;
+    if (fresh.length === 0 || nearBottom.current) return;
+    const oldestFresh = fresh[fresh.length - 1];
+    if (!oldestFresh) return;
+    setNewSinceId(oldestFresh.id);
+    setAwayCount((count) => count + fresh.length);
+  }, [list]);
 
   const name = summary?.person.displayName ?? '';
   const readOnly = summary?.readOnly ?? false;
@@ -286,6 +328,23 @@ export default function ConversationScreen() {
     if (recording) sendVoice.mutate(recording);
   }
 
+  function jumpToLatest() {
+    listRef.current?.scrollToOffset({ offset: 0, animated: !reduceMotion });
+    nearBottom.current = true;
+    setAtBottom(true);
+    setAwayCount(0);
+    setNewSinceId(null);
+  }
+
+  function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    const nextAtBottom = event.nativeEvent.contentOffset.y <= NEAR_BOTTOM_PX;
+    nearBottom.current = nextAtBottom;
+    setAtBottom((current) => (current === nextAtBottom ? current : nextAtBottom));
+    if (!nextAtBottom) return;
+    setAwayCount((count) => (count === 0 ? count : 0));
+    setNewSinceId((current) => (current === null ? current : null));
+  }
+
   if (conversation.isPending) {
     return (
       <View style={styles.center}>
@@ -305,114 +364,113 @@ export default function ConversationScreen() {
   const matchId = relationship.data?.matchId ?? null;
   const theme = summary.settings.theme;
   const pinnedMessages = pinned.data?.messages ?? [];
-  const firstPinned = pinnedMessages[0];
+  const sending =
+    sendText.isPending || sendPhoto.isPending || sendVoice.isPending || sendVideo.isPending;
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <View style={[styles.header, { paddingTop: insets.top + space.s }]}>
-        <Pressable
-          role="button"
-          aria-label="Back"
-          onPress={() => router.back()}
-          hitSlop={12}
-          style={styles.icon}
-        >
-          <Svg width={24} height={24} viewBox="0 0 24 24">
-            <Path
-              d="M14.5 5.5L8 12l6.5 6.5"
-              stroke={color.textPrimary}
-              strokeWidth={1.6}
-              fill="none"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </Svg>
-        </Pressable>
-        <Pressable
-          role="link"
-          aria-label={`${name}. View profile`}
-          onPress={() => router.push(`/person/${summary.person.userId}`)}
-          style={styles.who}
-        >
-          <PersonAvatar name={name} photoUrl={summary.person.photoUrl} size={36} round />
-          <View style={styles.whoCopy}>
-            <Text variant="title" numberOfLines={1} accessibilityRole="header">
-              {name}
-            </Text>
-            <Text variant="caption" tone={typing ? 'chemistryText' : 'textSecondary'}>
-              {readOnly ? 'Connection ended' : typing ? 'typing…' : (summary.person.city ?? ' ')}
-            </Text>
-          </View>
-        </Pressable>
-        <Pressable
-          role="button"
-          aria-label="Conversation settings"
-          onPress={() => setSheet('settings')}
-          hitSlop={12}
-          style={styles.icon}
-        >
-          <Svg width={24} height={24} viewBox="0 0 24 24">
-            {[6, 12, 18].map((cx) => (
-              <Circle key={cx} cx={cx} cy={12} r={1.6} fill={color.textPrimary} />
-            ))}
-          </Svg>
-        </Pressable>
-      </View>
-
-      {firstPinned ? (
-        <Pressable
-          role="button"
-          aria-label={`${pinnedMessages.length} pinned. Show pinned messages`}
-          onPress={() => setSheet('pinned')}
-          style={styles.pinnedBar}
-        >
-          <Text variant="eyebrow" tone="chemistryText">
-            Pinned{pinnedMessages.length > 1 ? ` · ${pinnedMessages.length}` : ''}
-          </Text>
-          <Text variant="caption" numberOfLines={1} style={styles.grow}>
-            {firstPinned.body ??
-              (firstPinned.kind === 'image'
-                ? 'Photo'
-                : firstPinned.kind === 'voice'
-                  ? 'Voice note'
-                  : 'Date idea')}
-          </Text>
-        </Pressable>
-      ) : null}
-
-      <FlatList
-        inverted
-        data={list}
-        keyExtractor={(m) => m.id}
-        contentContainerStyle={styles.list}
-        renderItem={({ item }) => (
-          <MessageBubble
-            message={item}
-            otherName={name}
-            pending={pendingIds.has(item.id)}
-            canAct={!readOnly}
-            onActions={setActionsFor}
-            onPlan={(message, action) => plan.mutate({ messageId: message.id, action })}
-            onReact={(message, emoji) => react.mutate({ messageId: message.id, emoji })}
-            theme={theme}
-            onOpen={open}
-            onAllowMedia={readOnly ? null : () => settings.mutate({ mediaConsent: 'allowed' })}
-          />
-        )}
-        onEndReached={() => {
-          if (messages.hasNextPage && !messages.isFetchingNextPage) void messages.fetchNextPage();
-        }}
-        onEndReachedThreshold={0.4}
-        ListFooterComponent={
-          messages.isPending || messages.isFetchingNextPage ? (
-            <ActivityIndicator color={color.textSecondary} style={styles.gap} />
-          ) : undefined
-        }
-        aria-label={`Conversation with ${name}`}
+      <ChatHeader
+        name={name}
+        photoUrl={summary.person.photoUrl}
+        city={summary.person.city}
+        typing={typing}
+        readOnly={readOnly}
+        onBack={() => router.back()}
+        onProfile={() => router.push(`/person/${summary.person.userId}`)}
+        onSettings={() => setSheet('settings')}
       />
+
+      <PinnedBanner messages={pinnedMessages} onPress={() => setSheet('pinned')} />
+
+      <View style={styles.listWrap}>
+        {messages.isPending && list.length === 0 ? <ChatSkeleton /> : null}
+
+        {!messages.isPending && messages.isError && list.length === 0 ? (
+          <View style={styles.statePanel}>
+            <ErrorNotice message={errorMessage(messages.error)} />
+            <Button label="Try again" variant="secondary" onPress={() => void messages.refetch()} />
+          </View>
+        ) : null}
+
+        {!messages.isPending && !messages.isError && list.length === 0 ? (
+          <ChatEmpty
+            name={name}
+            photoUrl={summary.person.photoUrl}
+            onStarter={(text) => {
+              setDraft(text);
+              inputRef.current?.focus();
+            }}
+          />
+        ) : null}
+
+        {list.length > 0 ? (
+          <FlatList
+            ref={listRef}
+            inverted
+            data={rows}
+            keyExtractor={(row) => row.message.id}
+            contentContainerStyle={styles.list}
+            scrollEventThrottle={16}
+            onScroll={onScroll}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            initialNumToRender={14}
+            renderItem={({ item }) => (
+              <View>
+                {item.showDate ? <ChatDateSeparator iso={item.message.createdAt} /> : null}
+                {item.showNew ? <ChatNewSeparator /> : null}
+                <MessageBubble
+                  message={item.message}
+                  otherName={name}
+                  otherPhotoUrl={summary.person.photoUrl}
+                  pending={pendingIds.has(item.message.id)}
+                  canAct={!readOnly}
+                  onActions={setActionsFor}
+                  onPlan={(message, action) => plan.mutate({ messageId: message.id, action })}
+                  onReact={(message, emoji) => react.mutate({ messageId: message.id, emoji })}
+                  theme={theme}
+                  firstOfGroup={item.firstOfGroup}
+                  lastOfGroup={item.lastOfGroup}
+                  showAvatar={item.showAvatar}
+                  showMeta={item.showMeta}
+                  onOpen={open}
+                  onAllowMedia={
+                    readOnly ? null : () => settings.mutate({ mediaConsent: 'allowed' })
+                  }
+                />
+              </View>
+            )}
+            onEndReached={() => {
+              if (messages.hasNextPage && !messages.isFetchingNextPage)
+                void messages.fetchNextPage();
+            }}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={
+              messages.isFetchingNextPage ? (
+                <ActivityIndicator color={color.textSecondary} style={styles.gap} />
+              ) : undefined
+            }
+            aria-label={`Conversation with ${name}`}
+          />
+        ) : null}
+
+        {awayCount > 0 ? (
+          <Pressable
+            role="button"
+            aria-label="Jump to latest messages"
+            onPress={jumpToLatest}
+            style={({ pressed }) => [styles.jump, pressed && styles.jumpPressed]}
+          >
+            <ChatIcon name="chevronDown" color={color.textPrimary} size={16} />
+            <Text variant="captionStrong">
+              {awayCount === 1 ? 'New message' : `${awayCount} new messages`}
+            </Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {error ? (
         <View style={styles.errorBar}>
@@ -420,105 +478,26 @@ export default function ConversationScreen() {
         </View>
       ) : null}
 
-      <View style={[styles.composer, { paddingBottom: insets.bottom + space.s }]}>
-        {readOnly ? (
-          <Text tone="textSecondary" style={styles.readOnly}>
-            This connection has ended. You can read the conversation, but not send messages.
-          </Text>
-        ) : recorder.recording ? (
-          <View style={styles.composerRow}>
-            <View style={styles.recordingDot} />
-            <Text style={styles.grow} role="timer" aria-live="polite">
-              Recording {clock(recorder.elapsedMs)} / 1:00
-            </Text>
-            <Button label="Cancel" variant="quiet" onPress={() => void recorder.cancel()} />
-            <Button label="Send voice note" onPress={() => void finishVoice()} />
-          </View>
-        ) : (
-          <>
-            {recorder.denied ? (
-              <Text variant="caption" tone="textSecondary">
-                Microphone access is off. Turn it on in your device settings to send voice notes.
-              </Text>
-            ) : null}
-            {replyTo || editing ? (
-              <View style={styles.contextBar}>
-                <View style={styles.grow}>
-                  <Text variant="caption" tone="chemistryText">
-                    {editing
-                      ? 'Editing your message'
-                      : `Replying to ${replyTo?.mine ? 'yourself' : name}`}
-                  </Text>
-                  {replyTo ? (
-                    <Text variant="caption" tone="textSecondary" numberOfLines={1}>
-                      {replyTo.body ??
-                        (replyTo.kind === 'image'
-                          ? 'Photo'
-                          : replyTo.kind === 'voice'
-                            ? 'Voice note'
-                            : 'Date idea')}
-                    </Text>
-                  ) : null}
-                </View>
-                <Button label="Cancel" variant="quiet" onPress={stopComposing} />
-              </View>
-            ) : null}
-            {aiAssisted ? (
-              <Text variant="caption" tone="textSecondary">
-                Wingman’s idea — make it yours before sending.
-              </Text>
-            ) : null}
-            <View style={styles.composerRow}>
-              <Pressable
-                role="button"
-                aria-label="Add a photo, voice note, date idea or ask Wingman"
-                onPress={() => setSheet('add')}
-                style={styles.add}
-              >
-                <Svg width={22} height={22} viewBox="0 0 24 24">
-                  <Path
-                    d="M12 5v14M5 12h14"
-                    stroke={color.textPrimary}
-                    strokeWidth={1.6}
-                    strokeLinecap="round"
-                  />
-                </Svg>
-              </Pressable>
-              <TextInput
-                ref={inputRef}
-                value={draft}
-                onChangeText={onChangeDraft}
-                placeholder="Write a message"
-                placeholderTextColor={color.textDisabled}
-                selectionColor={color.accent}
-                multiline
-                maxLength={MESSAGE_BODY_MAX}
-                aria-label="Message"
-                style={[styles.input, noBrowserFocusRing]}
-              />
-              <Button
-                label={editing ? 'Save' : 'Send'}
-                disabled={draft.trim().length === 0}
-                onPress={send}
-                style={styles.send}
-              />
-            </View>
-            {textTimer ? (
-              <View style={styles.contextBar}>
-                <Text variant="caption" tone="chemistryText" style={styles.grow}>
-                  Your next message disappears {timerLabel(textTimer)} after it’s read
-                </Text>
-                <Button label="Cancel" variant="quiet" onPress={() => setTextTimer(null)} />
-              </View>
-            ) : null}
-            {sendPhoto.isPending || sendVoice.isPending || sendVideo.isPending ? (
-              <Text variant="caption" tone="textSecondary">
-                Sending…
-              </Text>
-            ) : null}
-          </>
-        )}
-      </View>
+      <ChatComposer
+        draft={draft}
+        onChangeDraft={onChangeDraft}
+        onSend={send}
+        onAdd={() => setSheet('add')}
+        inputRef={inputRef}
+        otherName={name}
+        editing={editing}
+        replyTo={replyTo}
+        aiAssisted={aiAssisted}
+        readOnly={readOnly}
+        sending={sending}
+        recorder={recorder}
+        onFinishVoice={() => void finishVoice()}
+        onCancelVoice={() => void recorder.cancel()}
+        onStopComposing={stopComposing}
+        textTimer={textTimer}
+        onClearTextTimer={() => setTextTimer(null)}
+        bottomInset={insets.bottom}
+      />
 
       <AddSheet
         visible={sheet === 'add'}
@@ -590,6 +569,7 @@ export default function ConversationScreen() {
         onChoose={(text) => {
           setDraft(text);
           setAiAssisted(true);
+          inputRef.current?.focus();
         }}
       />
       <SettingsSheet
@@ -698,80 +678,42 @@ const styles = StyleSheet.create({
     backgroundColor: color.background,
   },
   gap: { marginTop: space.l },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.s,
-    paddingHorizontal: space.l,
-    paddingBottom: space.s,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: color.border,
-  },
-  icon: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  who: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.m },
-  whoCopy: { flex: 1 },
+  listWrap: { flex: 1, position: 'relative' },
   list: {
     paddingHorizontal: space.l,
     paddingVertical: space.l,
     width: '100%',
-    maxWidth: 680,
+    maxWidth: 720,
     alignSelf: 'center',
   },
-  errorBar: { paddingHorizontal: space.l },
-  composer: {
-    paddingHorizontal: space.l,
-    paddingTop: space.s,
-    gap: space.xs,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: color.border,
-  },
-  composerRow: { flexDirection: 'row', alignItems: 'flex-end', gap: space.s },
-  add: {
-    width: MIN_TOUCH_TARGET,
-    height: MIN_TOUCH_TARGET,
-    borderRadius: MIN_TOUCH_TARGET / 2,
-    borderWidth: 1,
-    borderColor: color.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  input: {
-    ...typography.body,
+  statePanel: {
     flex: 1,
-    minHeight: MIN_TOUCH_TARGET,
-    maxHeight: 140,
-    color: color.textPrimary,
-    backgroundColor: color.surface,
-    borderRadius: radius.l,
-    paddingHorizontal: space.m,
-    paddingVertical: space.s + space.xxs,
-  },
-  send: { paddingHorizontal: space.l },
-  readOnly: { paddingVertical: space.m },
-  recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.danger },
-  grow: { flex: 1 },
-  sheetIntro: { marginBottom: space.l },
-  pinnedBar: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    gap: space.s,
-    minHeight: MIN_TOUCH_TARGET,
+    gap: space.m,
+    paddingHorizontal: space.xl,
+  },
+  errorBar: {
     paddingHorizontal: space.l,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: color.border,
-    backgroundColor: color.surface,
+    paddingBottom: space.xs,
+    width: '100%',
+    maxWidth: 720,
+    alignSelf: 'center',
   },
-  contextBar: {
+  jump: {
+    position: 'absolute',
+    right: space.l,
+    bottom: space.m,
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.s,
-    paddingLeft: space.m,
-    borderLeftWidth: 2,
-    borderLeftColor: color.accent,
+    gap: space.xs,
+    minHeight: 40,
+    paddingHorizontal: space.m,
+    borderRadius: 20,
+    backgroundColor: color.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.border,
   },
+  jumpPressed: { backgroundColor: color.surface },
+  sheetIntro: { marginBottom: space.l },
 });

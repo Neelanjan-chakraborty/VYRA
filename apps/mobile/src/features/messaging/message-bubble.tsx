@@ -1,10 +1,12 @@
 import { type ChatTheme, chatThemes, color, radius, space } from '@vyra/design-system';
 import type { MessageView, Reaction } from '@vyra/validation';
-import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
-import { Button } from '@/components/ui/button';
+import { PersonAvatar } from '@/features/discovery/person-avatar';
+import { ChatIcon } from './chat-icons';
+import { DatePlanMessage } from './date-plan-message';
+import { MediaMessage } from './media-message';
 import {
   BlurredMedia,
   HeldMedia,
@@ -13,19 +15,13 @@ import {
   useNow,
   VideoMessage,
 } from './media-views';
+import { ReactionBar } from './reaction-bar';
 import { VoiceNote } from './voice';
 
 const DISAPPEAR_WORDS: Readonly<Record<number, string>> = {
   86_400: '24 hours',
   604_800: '7 days',
   7_776_000: '90 days',
-};
-
-const PLAN_STATUS: Readonly<Record<string, string>> = {
-  proposed: 'Waiting for an answer',
-  accepted: 'You’re both in',
-  declined: 'Not this time',
-  withdrawn: 'Withdrawn',
 };
 
 function time(iso: string): string {
@@ -35,6 +31,7 @@ function time(iso: string): string {
 interface BubbleProps {
   readonly message: MessageView;
   readonly otherName: string;
+  readonly otherPhotoUrl: string | null;
   /** Pending: sent from this device and not yet confirmed. */
   readonly pending: boolean;
   readonly canAct: boolean;
@@ -47,12 +44,21 @@ interface BubbleProps {
   /** Allow photos, video and voice from the other person (null when not possible). */
   readonly onAllowMedia: (() => void) | null;
   readonly theme: ChatTheme;
+  readonly firstOfGroup: boolean;
+  readonly lastOfGroup: boolean;
+  readonly showAvatar: boolean;
+  readonly showMeta: boolean;
 }
 
-/** One message. Text is always rendered as plain text, never as markup or links. */
+/**
+ * One message. Text is always rendered as plain text, never as markup or links.
+ * Bubble corners, rhythm and avatar presence come from the timeline row, so a
+ * burst reads as one utterance rather than a stack of cards.
+ */
 export function MessageBubble({
   message,
   otherName,
+  otherPhotoUrl,
   pending,
   canAct,
   onActions,
@@ -61,34 +67,49 @@ export function MessageBubble({
   onOpen,
   onAllowMedia,
   theme,
+  firstOfGroup,
+  lastOfGroup,
+  showAvatar,
+  showMeta,
 }: BubbleProps) {
   const [revealed, setRevealed] = useState(false);
   const now = useNow(Boolean(message.expiresAt) && !message.removed);
   if (message.kind === 'system' && message.event === 'theme') {
     const label = chatThemes[message.theme ?? 'default'].label;
     return (
-      <Text variant="caption" tone="textSecondary" style={styles.system}>
-        {message.mine ? 'You' : otherName} changed the theme to {label}
-      </Text>
+      <View style={styles.systemRow}>
+        <ChatIcon name="sparkle" color={color.textSecondary} size={14} />
+        <Text variant="caption" tone="textSecondary" style={styles.systemText}>
+          {message.mine ? 'You' : otherName} changed the theme to {label}
+        </Text>
+      </View>
     );
   }
   if (message.kind === 'system' && message.event === 'disappear') {
     const who = message.mine ? 'You' : otherName;
     return (
-      <Text variant="caption" tone="textSecondary" style={styles.system}>
-        {message.disappearSeconds
-          ? `${who} turned on disappearing messages: new messages go after ${DISAPPEAR_WORDS[message.disappearSeconds] ?? 'a while'}`
-          : `${who} turned off disappearing messages`}
-      </Text>
+      <View style={styles.systemRow}>
+        <ChatIcon name="clock" color={color.textSecondary} size={14} />
+        <Text variant="caption" tone="textSecondary" style={styles.systemText}>
+          {message.disappearSeconds
+            ? `${who} turned on disappearing messages: new messages go after ${DISAPPEAR_WORDS[message.disappearSeconds] ?? 'a while'}`
+            : `${who} turned off disappearing messages`}
+        </Text>
+      </View>
     );
   }
   if (message.kind === 'system') {
     return (
-      <Text variant="caption" tone="textSecondary" style={styles.system}>
-        You and {otherName} are connected · {new Date(message.createdAt).toLocaleDateString()}
-      </Text>
+      <View style={styles.systemRow}>
+        <View style={styles.systemRule} aria-hidden />
+        <Text variant="caption" tone="chemistryText" style={styles.systemText}>
+          You and {otherName} are connected · {new Date(message.createdAt).toLocaleDateString()}
+        </Text>
+        <View style={styles.systemRule} aria-hidden />
+      </View>
     );
   }
+
   const mine = message.mine;
   const palette = chatThemes[theme];
   const ink = mine ? palette.mineText : color.textPrimary;
@@ -113,6 +134,7 @@ export function MessageBubble({
   ]
     .filter(Boolean)
     .join(' · ');
+
   let content;
   const protectedTheirs =
     !mine && (message.viewOnce || (message.timerSeconds !== null && message.kind !== 'text'));
@@ -176,38 +198,12 @@ export function MessageBubble({
       );
   } else if (message.kind === 'text') {
     content = (
-      <Text selectable style={{ color: ink }}>
+      <Text selectable variant="message" style={{ color: ink }}>
         {message.body}
       </Text>
     );
   } else if (message.kind === 'image' && message.media) {
-    const { media } = message;
-    const ratio = media.width && media.height ? media.width / media.height : 0.8;
-    content = (
-      <View>
-        {media.url ? (
-          <Image
-            draggable={false}
-            source={{ uri: media.thumbUrl ?? media.url }}
-            style={[styles.photo, { aspectRatio: ratio }, media.status !== 'ready' && styles.dim]}
-            contentFit="cover"
-            accessibilityLabel={mine ? 'Photo you sent' : `Photo from ${otherName}`}
-          />
-        ) : (
-          <View style={[styles.photo, styles.photoPlaceholder, { aspectRatio: ratio }]} />
-        )}
-        {media.status !== 'ready' ? (
-          <Text
-            variant="caption"
-            style={[styles.mediaNote, { color: mine ? ink : color.textSecondary }]}
-          >
-            {media.status === 'checking'
-              ? 'Photo being checked'
-              : 'This photo couldn’t be sent. Try another.'}
-          </Text>
-        ) : null}
-      </View>
-    );
+    content = <MediaMessage media={message.media} mine={mine} otherName={otherName} tint={ink} />;
   } else if (message.kind === 'voice' && message.media?.url) {
     // iOS's native player can't read Ogg; the server also stores the same audio as CAF.
     const voiceUrl =
@@ -215,152 +211,167 @@ export function MessageBubble({
     content = (
       <VoiceNote url={voiceUrl} durationMs={message.media.durationMs} mine={mine} tint={ink} />
     );
-  } else if (message.kind === 'date_plan' && message.plan) {
-    const { plan } = message;
-    const tint = ink;
+  } else if (message.kind === 'date_plan') {
     content = (
-      <View style={styles.plan}>
-        <Text variant="eyebrow" style={{ color: tint }}>
-          Date idea
-        </Text>
-        <Text variant="title" style={{ color: tint }}>
-          {plan.idea}
-        </Text>
-        {plan.when || plan.area ? (
-          <Text variant="caption" style={{ color: tint }}>
-            {[plan.when, plan.area].filter(Boolean).join(' · ')}
-          </Text>
-        ) : null}
-        <Text variant="caption" style={{ color: tint }}>
-          {PLAN_STATUS[plan.status]}
-        </Text>
-        {plan.status === 'accepted' ? (
-          <Text variant="caption" style={{ color: tint }}>
-            Meet somewhere public and let a friend know your plans.
-          </Text>
-        ) : null}
-        {canAct && plan.status === 'proposed' && !mine ? (
-          <View style={styles.planActions}>
-            <Button
-              label="Not this time"
-              variant="secondary"
-              onPress={() => onPlan(message, 'decline')}
-            />
-            <Button label="I’m in" onPress={() => onPlan(message, 'accept')} />
-          </View>
-        ) : null}
-        {canAct && plan.status === 'proposed' && mine ? (
-          <Button
-            label="Withdraw idea"
-            variant="quiet"
-            style={styles.withdraw}
-            onPress={() => onPlan(message, 'withdraw')}
-          />
-        ) : null}
-      </View>
+      <DatePlanMessage message={message} mine={mine} canAct={canAct} tint={ink} onPlan={onPlan} />
     );
   } else {
     content = <Text tone="textSecondary">Unavailable</Text>;
   }
 
   const actionable = !message.removed && !pending;
+  const shape = {
+    borderTopLeftRadius: !firstOfGroup && !mine ? radius.s : radius.l,
+    borderTopRightRadius: !firstOfGroup && mine ? radius.s : radius.l,
+    borderBottomLeftRadius: lastOfGroup && !mine ? radius.s : radius.l,
+    borderBottomRightRadius: lastOfGroup && mine ? radius.s : radius.l,
+  };
+
   return (
-    <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
-      {message.forwarded && !message.removed ? (
-        <Text variant="caption" tone="textSecondary" style={styles.label}>
-          Forwarded
-        </Text>
+    <View
+      style={[
+        styles.row,
+        mine ? styles.rowMine : styles.rowTheirs,
+        firstOfGroup ? styles.rowSpaced : styles.rowTight,
+      ]}
+    >
+      {!mine ? (
+        <View style={styles.avatarColumn}>
+          {showAvatar ? (
+            <View style={styles.avatar}>
+              <PersonAvatar name={otherName} photoUrl={otherPhotoUrl} size={24} round />
+            </View>
+          ) : null}
+        </View>
       ) : null}
-      <Pressable
-        onLongPress={actionable ? () => onActions(message) : undefined}
-        accessibilityActions={actionable ? [{ name: 'activate', label: 'Message options' }] : []}
-        onAccessibilityAction={() => onActions(message)}
-        style={[
-          styles.bubble,
-          mine ? [styles.mine, { backgroundColor: palette.mine }] : styles.theirs,
-          (message.kind === 'image' || message.kind === 'video') && styles.mediaBubble,
-          pending && styles.dim,
-        ]}
-      >
-        {message.replyTo && !message.removed ? (
-          <View
-            style={[styles.quote, { borderLeftColor: mine ? ink : color.accent }]}
-            aria-label={`Replying to ${message.replyTo.mine ? 'you' : otherName}`}
-          >
-            <Text variant="caption" style={{ color: ink }}>
-              {message.replyTo.mine ? 'You' : otherName}
-            </Text>
-            <Text variant="caption" numberOfLines={2} style={{ color: ink }}>
-              {message.replyTo.preview}
+
+      <View style={[styles.column, mine ? styles.columnMine : styles.columnTheirs]}>
+        {message.forwarded && !message.removed ? (
+          <View style={styles.labelRow}>
+            <ChatIcon name="forward" color={color.textSecondary} size={12} />
+            <Text variant="caption" tone="textSecondary">
+              Forwarded
             </Text>
           </View>
         ) : null}
-        {content}
-      </Pressable>
-      {message.reactions.length > 0 ? (
-        <View style={styles.reactions}>
-          {message.reactions.map((r) => (
-            <Pressable
-              key={r.emoji}
-              role="button"
-              aria-label={`${r.emoji} ${r.count}${r.mine ? ', yours. Tap to remove' : ''}`}
-              disabled={!canAct}
-              onPress={() => onReact(message, r.mine ? null : r.emoji)}
-              style={[styles.chip, r.mine && styles.chipMine]}
-            >
-              <Text variant="caption">
-                {r.emoji}
-                {r.count > 1 ? ` ${r.count}` : ''}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-      ) : null}
-      <Text variant="caption" tone="textSecondary" style={styles.meta}>
-        {time(message.createdAt)}
-        {status ? ` · ${status}` : ''}
-      </Text>
+
+        <Pressable
+          onLongPress={actionable ? () => onActions(message) : undefined}
+          accessibilityActions={actionable ? [{ name: 'activate', label: 'Message options' }] : []}
+          onAccessibilityAction={actionable ? () => onActions(message) : undefined}
+          style={({ pressed }) => [pressed && actionable && styles.pressed]}
+        >
+          <View
+            style={[
+              styles.bubble,
+              mine ? { backgroundColor: palette.mine } : styles.theirs,
+              shape,
+              (message.kind === 'image' || message.kind === 'video') && styles.mediaBubble,
+              pending && styles.dim,
+            ]}
+          >
+            {message.replyTo && !message.removed ? (
+              <View
+                style={[styles.quote, { borderLeftColor: mine ? ink : color.textSecondary }]}
+                aria-label={`Replying to ${message.replyTo.mine ? 'you' : otherName}`}
+              >
+                <Text variant="captionStrong" style={{ color: mine ? ink : color.chemistryText }}>
+                  {message.replyTo.mine ? 'You' : otherName}
+                </Text>
+                <Text
+                  variant="caption"
+                  numberOfLines={2}
+                  style={{ color: mine ? ink : color.textSecondary }}
+                >
+                  {message.replyTo.preview}
+                </Text>
+              </View>
+            ) : null}
+
+            {content}
+
+            {showMeta && !message.removed ? (
+              <View style={[styles.metaRow, mine ? styles.metaRowMine : styles.metaRowTheirs]}>
+                {pending ? (
+                  <ChatIcon name="clock" color={ink} size={11} />
+                ) : mine && message.read ? (
+                  <ChatIcon name="checkDouble" color={ink} size={11} />
+                ) : null}
+                <Text
+                  variant="caption"
+                  style={[styles.meta, { color: mine ? ink : color.textSecondary }]}
+                >
+                  {time(message.createdAt)}
+                  {status ? ` · ${status}` : ''}
+                </Text>
+              </View>
+            ) : null}
+          </View>
+        </Pressable>
+
+        <ReactionBar message={message} canAct={canAct} onReact={onReact} />
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  system: { textAlign: 'center', marginVertical: space.l },
-  row: { marginVertical: space.xs, maxWidth: '82%' },
-  rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
-  rowTheirs: { alignSelf: 'flex-start', alignItems: 'flex-start' },
-  bubble: { borderRadius: radius.l, paddingHorizontal: space.m, paddingVertical: space.s },
-  mine: { borderBottomRightRadius: radius.s },
-  theirs: { backgroundColor: color.surfaceRaised, borderBottomLeftRadius: radius.s },
-  mediaBubble: { padding: space.xs },
+  systemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.s,
+    marginVertical: space.l,
+    paddingHorizontal: space.l,
+  },
+  systemRule: {
+    flex: 1,
+    maxWidth: 48,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: color.border,
+  },
+  systemText: { textAlign: 'center', flexShrink: 1 },
+  row: { width: '100%', flexDirection: 'row', alignItems: 'flex-end' },
+  rowMine: { justifyContent: 'flex-end' },
+  rowTheirs: { justifyContent: 'flex-start' },
+  rowSpaced: { marginTop: space.m },
+  rowTight: { marginTop: 2 },
+  avatarColumn: { width: 32, flexShrink: 0, paddingBottom: 2 },
+  avatar: { width: 24, height: 24, borderRadius: 12, overflow: 'hidden' },
+  column: { flexShrink: 1, maxWidth: '82%' },
+  columnMine: { alignItems: 'flex-end', maxWidth: '84%' },
+  columnTheirs: { alignItems: 'flex-start' },
+  bubble: {
+    paddingHorizontal: space.m + 2,
+    paddingVertical: space.s + 2,
+    overflow: 'hidden',
+  },
+  theirs: { backgroundColor: color.surfaceRaised },
+  mediaBubble: { padding: space.xs + 1 },
+  dim: { opacity: 0.62 },
+  pressed: { opacity: 0.9 },
   removed: { fontStyle: 'italic' },
-  photo: { width: 220, borderRadius: radius.m, backgroundColor: color.surface },
-  photoPlaceholder: { borderWidth: StyleSheet.hairlineWidth, borderColor: color.border },
-  dim: { opacity: 0.6 },
-  mediaNote: { marginTop: space.xs, paddingHorizontal: space.xs },
-  plan: { gap: space.xs, paddingVertical: space.xs, minWidth: 220 },
-  planActions: { flexDirection: 'row', gap: space.s, marginTop: space.s },
-  withdraw: { alignSelf: 'flex-start', paddingHorizontal: 0 },
-  meta: { marginTop: space.xxs },
-  label: { marginBottom: space.xxs },
   quote: {
     borderLeftWidth: 2,
     paddingLeft: space.s,
-    marginBottom: space.xs,
-    opacity: 0.85,
-    maxWidth: 260,
+    marginBottom: space.s,
+    maxWidth: 280,
+    gap: 1,
   },
-  reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xxs, marginTop: space.xxs },
-  chip: {
-    minHeight: 28,
-    minWidth: 36,
-    paddingHorizontal: space.s,
-    borderRadius: radius.l,
-    backgroundColor: color.surfaceRaised,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: color.border,
+  labelRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: space.xxs,
+    marginBottom: space.xxs,
+    paddingHorizontal: space.xs,
   },
-  chipMine: { borderColor: color.accent },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xxs,
+    marginTop: space.xs,
+  },
+  metaRowMine: { justifyContent: 'flex-end' },
+  metaRowTheirs: { justifyContent: 'flex-start' },
+  meta: { opacity: 0.9 },
 });

@@ -162,6 +162,15 @@ carries the recipient's name as a watermark. Photos and videos can be kept in a 
 Device-only parts (native video playback, the iOS/Android pickers) are unverified on hardware.
 Also fixed on the way: bottom sheets now scroll when taller than the screen.
 
+**New — conversation screen redesign.** The thread now reads as one composed room: a compact
+identity header, grouped message bursts with date and new-message rules, a raised composer that
+becomes voice when there is nothing to type, and a small set of VYRA line icons. Photo states,
+date ideas, pads, reactions and receipts keep their exact behaviour. The voice note shows a real
+playback ruler rather than a synthetic waveform; there is no online badge, call control or
+view-once affordance because the API does not provide them. Loading, empty, error and ended
+states are all present. New type tokens (`titleSmall`, `message`, `messageStrong`,
+`captionStrong`) and `radius.xl` live in the design system, not in the screen.
+
 ## What is deliberately not there
 
 - **Sign-in codes are not delivered.** The development sender returns the code to the app,
@@ -187,6 +196,17 @@ Also fixed on the way: bottom sheets now scroll when taller than the screen.
 | `pnpm e2e:web`                    | Pass — 55 screenshots, no browser errors: chat actions, send later, media send options, held media and allowing it, view-once open and close, vault, shared theme and disappearing-messages notes                                     |
 | `pnpm rust:check`                 | Pass — fmt, clippy `-D warnings`, 13 Rust tests (engine 8 incl. learning 6, parity 2 over 2 000 pairs + 60 rankings, gateway 3)                                                                                                       |
 | Benchmarks                        | `scripts/bench-engine.mjs`, `cargo bench -p vyra-engine`, `scripts/bench-realtime.mjs` — numbers above                                                                                                                                |
+
+**Chat redesign check (15 Nov 2026, local machine).** `pnpm format:check`, `pnpm lint`,
+`pnpm --filter @vyra/mobile typecheck`, `pnpm --filter @vyra/mobile test` (14),
+`pnpm --filter @vyra/design-system test` (16) and `expo export --platform web` passed. The
+exported web build was inspected at 390×844 and 320×700 against mocked API data for the thread,
+empty, error, add sheet, message actions, reply/emoji composer and date-idea states; screenshots
+are in `visual-check-output/chat-redesign/`. The full `pnpm check`/`pnpm test` pipeline did not
+run because this machine has no Rust toolchain (`cargo`, so `@vyra/engine-native` cannot build),
+and `pnpm test:e2e`/`pnpm e2e:web` were not run because the API, PostgreSQL, Redis and Rust
+realtime gateway were not started. Expo web is a proxy for native; iOS and Android were not
+verified on a device or emulator.
 
 Found and fixed while verifying Milestone 7: the addon was first _slower_ than TypeScript
 because whole result sets crossed the boundary twice (fixed with a single `recommend` call);

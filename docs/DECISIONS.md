@@ -300,6 +300,15 @@ view-once or timed media, and only where the sender allowed saving. Photos and v
 boundary, so re-signing after a refetch gives the same URL and image caches hit instead of
 downloading again (found in the browser run: every chat event reloaded every image).
 
+**D-076 · The conversation is a quiet room, not a widget board.** Messages group into bursts
+(four-minute window), date rules appear only when the calendar day changes, and the composer's
+primary action becomes voice when there is nothing to send. Only states the API actually has
+are shown: photo checking/ready/declined, typing, pins, reactions, replies, edits, forwarding
+and scheduled messages. There is deliberately no online badge, call button or view-once control
+until the backend supports them. The voice track is a real playback ruler, not a synthetic
+waveform. New type tokens and the composer radius ship in the design system so screens stay
+token-only.
+
 ## Open (need the product owner)
 
 | #   | Question                                               | Needed by     | Default if unanswered                                                    |

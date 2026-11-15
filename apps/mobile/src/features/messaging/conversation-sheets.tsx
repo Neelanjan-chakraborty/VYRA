@@ -11,6 +11,7 @@ import {
   REACTIONS,
   type WingmanPurpose,
 } from '@vyra/validation';
+import * as Clipboard from 'expo-clipboard';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
@@ -23,6 +24,7 @@ import { TextField } from '@/components/ui/text-field';
 import { Toggle } from '@/components/ui/toggle';
 import { useConsents, useSetConsent } from '@/features/persona/persona-api';
 import { errorMessage } from '@/lib/api';
+import { ChatIcon, type ChatIconName } from './chat-icons';
 import { timerLabel } from './media-views';
 import {
   useCancelScheduled,
@@ -37,6 +39,39 @@ import {
   NO_PROTECTION,
   useWingman,
 } from './messaging-api';
+
+function SheetAction(props: {
+  label: string;
+  description?: string;
+  icon: ChatIconName;
+  tone?: 'default' | 'danger';
+  onPress: () => void;
+}) {
+  const tint = props.tone === 'danger' ? color.danger : color.textPrimary;
+  return (
+    <Pressable
+      role="button"
+      aria-label={props.label}
+      onPress={props.onPress}
+      style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+    >
+      <View style={[styles.actionIcon, props.tone === 'danger' && styles.actionIconDanger]}>
+        <ChatIcon name={props.icon} color={tint} size={20} />
+      </View>
+      <View style={styles.actionCopy}>
+        <Text variant="bodyStrong" style={{ color: tint }}>
+          {props.label}
+        </Text>
+        {props.description ? (
+          <Text variant="caption" tone="textSecondary">
+            {props.description}
+          </Text>
+        ) : null}
+      </View>
+      <ChatIcon name="chevronRight" color={color.textDisabled} size={16} />
+    </Pressable>
+  );
+}
 
 function SettingRow(props: {
   label: string;
@@ -71,14 +106,49 @@ export function AddSheet(props: {
 }) {
   return (
     <BottomSheet visible={props.visible} title="Add to the conversation" onClose={props.onClose}>
-      <View style={styles.stack}>
-        <Button label="Photo" variant="secondary" onPress={props.onPhoto} />
-        <Button label="Video (up to 30 s)" variant="secondary" onPress={props.onVideo} />
-        <Button label="Voice note" variant="secondary" onPress={props.onVoice} />
-        <Button label="Date idea" variant="secondary" onPress={props.onPlan} />
-        <Button label="Ask Wingman for ideas" variant="secondary" onPress={props.onWingman} />
-        <Button label="Send later" variant="secondary" onPress={props.onSchedule} />
-        <Button label="Self-destructing message" variant="secondary" onPress={props.onTextTimer} />
+      <View style={styles.actionList}>
+        <SheetAction
+          label="Photo"
+          description="From your library"
+          icon="image"
+          onPress={props.onPhoto}
+        />
+        <SheetAction
+          label="Video"
+          description="Up to 30 seconds"
+          icon="play"
+          onPress={props.onVideo}
+        />
+        <SheetAction
+          label="Voice note"
+          description="Speak it instead"
+          icon="mic"
+          onPress={props.onVoice}
+        />
+        <SheetAction
+          label="Date idea"
+          description="Suggest something real"
+          icon="calendar"
+          onPress={props.onPlan}
+        />
+        <SheetAction
+          label="Ask Wingman for ideas"
+          description="A little help finding the words"
+          icon="sparkle"
+          onPress={props.onWingman}
+        />
+        <SheetAction
+          label="Send later"
+          description="Choose when it goes"
+          icon="clock"
+          onPress={props.onSchedule}
+        />
+        <SheetAction
+          label="Self-destructing message"
+          description="Disappears after it’s read"
+          icon="lock"
+          onPress={props.onTextTimer}
+        />
       </View>
     </BottomSheet>
   );
@@ -411,42 +481,58 @@ export function MessageActionsSheet(props: {
               ))}
             </View>
           ) : null}
-          <View style={styles.stack}>
+          <View style={styles.actionList}>
             {props.canAct ? (
               <>
-                <Button label="Reply" variant="secondary" onPress={() => props.onReply(message)} />
-                <Button
+                <SheetAction label="Reply" icon="reply" onPress={() => props.onReply(message)} />
+                <SheetAction
                   label={message.pinned ? 'Unpin' : 'Pin for both of you'}
-                  variant="secondary"
+                  icon="pin"
                   onPress={() => props.onPin(message)}
                 />
               </>
             ) : null}
             {props.canAct && message.editable ? (
-              <Button label="Edit" variant="secondary" onPress={() => props.onEdit(message)} />
+              <SheetAction label="Edit" icon="edit" onPress={() => props.onEdit(message)} />
             ) : null}
             {props.canAct && message.mine && message.kind === 'text' ? (
-              <Button
+              <SheetAction
                 label="Forward"
-                variant="secondary"
+                icon="forward"
                 onPress={() => props.onForward(message)}
               />
             ) : null}
             {message.savable ? (
-              <Button
+              <SheetAction
                 label="Save to your vault"
-                variant="secondary"
+                icon="lock"
                 onPress={() => props.onSave(message)}
               />
             ) : null}
+            {message.body ? (
+              <SheetAction
+                label="Copy text"
+                icon="copy"
+                onPress={() => {
+                  void Clipboard.setStringAsync(message.body ?? '');
+                  props.onClose();
+                }}
+              />
+            ) : null}
             {message.mine ? (
-              <Button
+              <SheetAction
                 label="Remove for both of you"
-                variant="danger"
+                icon="trash"
+                tone="danger"
                 onPress={() => props.onRemove(message)}
               />
             ) : (
-              <Button label="Report" variant="danger" onPress={() => setReporting(true)} />
+              <SheetAction
+                label="Report"
+                icon="flag"
+                tone="danger"
+                onPress={() => setReporting(true)}
+              />
             )}
           </View>
         </>
@@ -763,6 +849,27 @@ export function TextTimerSheet(props: {
 const styles = StyleSheet.create({
   intro: { marginBottom: space.l },
   stack: { gap: space.s, marginTop: space.l },
+  actionList: { marginTop: space.m },
+  action: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.m,
+    minHeight: 58,
+    paddingVertical: space.s,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  actionPressed: { backgroundColor: color.surface },
+  actionIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: color.surface,
+  },
+  actionIconDanger: { backgroundColor: color.surfaceRaised },
+  actionCopy: { flex: 1, gap: 1 },
   row: { flexDirection: 'row', flexWrap: 'wrap', gap: space.s, marginBottom: space.m },
   purpose: { paddingHorizontal: space.m },
   footnote: { marginTop: space.m },
@@ -775,7 +882,14 @@ const styles = StyleSheet.create({
     borderTopColor: color.border,
   },
   settingCopy: { flex: 1, gap: space.xxs },
-  reactionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: space.m },
+  reactionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: space.m,
+    paddingHorizontal: space.xs,
+    borderRadius: radius.l,
+    backgroundColor: color.surface,
+  },
   reaction: {
     width: MIN_TOUCH_TARGET,
     height: MIN_TOUCH_TARGET,
@@ -786,7 +900,7 @@ const styles = StyleSheet.create({
   reactionChosen: {
     backgroundColor: color.surfaceRaised,
     borderWidth: 1,
-    borderColor: color.accent,
+    borderColor: color.chemistryText,
   },
   themeBlock: {
     gap: space.xxs,

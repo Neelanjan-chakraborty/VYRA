@@ -19,6 +19,7 @@ export const radius = {
   s: 4,
   m: 10,
   l: 18,
+  xl: 24,
   full: 999,
 } as const;
 export type RadiusToken = keyof typeof radius;
