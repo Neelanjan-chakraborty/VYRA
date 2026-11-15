@@ -46,3 +46,9 @@ next-env.d.ts
 *.node
 packages/engine-native/binding.cjs
 packages/engine-native/binding.d.ts
+
+# pnpm content store (created when the sandbox cannot reach the global store)
+.pnpm-store/
+
+# Firebase service-account keys (private)
+*-firebase-adminsdk-*.json

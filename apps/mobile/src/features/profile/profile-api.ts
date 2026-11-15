@@ -10,6 +10,7 @@ import {
 } from '@vyra/validation';
 import { Platform } from 'react-native';
 import { z } from 'zod';
+import { nativeFilePart } from '@/lib/native-file';
 import { api } from '@/lib/api';
 import { MEDIA_REFRESH_MS, queryClient } from '@/lib/query-client';
 import { useSession } from '@/lib/session';
@@ -97,12 +98,7 @@ function photoForm(image: PickedImage): FormData {
   if (Platform.OS === 'web' && image.file) {
     form.append('file', image.file);
   } else {
-    // React Native's FormData accepts this file descriptor in place of a Blob.
-    form.append('file', {
-      uri: image.uri,
-      name: 'photo.jpg',
-      type: image.mimeType ?? 'image/jpeg',
-    } as unknown as Blob);
+    form.append('file', nativeFilePart(image.uri), 'photo.jpg');
   }
   return form;
 }

@@ -1,0 +1,19 @@
+{
+  "cli": {
+    "version": ">= 27.4.1",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://vyra.azurerift.com",
+        "EXPO_PUBLIC_REALTIME_URL": "wss://vyra.azurerift.com/v1/realtime"
+      }
+    }
+  }
+}

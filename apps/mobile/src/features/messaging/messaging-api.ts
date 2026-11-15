@@ -18,6 +18,7 @@ import {
   wingmanSuggestionsSchema,
 } from '@vyra/validation';
 import { Platform } from 'react-native';
+import { nativeFilePart } from '@/lib/native-file';
 import { api } from '@/lib/api';
 import { MEDIA_REFRESH_MS, queryClient } from '@/lib/query-client';
 
@@ -174,12 +175,7 @@ function mediaForm(
   if (Platform.OS === 'web' && media.file) {
     form.append('file', media.file, fallbackName);
   } else {
-    // React Native's FormData accepts this file descriptor in place of a Blob.
-    form.append('file', {
-      uri: media.uri,
-      name: fallbackName,
-      type: media.mimeType ?? 'application/octet-stream',
-    } as unknown as Blob);
+    form.append('file', nativeFilePart(media.uri), fallbackName);
   }
   return form;
 }

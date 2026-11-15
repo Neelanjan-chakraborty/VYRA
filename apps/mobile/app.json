@@ -17,6 +17,7 @@
     },
     "android": {
       "package": "app.vyra.mobile",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#100F13",
         "foregroundImage": "./assets/images/adaptive-icon.png"
@@ -71,6 +72,18 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "owner": "azurerifts-organization",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2182bb67-9962-47da-88fb-ed8f9e8025bb"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "2182bb67-9962-47da-88fb-ed8f9e8025bb"
+      }
     }
   }
 }

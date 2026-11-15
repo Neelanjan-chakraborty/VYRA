@@ -368,10 +368,7 @@ export default function ConversationScreen() {
     sendText.isPending || sendPhoto.isPending || sendVoice.isPending || sendVideo.isPending;
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <KeyboardAvoidingView style={styles.root} behavior="padding">
       <ChatHeader
         name={name}
         photoUrl={summary.person.photoUrl}

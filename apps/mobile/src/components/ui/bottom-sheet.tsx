@@ -1,6 +1,6 @@
 import { color, easing, radius, resolveDuration, space } from '@vyra/design-system';
 import { type ReactNode, useEffect } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -47,7 +47,7 @@ export function BottomSheet({ visible, title, onClose, children }: BottomSheetPr
       onRequestClose={onClose}
       statusBarTranslucent
     >
-      <View style={styles.root}>
+      <KeyboardAvoidingView style={styles.root} behavior="padding">
         <Pressable style={styles.scrim} onPress={onClose} aria-label="Close" role="button" />
         <Animated.View
           style={[styles.sheet, sheetStyle]}
@@ -68,7 +68,7 @@ export function BottomSheet({ visible, title, onClose, children }: BottomSheetPr
             {children}
           </ScrollView>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

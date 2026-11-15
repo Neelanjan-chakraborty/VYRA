@@ -10,3 +10,4 @@ apps/api/prisma/migrations
 next-env.d.ts
 apps/landing/src/app/tokens.css
 apps/landing/src/content/engine-sample.json
+apps/mobile/google-services.json
