@@ -12,12 +12,15 @@ export const MEDIA_URL_TTL_SECONDS = 10 * 60;
  *   owner is active and discoverable.
  * - `owner`: the photo's owner, via their own endpoints — any status.
  * - `moderator`: someone reviewing it — any status.
+ * - `conversation`: the other participant of a conversation — message media
+ *   only, while APPROVED, not removed or reported, and nobody has blocked.
  */
-export type MediaScope = 'public' | 'owner' | 'moderator';
+export type MediaScope = 'public' | 'owner' | 'moderator' | 'conversation';
 const SCOPE_CODES: Readonly<Record<MediaScope, string>> = {
   public: 'p',
   owner: 'o',
   moderator: 'm',
+  conversation: 'c',
 };
 const SCOPES_BY_CODE = new Map(
   Object.entries(SCOPE_CODES).map(([scope, code]) => [code, scope as MediaScope]),

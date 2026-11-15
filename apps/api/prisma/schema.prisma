@@ -59,27 +59,28 @@ model User {
   compatibilityAsA CompatibilityScore[] @relation("CompatibilityUserA")
   compatibilityAsB CompatibilityScore[] @relation("CompatibilityUserB")
 
-  discoveryEvents        DiscoveryEvent[] @relation("DiscoveryActor")
-  discoveryEventsAbout   DiscoveryEvent[] @relation("DiscoveryTarget")
-  savedProfiles          SavedProfile[]   @relation("SavedBy")
-  savedByOthers          SavedProfile[]   @relation("SavedTarget")
-  sentRequests           ConnectionRequest[] @relation("RequestSender")
-  receivedRequests       ConnectionRequest[] @relation("RequestRecipient")
-  matchesAsA             Match[]          @relation("MatchUserA")
-  matchesAsB             Match[]          @relation("MatchUserB")
+  discoveryEvents         DiscoveryEvent[]          @relation("DiscoveryActor")
+  discoveryEventsAbout    DiscoveryEvent[]          @relation("DiscoveryTarget")
+  savedProfiles           SavedProfile[]            @relation("SavedBy")
+  savedByOthers           SavedProfile[]            @relation("SavedTarget")
+  sentRequests            ConnectionRequest[]       @relation("RequestSender")
+  receivedRequests        ConnectionRequest[]       @relation("RequestRecipient")
+  matchesAsA              Match[]                   @relation("MatchUserA")
+  matchesAsB              Match[]                   @relation("MatchUserB")
   conversationMemberships ConversationParticipant[]
-  messages               Message[]
+  messages                Message[]
 
-  feedbackGiven   UserFeedback[] @relation("FeedbackAuthor")
-  feedbackAbout   UserFeedback[] @relation("FeedbackTarget")
-  reportsFiled    SafetyReport[] @relation("ReportAuthor")
-  reportsAgainst  SafetyReport[] @relation("ReportSubject")
-  reportsResolved SafetyReport[] @relation("ReportResolver")
-  blocksCreated   BlockedUser[]  @relation("Blocker")
-  blocksReceived  BlockedUser[]  @relation("Blocked")
-  moderationEvents      ModerationEvent[] @relation("ModerationSubject")
-  moderationActions     ModerationEvent[] @relation("ModerationActor")
-  auditLogs       AuditLog[]
+  feedbackGiven     UserFeedback[]    @relation("FeedbackAuthor")
+  feedbackAbout     UserFeedback[]    @relation("FeedbackTarget")
+  reportsFiled      SafetyReport[]    @relation("ReportAuthor")
+  reportsAgainst    SafetyReport[]    @relation("ReportSubject")
+  reportsResolved   SafetyReport[]    @relation("ReportResolver")
+  blocksCreated     BlockedUser[]     @relation("Blocker")
+  blocksReceived    BlockedUser[]     @relation("Blocked")
+  moderationEvents  ModerationEvent[] @relation("ModerationSubject")
+  moderationActions ModerationEvent[] @relation("ModerationActor")
+  auditLogs         AuditLog[]
+  pushDevices       PushDevice[]
 
   @@index([status])
   @@map("users")
@@ -132,6 +133,8 @@ enum ConsentType {
   PHOTO_ANALYSIS
   ASTROLOGY
   WINGMAN_MESSAGE_CONTEXT
+  /// Wingman may send what both people already show each other to the AI provider.
+  WINGMAN
   ANALYTICS
   MARKETING
 }
@@ -155,9 +158,9 @@ model UserConsent {
 // ───────────────────────────── Profile ─────────────────────────────
 
 model UserProfile {
-  userId         String   @id @map("user_id") @db.Uuid
-  displayName    String   @map("display_name") @db.VarChar(60)
-  bio            String?  @db.VarChar(600)
+  userId                String           @id @map("user_id") @db.Uuid
+  displayName           String           @map("display_name") @db.VarChar(60)
+  bio                   String?          @db.VarChar(600)
   /// null = not answered. Never inferred.
   genderIdentity        GenderIdentity?  @map("gender_identity")
   /// Kept only with SELF_DESCRIBE (CHECK constraint).
@@ -166,27 +169,30 @@ model UserProfile {
   genderVisible         Boolean          @default(false) @map("gender_visible")
   /// SELF_DESCRIBE only: searches to appear in (WOMAN, MAN, NON_BINARY).
   discoverableAs        GenderIdentity[] @default([]) @map("discoverable_as")
-  pronouns       String?  @db.VarChar(40)
-  occupation     String?  @db.VarChar(80)
-  city           String?  @db.VarChar(80)
+  pronouns              String?          @db.VarChar(40)
+  occupation            String?          @db.VarChar(80)
+  city                  String?          @db.VarChar(80)
   /// ISO 3166-1 alpha-2.
-  countryCode    String?  @map("country_code") @db.Char(2)
+  countryCode           String?          @map("country_code") @db.Char(2)
   /// Coordinates on a 0.02° grid (~2 km), used only for distance. Never returned by the API.
-  latitude       Float?
-  longitude      Float?
+  latitude              Float?
+  longitude             Float?
   /// How the location was set; null = no location.
-  locationSource LocationSource? @map("location_source")
+  locationSource        LocationSource?  @map("location_source")
   /// GeoNames id of a manually chosen place, e.g. "gn:1277333".
-  placeId        String?         @map("place_id") @db.VarChar(40)
+  placeId               String?          @map("place_id") @db.VarChar(40)
   /// Admin region label of the place, e.g. "Karnataka".
-  region         String?         @db.VarChar(80)
+  region                String?          @db.VarChar(80)
   /// Neighbourhood label typed by the person. Never used for distance.
-  area           String?         @db.VarChar(80)
+  area                  String?          @db.VarChar(80)
   /// Last completed onboarding stage key.
-  onboardingStep String?  @map("onboarding_step") @db.VarChar(40)
-  isDiscoverable Boolean  @default(false) @map("is_discoverable")
-  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  onboardingStep        String?          @map("onboarding_step") @db.VarChar(40)
+  isDiscoverable        Boolean          @default(false) @map("is_discoverable")
+  /// Push notifications for new messages and for connection requests.
+  notifyMessages        Boolean          @default(true) @map("notify_messages")
+  notifyRequests        Boolean          @default(true) @map("notify_requests")
+  createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -217,29 +223,29 @@ enum PhotoModerationStatus {
 }
 
 model UserPhoto {
-  id               String                @id @default(uuid()) @db.Uuid
-  userId           String                @map("user_id") @db.Uuid
+  id                String                @id @default(uuid()) @db.Uuid
+  userId            String                @map("user_id") @db.Uuid
   /// Object-storage key. Served only through short-lived signed URLs.
-  storageKey       String                @unique @map("storage_key")
-  position         Int
-  width            Int
-  height           Int
-  mimeType         String                @map("mime_type") @db.VarChar(40)
-  sizeBytes        Int                   @map("size_bytes")
+  storageKey        String                @unique @map("storage_key")
+  position          Int
+  width             Int
+  height            Int
+  mimeType          String                @map("mime_type") @db.VarChar(40)
+  sizeBytes         Int                   @map("size_bytes")
   /// SHA-256 of the file, for exact-duplicate detection.
-  contentHash      String                @map("content_hash") @db.Char(64)
+  contentHash       String                @map("content_hash") @db.Char(64)
   /// Perceptual hash, for near-duplicate detection.
-  perceptualHash   String?               @map("perceptual_hash") @db.VarChar(32)
-  moderationStatus PhotoModerationStatus @default(PENDING) @map("moderation_status")
+  perceptualHash    String?               @map("perceptual_hash") @db.VarChar(32)
+  moderationStatus  PhotoModerationStatus @default(PENDING) @map("moderation_status")
   /// Machine-readable reason for the current status, e.g. "explicit_content".
-  moderationReason String?               @map("moderation_reason") @db.VarChar(60)
-  moderatedAt      DateTime?             @map("moderated_at") @db.Timestamptz(3)
+  moderationReason  String?               @map("moderation_reason") @db.VarChar(60)
+  moderatedAt       DateTime?             @map("moderated_at") @db.Timestamptz(3)
   /// Set when the owner asks for a person to look at a rejection; one appeal per upload.
-  appealRequestedAt DateTime?            @map("appeal_requested_at") @db.Timestamptz(3)
+  appealRequestedAt DateTime?             @map("appeal_requested_at") @db.Timestamptz(3)
   /// BestPic assessment (quality, lighting, composition, clarity) with its version.
-  assessment       Json?
-  createdAt        DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
-  deletedAt        DateTime?             @map("deleted_at") @db.Timestamptz(3)
+  assessment        Json?
+  createdAt         DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt         DateTime?             @map("deleted_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -307,11 +313,11 @@ model RelationshipIntent {
 }
 
 model DiscoveryPreferences {
-  userId          String   @id @map("user_id") @db.Uuid
-  minAge          Int      @default(18) @map("min_age")
-  maxAge          Int      @default(40) @map("max_age")
+  userId                 String           @id @map("user_id") @db.Uuid
+  minAge                 Int              @default(18) @map("min_age")
+  maxAge                 Int              @default(40) @map("max_age")
   /// Null means no distance limit.
-  maxDistanceKm   Int?     @map("max_distance_km")
+  maxDistanceKm          Int?             @map("max_distance_km")
   /// Identities the user wants to see (WOMAN, MAN, NON_BINARY); empty = everyone.
   showGenders            GenderIdentity[] @default([]) @map("show_genders")
   /// Also show self-described (without chosen searches), undisclosed and unanswered.
@@ -319,8 +325,8 @@ model DiscoveryPreferences {
   /// Must-haves, preferences and open-to-exploring, validated by
   /// criteriaListSchema in @vyra/validation. Private to this person.
   criteria               Json             @default("[]") @map("relationship_criteria")
-  showAstrology   Boolean  @default(false) @map("show_astrology")
-  updatedAt       DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  showAstrology          Boolean          @default(false) @map("show_astrology")
+  updatedAt              DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -330,17 +336,17 @@ model DiscoveryPreferences {
 // ───────────────────────────── Persona ─────────────────────────────
 
 model Persona {
-  id               String   @id @default(uuid()) @db.Uuid
-  userId           String   @unique @map("user_id") @db.Uuid
+  id                    String    @id @default(uuid()) @db.Uuid
+  userId                String    @unique @map("user_id") @db.Uuid
   /// The approved version currently used for matching.
-  currentVersionId String?  @unique @map("current_version_id") @db.Uuid
+  currentVersionId      String?   @unique @map("current_version_id") @db.Uuid
   /// idle | queued | generating | ready | failed (CHECK constraint).
   generationStatus      String    @default("idle") @map("generation_status") @db.VarChar(20)
   /// Machine-readable reason for the last failed generation. Never content.
   generationFailureCode String?   @map("generation_failure_code") @db.VarChar(60)
   generationRequestedAt DateTime? @map("generation_requested_at") @db.Timestamptz(3)
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt             DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
   currentVersion PersonaVersion?  @relation("CurrentPersonaVersion", fields: [currentVersionId], references: [id], onDelete: SetNull)
@@ -445,20 +451,20 @@ enum ImportStatus {
 }
 
 model AiImport {
-  id             String         @id @default(uuid()) @db.Uuid
-  userId         String         @map("user_id") @db.Uuid
-  provider       ImportProvider
-  status         ImportStatus   @default(UPLOADED)
+  id           String         @id @default(uuid()) @db.Uuid
+  userId       String         @map("user_id") @db.Uuid
+  provider     ImportProvider
+  status       ImportStatus   @default(UPLOADED)
   /// Object-storage key of the raw archive; nulled when the raw data is deleted.
-  storageKey     String?        @map("storage_key")
-  sizeBytes      BigInt         @map("size_bytes")
+  storageKey   String?        @map("storage_key")
+  sizeBytes    BigInt         @map("size_bytes")
   /// Machine-readable failure code. Never contains imported content.
-  failureCode    String?        @map("failure_code") @db.VarChar(60)
+  failureCode  String?        @map("failure_code") @db.VarChar(60)
   /// Raw archive must be deleted by this time.
-  rawExpiresAt   DateTime       @map("raw_expires_at") @db.Timestamptz(3)
-  rawDeletedAt   DateTime?      @map("raw_deleted_at") @db.Timestamptz(3)
-  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
-  completedAt    DateTime?      @map("completed_at") @db.Timestamptz(3)
+  rawExpiresAt DateTime       @map("raw_expires_at") @db.Timestamptz(3)
+  rawDeletedAt DateTime?      @map("raw_deleted_at") @db.Timestamptz(3)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(3)
+  completedAt  DateTime?      @map("completed_at") @db.Timestamptz(3)
 
   user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   evidence PersonaEvidence[]
@@ -513,11 +519,11 @@ model CompatibilityScore {
   blockedReason     String?         @map("blocked_reason") @db.VarChar(80)
   computedAt        DateTime        @default(now()) @map("computed_at") @db.Timestamptz(3)
 
-  userA           User                   @relation("CompatibilityUserA", fields: [userAId], references: [id], onDelete: Cascade)
-  userB           User                   @relation("CompatibilityUserB", fields: [userBId], references: [id], onDelete: Cascade)
-  personaVersionA PersonaVersion         @relation("CompatibilityVersionA", fields: [personaVersionAId], references: [id], onDelete: Cascade)
-  personaVersionB PersonaVersion         @relation("CompatibilityVersionB", fields: [personaVersionBId], references: [id], onDelete: Cascade)
-  weightSet       CompatibilityWeightSet @relation(fields: [weightsVersion], references: [version])
+  userA           User                    @relation("CompatibilityUserA", fields: [userAId], references: [id], onDelete: Cascade)
+  userB           User                    @relation("CompatibilityUserB", fields: [userBId], references: [id], onDelete: Cascade)
+  personaVersionA PersonaVersion          @relation("CompatibilityVersionA", fields: [personaVersionAId], references: [id], onDelete: Cascade)
+  personaVersionB PersonaVersion          @relation("CompatibilityVersionB", fields: [personaVersionBId], references: [id], onDelete: Cascade)
+  weightSet       CompatibilityWeightSet  @relation(fields: [weightsVersion], references: [version])
   scenarios       CompatibilityScenario[]
 
   @@unique([personaVersionAId, personaVersionBId, weightsVersion, engineVersion])
@@ -529,9 +535,9 @@ model CompatibilityScore {
 
 /// Scenario-specific estimated alignment for a scored pair.
 model CompatibilityScenario {
-  id          String   @id @default(uuid()) @db.Uuid
-  scoreId     String   @map("score_id") @db.Uuid
-  scenarioKey String   @map("scenario_key") @db.VarChar(40)
+  id          String @id @default(uuid()) @db.Uuid
+  scoreId     String @map("score_id") @db.Uuid
+  scenarioKey String @map("scenario_key") @db.VarChar(40)
   alignment   Float?
   confidence  Float
   /// Features used and their contribution, for the explanation UI.
@@ -657,14 +663,16 @@ model Conversation {
 }
 
 model ConversationParticipant {
-  conversationId String    @map("conversation_id") @db.Uuid
-  userId         String    @map("user_id") @db.Uuid
-  lastReadAt     DateTime? @map("last_read_at") @db.Timestamptz(3)
+  conversationId        String    @map("conversation_id") @db.Uuid
+  userId                String    @map("user_id") @db.Uuid
+  lastReadAt            DateTime? @map("last_read_at") @db.Timestamptz(3)
   /// Whether this person shares read receipts in this conversation.
-  sendsReadReceipts Boolean @default(true) @map("sends_read_receipts")
+  sendsReadReceipts     Boolean   @default(true) @map("sends_read_receipts")
   /// Explicit opt-in for Wingman to read this conversation's recent messages.
-  wingmanContextEnabled Boolean @default(false) @map("wingman_context_enabled")
-  mutedAt        DateTime? @map("muted_at") @db.Timestamptz(3)
+  wingmanContextEnabled Boolean   @default(false) @map("wingman_context_enabled")
+  /// Whether the other person sees when this person is typing.
+  sharesTyping          Boolean   @default(true) @map("shares_typing")
+  mutedAt               DateTime? @map("muted_at") @db.Timestamptz(3)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -683,28 +691,58 @@ enum MessageKind {
 }
 
 model Message {
-  id             String      @id @default(uuid()) @db.Uuid
-  conversationId String      @map("conversation_id") @db.Uuid
+  id              String                 @id @default(uuid()) @db.Uuid
+  conversationId  String                 @map("conversation_id") @db.Uuid
   /// Null for SYSTEM messages and for senders whose account was deleted.
-  senderId       String?     @map("sender_id") @db.Uuid
-  kind           MessageKind @default(TEXT)
-  body           String?     @db.VarChar(4000)
-  mediaKey       String?     @map("media_key")
+  senderId        String?                @map("sender_id") @db.Uuid
+  kind            MessageKind            @default(TEXT)
+  body            String?                @db.VarChar(4000)
+  mediaKey        String?                @map("media_key")
   /// Structured payload for DATE_PLAN and SYSTEM messages.
-  payload        Json?
+  payload         Json?
   /// True when the text started as a Wingman suggestion the sender approved.
-  aiAssisted     Boolean     @default(false) @map("ai_assisted")
+  aiAssisted      Boolean                @default(false) @map("ai_assisted")
   /// Client-generated id that makes sends idempotent.
-  clientId       String?     @map("client_id") @db.Uuid
-  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(3)
-  deletedAt      DateTime?   @map("deleted_at") @db.Timestamptz(3)
+  clientId        String?                @map("client_id") @db.Uuid
+  /// IMAGE and VOICE only. The other participant sees media only once APPROVED.
+  mediaStatus     PhotoModerationStatus? @map("media_status")
+  /// VOICE only, at most 60 000 (CHECK constraint).
+  mediaDurationMs Int?                   @map("media_duration_ms")
+  mediaWidth      Int?                   @map("media_width")
+  mediaHeight     Int?                   @map("media_height")
+  /// Set when the recipient reports the message; it is then hidden from them.
+  reportedAt      DateTime?              @map("reported_at") @db.Timestamptz(3)
+  createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+  deletedAt       DateTime?              @map("deleted_at") @db.Timestamptz(3)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   sender       User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
 
   @@unique([conversationId, clientId])
   @@index([conversationId, createdAt])
+  @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)], map: "messages_conversation_created_desc_idx")
   @@map("messages")
+}
+
+enum PushPlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+/// A device that asked for push notifications. The token is needed to send, so it is stored.
+model PushDevice {
+  id         String       @id @default(uuid()) @db.Uuid
+  userId     String       @map("user_id") @db.Uuid
+  token      String       @unique @db.VarChar(255)
+  platform   PushPlatform
+  createdAt  DateTime     @default(now()) @map("created_at") @db.Timestamptz(3)
+  lastSeenAt DateTime     @default(now()) @map("last_seen_at") @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_devices")
 }
 
 // ─────────────────────── Trends and astrology ───────────────────────
@@ -733,20 +771,20 @@ model Trend {
 
 /// Optional, entertainment-only. Chart data is computed deterministically.
 model AstrologyProfile {
-  userId        String   @id @map("user_id") @db.Uuid
-  birthDate     DateTime @map("birth_date") @db.Date
+  userId         String   @id @map("user_id") @db.Uuid
+  birthDate      DateTime @map("birth_date") @db.Date
   /// Local wall-clock time "HH:mm"; null when unknown.
-  birthTime     String?  @map("birth_time") @db.Char(5)
-  birthPlace    String?  @map("birth_place") @db.VarChar(120)
-  birthLatitude  Float?  @map("birth_latitude")
-  birthLongitude Float?  @map("birth_longitude")
+  birthTime      String?  @map("birth_time") @db.Char(5)
+  birthPlace     String?  @map("birth_place") @db.VarChar(120)
+  birthLatitude  Float?   @map("birth_latitude")
+  birthLongitude Float?   @map("birth_longitude")
   /// IANA time zone of the birth place.
-  birthTimeZone String?  @map("birth_time_zone") @db.VarChar(60)
+  birthTimeZone  String?  @map("birth_time_zone") @db.VarChar(60)
   /// Computed placements with the calculation library version.
-  chart         Json?
-  isVisible     Boolean  @default(false) @map("is_visible")
-  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
-  updatedAt     DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
+  chart          Json?
+  isVisible      Boolean  @default(false) @map("is_visible")
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz(3)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

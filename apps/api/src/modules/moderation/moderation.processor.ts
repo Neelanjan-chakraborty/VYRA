@@ -10,7 +10,9 @@ export class ModerationProcessor extends WorkerHost {
     super();
   }
 
-  async process(job: Job<{ photoId: string }>): Promise<void> {
-    await this.moderation.assess(job.data.photoId);
+  async process(job: Job<{ photoId?: string; messageId?: string }>): Promise<void> {
+    if (job.name === 'assess-message' && job.data.messageId)
+      await this.moderation.assessMessage(job.data.messageId);
+    else if (job.data.photoId) await this.moderation.assess(job.data.photoId);
   }
 }

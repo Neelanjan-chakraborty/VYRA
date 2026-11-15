@@ -36,6 +36,9 @@ export const profileUpdateSchema = z
     pronouns: clearable(PROFILE_LIMITS.short),
     occupation: clearable(PROFILE_LIMITS.occupation),
     isDiscoverable: z.boolean(),
+    /** Push notifications for new messages / connection requests. */
+    notifyMessages: z.boolean(),
+    notifyRequests: z.boolean(),
   })
   .partial();
 export type ProfileUpdate = z.input<typeof profileUpdateSchema>;
@@ -158,6 +161,8 @@ export const meSchema = z.object({
       city: z.string().nullable(),
       countryCode: z.string().nullable(),
       isDiscoverable: z.boolean(),
+      notifyMessages: z.boolean(),
+      notifyRequests: z.boolean(),
     })
     .nullable(),
   photos: z.array(photoSchema),

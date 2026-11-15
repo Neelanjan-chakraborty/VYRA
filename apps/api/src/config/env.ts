@@ -52,6 +52,8 @@ export const envSchema = z
     RUN_QUEUE_WORKERS: z.enum(['true', 'false']).default('true'),
     /** nsfwjs = open-source classifier (default); manual = every photo to a person; mock = tests only. */
     PHOTO_MODERATION_PROVIDER: z.enum(['nsfwjs', 'manual', 'mock']).default('nsfwjs'),
+    /** log = record that a push would be sent (dev/test); expo = Expo's push service. */
+    PUSH_PROVIDER: z.enum(['log', 'expo']).default('log'),
   })
   .superRefine((env, ctx) => {
     if (env.AI_PROVIDER === 'gemini' && !env.GEMINI_API_KEY) {

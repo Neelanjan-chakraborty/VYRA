@@ -15,6 +15,23 @@ export interface PersonaSourceBundle {
   readonly items: readonly SourceItem[];
 }
 
+/** What Wingman may know. Built only from what both people already show each other. */
+export interface WingmanContext {
+  readonly purpose: 'opener' | 'reply' | 'date_idea';
+  readonly me: { readonly name: string; readonly interests: readonly string[] };
+  readonly them: {
+    readonly name: string;
+    readonly bio: string | null;
+    readonly occupation: string | null;
+    readonly interests: readonly string[];
+  };
+  readonly sharedInterests: readonly string[];
+  /** Plain-language reasons from the compatibility engine. */
+  readonly highlights: readonly string[];
+  /** Recent messages, oldest first. Only present when the requester allowed it. Redacted. */
+  readonly messages: readonly { readonly fromMe: boolean; readonly text: string }[] | null;
+}
+
 export interface AiProvider {
   /** e.g. "mock" or "gemini:gemini-3.8-flash". Stored on the persona version. */
   readonly id: string;
@@ -23,6 +40,11 @@ export interface AiProvider {
    * deliberately `unknown`: callers must validate it before use.
    */
   draftPersona(bundle: PersonaSourceBundle): Promise<unknown>;
+  /**
+   * Up to three short message ideas. Untrusted `unknown`: callers filter it with
+   * `filterWingmanSuggestions` and the person always edits before sending.
+   */
+  suggestMessages(context: WingmanContext): Promise<unknown>;
   /** A unit-length vector of EMBEDDING_DIMENSIONS numbers. */
   embed(text: string): Promise<number[]>;
 }

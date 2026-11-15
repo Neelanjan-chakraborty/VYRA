@@ -22,6 +22,9 @@ describe('Connections (e2e)', () => {
   beforeAll(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
+    // Earlier suites leave many active people behind; hide them so rankings
+    // here are about the people this suite creates.
+    await prisma.userProfile.updateMany({ data: { isDiscoverable: false } });
   });
   afterAll(async () => {
     await app.close();

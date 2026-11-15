@@ -4,11 +4,15 @@ import {
   EMBEDDING_DIMENSIONS,
   normalise,
   type PersonaSourceBundle,
+  type WingmanContext,
 } from './ai-provider.js';
 import {
   buildPersonaUserPrompt,
   PERSONA_SYSTEM_INSTRUCTION,
   personaResponseJsonSchema,
+  WINGMAN_SYSTEM_INSTRUCTION,
+  buildWingmanUserPrompt,
+  wingmanResponseJsonSchema,
 } from './prompt.js';
 
 export class AiProviderError extends Error {
@@ -36,16 +40,39 @@ export class GeminiAiProvider implements AiProvider {
   }
 
   async draftPersona(bundle: PersonaSourceBundle): Promise<unknown> {
+    return this.generateJson(
+      buildPersonaUserPrompt(bundle),
+      PERSONA_SYSTEM_INSTRUCTION,
+      personaResponseJsonSchema(),
+      0,
+    );
+  }
+
+  async suggestMessages(context: WingmanContext): Promise<unknown> {
+    return this.generateJson(
+      buildWingmanUserPrompt(context),
+      WINGMAN_SYSTEM_INSTRUCTION,
+      wingmanResponseJsonSchema(),
+      0.7,
+    );
+  }
+
+  private async generateJson(
+    contents: string,
+    systemInstruction: string,
+    schema: Record<string, unknown>,
+    temperature: number,
+  ): Promise<unknown> {
     let text: string | undefined;
     try {
       const response = await this.client.models.generateContent({
         model: this.model,
-        contents: buildPersonaUserPrompt(bundle),
+        contents,
         config: {
-          systemInstruction: PERSONA_SYSTEM_INSTRUCTION,
-          temperature: 0,
+          systemInstruction,
+          temperature,
           responseMimeType: 'application/json',
-          responseJsonSchema: personaResponseJsonSchema(),
+          responseJsonSchema: schema,
         },
       });
       text = response.text;

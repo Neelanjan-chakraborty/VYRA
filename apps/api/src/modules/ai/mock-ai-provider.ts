@@ -5,6 +5,7 @@ import {
   normalise,
   type PersonaSourceBundle,
   type SourceItem,
+  type WingmanContext,
 } from './ai-provider.js';
 
 interface Proposal {
@@ -117,6 +118,39 @@ export class MockAiProvider implements AiProvider {
       ([, value]) => value,
     );
     if (values.length > 0) add('values', values.slice(0, 5), 'Mentioned in your bio', bio.ref);
+  }
+
+  /** The last context Wingman was given, so tests can check what was (not) shared. */
+  lastWingmanContext: WingmanContext | null = null;
+
+  async suggestMessages(context: WingmanContext): Promise<unknown> {
+    this.lastWingmanContext = context;
+    const topic = context.sharedInterests[0] ?? context.them.interests[0];
+    const them = context.them.name;
+    if (context.purpose === 'date_idea') {
+      return {
+        suggestions: [
+          topic
+            ? `Would you be up for something around ${topic.toLowerCase()} this weekend? Somewhere easy to meet.`
+            : 'Would you be up for coffee somewhere easy this weekend?',
+          'How about a walk and a chai somewhere central, whenever suits you?',
+        ],
+      };
+    }
+    const lastFromThem = context.messages?.findLast((m) => !m.fromMe);
+    if (context.purpose === 'reply' && lastFromThem) {
+      return {
+        suggestions: ['That sounds fun! Tell me more?', 'Ha, I was hoping you’d say that.'],
+      };
+    }
+    return {
+      suggestions: [
+        topic
+          ? `Hi ${them}! I noticed we both like ${topic.toLowerCase()} — what got you into it?`
+          : `Hi ${them}! What’s been the best part of your week?`,
+        `Hi ${them}, your profile made me smile. What does a good weekend look like for you?`,
+      ],
+    };
   }
 
   async embed(text: string): Promise<number[]> {

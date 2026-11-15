@@ -32,12 +32,29 @@ export class ReportsService {
       });
       if (photo === 0) throw new NotFoundException('Not found.');
     }
+    if (report.messageId) {
+      // Only a message you received, from the person you're reporting.
+      const message = await this.prisma.message.count({
+        where: {
+          id: report.messageId,
+          senderId: report.reportedUserId,
+          deletedAt: null,
+          conversation: { participants: { some: { userId: reporterId } } },
+        },
+      });
+      if (message === 0) throw new NotFoundException('Not found.');
+      await this.prisma.message.update({
+        where: { id: report.messageId },
+        data: { reportedAt: new Date() },
+      });
+    }
 
     const duplicate = await this.prisma.safetyReport.count({
       where: {
         reporterId,
         reportedUserId: report.reportedUserId,
         photoId: report.photoId ?? null,
+        messageId: report.messageId ?? null,
         status: { in: ['OPEN', 'IN_REVIEW'] },
       },
     });
@@ -49,6 +66,7 @@ export class ReportsService {
           reason: report.reason,
           details: report.details ?? null,
           photoId: report.photoId ?? null,
+          messageId: report.messageId ?? null,
         },
       });
       await this.audit.record({
@@ -56,7 +74,11 @@ export class ReportsService {
         actorId: reporterId,
         entityType: 'user',
         entityId: report.reportedUserId,
-        metadata: { reason: report.reason, photo: report.photoId !== undefined },
+        metadata: {
+          reason: report.reason,
+          photo: report.photoId !== undefined,
+          message: report.messageId !== undefined,
+        },
         requestId,
       });
     }

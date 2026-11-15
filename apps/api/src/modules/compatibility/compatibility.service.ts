@@ -84,6 +84,23 @@ export class CompatibilityService {
     return { userId: targetId, result };
   }
 
+  /**
+   * Reasons and shared interests for a pair, without recording a view. Used by
+   * Wingman for people who are already connected.
+   */
+  async reasonsFor(
+    viewerId: string,
+    targetId: string,
+  ): Promise<{ highlights: string[]; sharedInterests: string[] }> {
+    const { version, weights } = await this.activeWeights();
+    const loaded = await this.people.load([viewerId, targetId]);
+    const viewer = loaded.get(viewerId);
+    const target = loaded.get(targetId);
+    if (!viewer || !target) return { highlights: [], sharedInterests: [] };
+    const result = score(viewer.person, target.person, weights, version);
+    return { highlights: highlights(result, weights), sharedInterests: result.sharedInterests };
+  }
+
   /** Another person's profile as the viewer may see it. Same visibility rules as `forPair`. */
   async profile(viewerId: string, targetId: string): Promise<PublicProfile> {
     const pair = await this.people.visiblePair(viewerId, targetId);

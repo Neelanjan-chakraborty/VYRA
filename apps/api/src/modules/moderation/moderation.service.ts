@@ -39,6 +39,58 @@ export class ModerationService {
     @InjectQueue(PHOTO_MODERATION_QUEUE) private readonly queue: Queue,
   ) {}
 
+  private readonly messageListeners: ((messageId: string) => Promise<void>)[] = [];
+
+  /** Messaging subscribes here to tell both people when a photo message is decided. */
+  onMessageAssessed(listener: (messageId: string) => Promise<void>): void {
+    this.messageListeners.push(listener);
+  }
+
+  /** Queues a photo sent in a conversation for the automated pass. */
+  async submitMessage(messageId: string): Promise<void> {
+    await this.queue.add(
+      'assess-message',
+      { messageId },
+      {
+        removeOnComplete: true,
+        removeOnFail: 100,
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 2000 },
+      },
+    );
+  }
+
+  /**
+   * Photos in private conversations are never put in front of a person unless
+   * someone reports them, so anything the classifier is unsure about is not
+   * delivered: the sender is told and can send another.
+   */
+  async assessMessage(messageId: string): Promise<void> {
+    const message = await this.prisma.message.findUnique({ where: { id: messageId } });
+    if (!message?.mediaKey || message.kind !== 'IMAGE' || message.mediaStatus !== 'PENDING') return;
+    const data = await this.storage.get(message.mediaKey);
+    if (!data) return;
+    const result = await this.provider.assess(data);
+    const status: PhotoModerationStatus = result.verdict === 'approve' ? 'APPROVED' : 'REJECTED';
+    const updated = await this.prisma.message.updateMany({
+      where: { id: messageId, mediaStatus: 'PENDING' },
+      data: { mediaStatus: status },
+    });
+    if (updated.count === 0) return;
+    if (message.senderId) {
+      await this.prisma.moderationEvent.create({
+        data: {
+          subjectUserId: message.senderId,
+          action: STATUS_ACTION[status],
+          targetType: 'message',
+          targetId: messageId,
+          reason: result.reason,
+        },
+      });
+    }
+    for (const listener of this.messageListeners) await listener(messageId);
+  }
+
   /** Records a new or replaced upload and queues it for the automated pass. */
   async submit(photoId: string, ownerId: string): Promise<void> {
     await this.event(ownerId, null, 'PHOTO_SUBMITTED', photoId, null);

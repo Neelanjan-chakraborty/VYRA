@@ -16,6 +16,7 @@ import { ConnectionsModule } from './modules/connections/connections.module.js';
 import { ConsentsModule } from './modules/consents/consents.module.js';
 import { LocationModule } from './modules/location/location.module.js';
 import { MeModule } from './modules/me/me.module.js';
+import { MessagingModule } from './modules/messaging/messaging.module.js';
 import { ModerationModule } from './modules/moderation/moderation.module.js';
 import { PersonaModule } from './modules/persona/persona.module.js';
 import { StorageModule } from './modules/storage/storage.module.js';
@@ -51,6 +52,7 @@ import { SafetyModule } from './modules/safety/safety.module.js';
     PersonaModule,
     CompatibilityModule,
     ConnectionsModule,
+    MessagingModule,
     SafetyModule,
   ],
   providers: [

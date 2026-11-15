@@ -17,6 +17,8 @@ import type { DiscoveryEventType, Prisma } from '../../generated/prisma/client.j
 import { AuditService } from '../audit/audit.service.js';
 import { CompatibilityService } from '../compatibility/compatibility.service.js';
 import { PeopleService } from '../compatibility/people.service.js';
+import { MessagingService } from '../messaging/messaging.service.js';
+import { NotificationService } from '../messaging/notification.service.js';
 
 const NOT_FOUND = 'Not found.';
 const DAY_MS = 86_400_000;
@@ -35,6 +37,8 @@ export class ConnectionsService {
     private readonly people: PeopleService,
     private readonly compatibility: CompatibilityService,
     private readonly audit: AuditService,
+    private readonly messaging: MessagingService,
+    private readonly notifications: NotificationService,
   ) {}
 
   private async requireVisible(viewerId: string, targetId: string): Promise<void> {
@@ -101,6 +105,8 @@ export class ConnectionsService {
     if (reverse?.status === 'PENDING') {
       const matchId = await this.acceptRequest(reverse.id, recipientId, senderId);
       await this.event(senderId, recipientId, 'CONNECTION_ACCEPTED', { via: 'mutual_request' });
+      this.messaging.connectionChanged([senderId, recipientId]);
+      await this.notifications.notify(recipientId, { kind: 'connected', fromUserId: senderId });
       return { outcome: 'matched', requestId: reverse.id, matchId };
     }
 
@@ -135,6 +141,8 @@ export class ConnectionsService {
       ? await this.prisma.connectionRequest.update({ where: { id: existing.id }, data })
       : await this.prisma.connectionRequest.create({ data: { senderId, recipientId, ...data } });
     await this.event(senderId, recipientId, 'CONNECT_REQUESTED', { withNote: Boolean(note) });
+    this.messaging.connectionChanged([senderId, recipientId]);
+    await this.notifications.notify(recipientId, { kind: 'request', fromUserId: senderId });
     await this.audit.record({
       action: 'connections.requested',
       actorId: senderId,
@@ -159,6 +167,7 @@ export class ConnectionsService {
         create: { userAId, userBId, connectionRequestId: id },
         update: { connectionRequestId: id, endedAt: null, createdAt: new Date() },
       });
+      await MessagingService.openConversation(tx, match.id, userAId, userBId);
       return match.id;
     });
   }
@@ -172,6 +181,11 @@ export class ConnectionsService {
       throw new NotFoundException(NOT_FOUND);
     const matchId = await this.acceptRequest(id, request.senderId, recipientId);
     await this.event(recipientId, request.senderId, 'CONNECTION_ACCEPTED');
+    this.messaging.connectionChanged([recipientId, request.senderId]);
+    await this.notifications.notify(request.senderId, {
+      kind: 'connected',
+      fromUserId: recipientId,
+    });
     await this.audit.record({
       action: 'connections.accepted',
       actorId: recipientId,
@@ -190,6 +204,7 @@ export class ConnectionsService {
     if (updated.count !== 1) throw new NotFoundException(NOT_FOUND);
     const request = await this.prisma.connectionRequest.findUniqueOrThrow({ where: { id } });
     await this.event(recipientId, request.senderId, 'CONNECTION_DECLINED');
+    this.messaging.connectionChanged([recipientId, request.senderId]);
   }
 
   async withdraw(senderId: string, id: string): Promise<void> {
@@ -198,6 +213,8 @@ export class ConnectionsService {
       data: { status: 'WITHDRAWN', respondedAt: new Date() },
     });
     if (updated.count !== 1) throw new NotFoundException(NOT_FOUND);
+    const request = await this.prisma.connectionRequest.findUniqueOrThrow({ where: { id } });
+    this.messaging.connectionChanged([senderId, request.recipientId]);
   }
 
   async endMatch(userId: string, matchId: string, requestId: string): Promise<void> {
@@ -206,6 +223,8 @@ export class ConnectionsService {
       data: { endedAt: new Date() },
     });
     if (updated.count !== 1) throw new NotFoundException(NOT_FOUND);
+    const match = await this.prisma.match.findUniqueOrThrow({ where: { id: matchId } });
+    this.messaging.connectionChanged([match.userAId, match.userBId]);
     await this.audit.record({
       action: 'connections.ended',
       actorId: userId,
@@ -238,6 +257,7 @@ export class ConnectionsService {
       outgoingRequestId: outgoing?.status === 'PENDING' ? outgoing.id : null,
       incomingRequestId: incoming?.status === 'PENDING' ? incoming.id : null,
       matchId: match?.id ?? null,
+      conversationId: match ? await this.messaging.conversationForMatch(match.id) : null,
       requestBlockedReason: declinedRecently
         ? 'declined_recently'
         : pendingCount >= MAX_PENDING_OUTGOING
@@ -269,14 +289,20 @@ export class ConnectionsService {
       ...saved.map((s) => s.targetUserId),
     ]);
     const summaries = await this.compatibility.summaries(userId, [...ids]);
+    const conversations = new Map<string, string>();
+    for (const m of matches)
+      conversations.set(m.id, await this.messaging.conversationForMatch(m.id));
     const item = (
       id: string | null,
       personId: string,
       note: string | null,
       createdAt: Date,
+      conversationId: string | null = null,
     ): ConnectionItem[] => {
       const person = summaries.get(personId);
-      return person ? [{ id, person, note, createdAt: createdAt.toISOString() }] : [];
+      return person
+        ? [{ id, person, note, createdAt: createdAt.toISOString(), conversationId }]
+        : [];
     };
     // Saved people must still be visible (they may have hidden or changed their preferences since).
     const visibleSaved = [];
@@ -286,7 +312,13 @@ export class ConnectionsService {
       incoming: incoming.flatMap((r) => item(r.id, r.senderId, r.note, r.createdAt)),
       outgoing: outgoing.flatMap((r) => item(r.id, r.recipientId, r.note, r.createdAt)),
       mutual: matches.flatMap((m) =>
-        item(m.id, m.userAId === userId ? m.userBId : m.userAId, null, m.createdAt),
+        item(
+          m.id,
+          m.userAId === userId ? m.userBId : m.userAId,
+          null,
+          m.createdAt,
+          conversations.get(m.id) ?? null,
+        ),
       ),
       saved: visibleSaved.flatMap((s) => item(null, s.targetUserId, null, s.createdAt)),
     };
@@ -334,6 +366,7 @@ export class ConnectionsService {
         },
       }),
     ]);
+    this.messaging.connectionChanged([blockerId, blockedId]);
     await this.audit.record({
       action: 'safety.blocked',
       actorId: blockerId,

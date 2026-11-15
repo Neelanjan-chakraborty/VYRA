@@ -12,12 +12,16 @@ export const REPORT_REASONS = [
 ] as const;
 export const reportReasonSchema = z.enum(REPORT_REASONS);
 
-export const reportRequestSchema = z.object({
-  reportedUserId: z.uuid(),
-  reason: reportReasonSchema,
-  details: z.string().trim().max(2000).optional(),
-  photoId: z.uuid().optional(),
-});
+export const reportRequestSchema = z
+  .object({
+    reportedUserId: z.uuid(),
+    reason: reportReasonSchema,
+    details: z.string().trim().max(2000).optional(),
+    photoId: z.uuid().optional(),
+    /** A message the reporter received from the reported person. Hidden from the reporter at once. */
+    messageId: z.uuid().optional(),
+  })
+  .refine((r) => !(r.photoId && r.messageId), 'Report a photo or a message, not both');
 export type ReportRequest = z.infer<typeof reportRequestSchema>;
 
 /** Distinct reporters after which a reported photo is hidden until a moderator decides. */

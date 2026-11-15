@@ -97,6 +97,8 @@ export class MeService {
         city: profile.city,
         countryCode: profile.countryCode,
         isDiscoverable: profile.isDiscoverable,
+        notifyMessages: profile.notifyMessages,
+        notifyRequests: profile.notifyRequests,
       },
       photos,
       relationshipIntents: user.relationshipIntents.map((intent) => ({

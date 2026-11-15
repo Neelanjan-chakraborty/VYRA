@@ -6,11 +6,9 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { PrismaService } from '../../database/prisma.service.js';
 import type { UserRole } from '../../generated/prisma/client.js';
 import { type AuthenticatedRequest, IS_PUBLIC, ROLES } from './auth.decorators.js';
-import { isUsable } from './auth.service.js';
-import { TokenService } from './token.service.js';
+import { AccessVerifier } from './access-verifier.js';
 
 const UNAUTHENTICATED = 'Sign in to continue.';
 
@@ -23,50 +21,31 @@ const UNAUTHENTICATED = 'Sign in to continue.';
 export class AuthGuard implements CanActivate {
   constructor(
     private readonly reflector: Reflector,
-    private readonly tokens: TokenService,
-    private readonly prisma: PrismaService,
+    private readonly access: AccessVerifier,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const targets = [context.getHandler(), context.getClass()];
     if (this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, targets)) return true;
+    // Sockets are authenticated once, when they connect (see RealtimeGateway).
+    if (context.getType() === 'ws') {
+      const client = context.switchToWs().getClient<{ data?: { userId?: string } }>();
+      return typeof client.data?.userId === 'string';
+    }
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const header = request.headers.authorization;
-    const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
-    const claims = token ? await this.tokens.verifyAccess(token) : null;
-    if (!claims) throw new UnauthorizedException(UNAUTHENTICATED);
-
-    const session = await this.prisma.authSession.findUnique({
-      where: { id: claims.sessionId },
-      select: {
-        userId: true,
-        revokedAt: true,
-        expiresAt: true,
-        user: { select: { role: true, status: true } },
-      },
-    });
-    if (
-      !session ||
-      session.userId !== claims.userId ||
-      session.revokedAt !== null ||
-      session.expiresAt <= new Date() ||
-      !isUsable(session.user.status)
-    ) {
-      throw new UnauthorizedException(UNAUTHENTICATED);
-    }
+    const auth = await this.access.verify(
+      header?.startsWith('Bearer ') ? header.slice(7) : undefined,
+    );
+    if (!auth) throw new UnauthorizedException(UNAUTHENTICATED);
 
     const roles = this.reflector.getAllAndOverride<UserRole[] | undefined>(ROLES, targets);
-    if (roles && !roles.includes(session.user.role)) {
+    if (roles && !roles.includes(auth.role)) {
       throw new ForbiddenException('You do not have access to this.');
     }
 
-    request.auth = {
-      userId: claims.userId,
-      sessionId: claims.sessionId,
-      role: session.user.role,
-      status: session.user.status,
-    };
+    request.auth = auth;
     return true;
   }
 }

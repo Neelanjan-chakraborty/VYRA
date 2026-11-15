@@ -10,7 +10,7 @@ export const MAX_PENDING_OUTGOING = 20;
 export const CONNECTION_NOTE_MAX = 300;
 
 /** Drops control characters except tab, line feed and carriage return. */
-function withoutControlCharacters(value: string): string {
+export function withoutControlCharacters(value: string): string {
   return [...value]
     .filter((ch) => {
       const code = ch.codePointAt(0) ?? 0;
@@ -51,6 +51,8 @@ export const connectionItemSchema = z.object({
   /** The sender's note. Present only on incoming requests and only for the recipient, or on your own outgoing ones. */
   note: z.string().nullable(),
   createdAt: z.iso.datetime(),
+  /** Mutual connections only: where to talk. */
+  conversationId: z.uuid().nullable(),
 });
 export type ConnectionItem = z.infer<typeof connectionItemSchema>;
 
@@ -71,6 +73,8 @@ export const relationshipStateSchema = z.object({
   incomingRequestId: z.uuid().nullable(),
   /** Active mutual connection. */
   matchId: z.uuid().nullable(),
+  /** The conversation with them, while connected. */
+  conversationId: z.uuid().nullable(),
   /** Why the viewer can't send a request right now, if they can't. */
   requestBlockedReason: z.enum(['declined_recently', 'too_many_pending']).nullable(),
 });

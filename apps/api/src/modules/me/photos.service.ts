@@ -4,42 +4,18 @@ import {
   Inject,
   Injectable,
   NotFoundException,
-  UnsupportedMediaTypeException,
 } from '@nestjs/common';
-import { ACCEPTED_PHOTO_MIME_TYPES, MAX_PHOTOS, type Photo } from '@vyra/validation';
-import sharp, { type OutputInfo } from 'sharp';
+import { MAX_PHOTOS, type Photo } from '@vyra/validation';
 import { PrismaService } from '../../database/prisma.service.js';
 import type { UserPhoto } from '../../generated/prisma/client.js';
-import { sha256Hex } from '../auth/crypto.js';
+import { type ProcessedImage, processImage, type UploadedImage } from '../../common/image.js';
 import { ModerationService } from '../moderation/moderation.service.js';
 import { MediaUrlService } from '../storage/media-url.service.js';
 import { OBJECT_STORAGE, type ObjectStorage } from '../storage/storage.js';
 
-/** sharp format name → the MIME type a client must declare for it. */
-const FORMAT_MIME: Readonly<Record<string, string>> = {
-  jpeg: 'image/jpeg',
-  png: 'image/png',
-  webp: 'image/webp',
-};
-const MAX_EDGE = 2048;
 const MIN_EDGE = 400;
-const MAX_INPUT_EDGE = 8000;
-/** Refuse decompression bombs: at most 50 megapixels of input. */
-const MAX_INPUT_PIXELS = 50_000_000;
 /** Offset used to move photos out of the way while reordering. */
 const REORDER_OFFSET = 1000;
-
-export interface UploadedImage {
-  readonly buffer: Buffer;
-  /** The type the client declared. Must agree with what the bytes are. */
-  readonly mimetype: string;
-}
-
-interface ProcessedImage {
-  readonly data: Buffer;
-  readonly info: OutputInfo;
-  readonly contentHash: string;
-}
 
 @Injectable()
 export class PhotosService {
@@ -72,44 +48,8 @@ export class PhotosService {
     return photos.map((photo) => this.toDto(photo));
   }
 
-  /**
-   * Checks the declared type, then what the bytes really are, then size and
-   * dimensions, and re-encodes to JPEG. Re-encoding drops EXIF (including GPS
-   * position) and anything else hidden in the original file.
-   */
-  private async process(input: UploadedImage): Promise<ProcessedImage> {
-    if (!(ACCEPTED_PHOTO_MIME_TYPES as readonly string[]).includes(input.mimetype)) {
-      throw new UnsupportedMediaTypeException('Upload a JPEG, PNG or WebP photo.');
-    }
-    let output: { data: Buffer; info: OutputInfo };
-    try {
-      const image = sharp(input.buffer, { failOn: 'error', limitInputPixels: MAX_INPUT_PIXELS });
-      const metadata = await image.metadata();
-      const actualMime = metadata.format ? FORMAT_MIME[metadata.format] : undefined;
-      if (!actualMime) throw new BadRequestException('Upload a JPEG, PNG or WebP photo.');
-      if (actualMime !== input.mimetype) {
-        throw new BadRequestException('That file isn’t the kind of image it says it is.');
-      }
-      const width = metadata.width ?? 0;
-      const height = metadata.height ?? 0;
-      if (Math.min(width, height) < MIN_EDGE) {
-        throw new BadRequestException(`Photos must be at least ${MIN_EDGE} pixels on each side.`);
-      }
-      if (Math.max(width, height) > MAX_INPUT_EDGE) {
-        throw new BadRequestException(
-          `Photos can be at most ${MAX_INPUT_EDGE} pixels on each side.`,
-        );
-      }
-      output = await image
-        .rotate() // apply EXIF orientation before the metadata is dropped
-        .resize({ width: MAX_EDGE, height: MAX_EDGE, fit: 'inside', withoutEnlargement: true })
-        .jpeg({ quality: 86, mozjpeg: true })
-        .toBuffer({ resolveWithObject: true });
-    } catch (error) {
-      if (error instanceof BadRequestException) throw error;
-      throw new BadRequestException('That file could not be read as a photo.');
-    }
-    return { ...output, contentHash: sha256Hex(output.data) };
+  private process(input: UploadedImage): Promise<ProcessedImage> {
+    return processImage(input, MIN_EDGE);
   }
 
   async upload(userId: string, input: UploadedImage): Promise<Photo> {
