@@ -156,11 +156,17 @@ async function createApiPerson(name) {
 }
 
 async function main() {
-  const browser = await chromium.launch();
-  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
-  await context.grantPermissions(['clipboard-read', 'clipboard-write', 'geolocation'], {
-    origin: ORIGIN,
+  // A fake microphone, so voice notes can be recorded headless.
+  const browser = await chromium.launch({
+    args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
   });
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.grantPermissions(
+    ['clipboard-read', 'clipboard-write', 'geolocation', 'microphone'],
+    {
+      origin: ORIGIN,
+    },
+  );
   // A precise device position in Bengaluru; VYRA must store and show only a rough area.
   await context.setGeolocation({ latitude: 12.971942, longitude: 77.593689 });
   const page = await context.newPage();
@@ -477,9 +483,9 @@ async function main() {
   });
 
   await step('discover: unapproved photos never show, approved ones do', async () => {
-    // People left by earlier runs would crowd this run's people out of the top 30.
+    // People left by earlier runs (and by the API test suites) would crowd this run's people out of the top 30.
     psql(
-      `update user_profiles set is_discoverable=false where display_name ~ '^(Ravi|Kabir|Dev|Arjun)[0-9]+$'`,
+      `update user_profiles set is_discoverable=false where display_name ~ '^(Ravi|Kabir|Dev|Arjun)[0-9]+$' or display_name = 'Synthetic'`,
     );
     // A second person, created through the API, who fits the viewer's choices.
     const subjectName = `Ravi${Date.now() % 100000}`;
@@ -531,10 +537,14 @@ async function main() {
     await page.getByRole('tab', { name: 'You' }).click();
   });
 
+  /** The person Asha connects with in the discovery step; the messaging step talks to them. */
+  let kabirForMessages = null;
+
   await step('discovery: orbit, filters, compatibility, connections, pass, block', async () => {
     const suffix = Date.now() % 100000;
     const [kabir, dev, arjun] = [`Kabir${suffix}`, `Dev${suffix}`, `Arjun${suffix}`];
     const kabirPerson = await createApiPerson(kabir);
+    kabirForMessages = { name: kabir, token: kabirPerson.token };
     await createApiPerson(dev);
     await createApiPerson(arjun);
     await page.reload({ waitUntil: 'networkidle' });
@@ -643,6 +653,124 @@ async function main() {
     await button('Back').click();
   });
 
+  await step('messaging: text, live reply, read, photo, voice, date idea, Wingman', async () => {
+    const { name: kabir, token } = kabirForMessages;
+    const { io } = require(require.resolve('socket.io-client', { paths: ['apps/mobile'] }));
+    const [conversation] = (await call('/conversations', null, token, 'GET')).conversations;
+    const conversationId = conversation.id;
+    const kabirSocket = io('http://localhost:4000', {
+      path: '/v1/socket',
+      transports: ['websocket'],
+      auth: { token },
+    });
+    await new Promise((resolve, reject) => {
+      kabirSocket.on('connect', resolve);
+      kabirSocket.on('connect_error', reject);
+    });
+    const kabirSays = (body) =>
+      call(
+        `/conversations/${conversationId}/messages`,
+        { kind: 'text', clientId: require('node:crypto').randomUUID(), body },
+        token,
+      );
+
+    try {
+      // From Connections › Mutual into the conversation.
+      await page.getByRole('tab', { name: 'Connections' }).click();
+      await page.getByRole('radio', { name: 'Show: Mutual' }).click();
+      await button(`Message ${kabir}`).click();
+      await title(kabir).waitFor();
+      await page.getByText(`You and ${kabir} are connected`, { exact: false }).waitFor();
+
+      // Asha writes; Kabir types and answers; it arrives without a reload.
+      await page.getByLabel('Message', { exact: true }).fill('Hi Kabir! Chai sounds good.');
+      await button('Send').click();
+      await page.getByText('Hi Kabir! Chai sounds good.', { exact: true }).waitFor();
+      kabirSocket.emit('typing', { conversationId });
+      await page.getByText('typing…', { exact: true }).waitFor({ timeout: 5000 });
+      await snap('conversation-typing');
+      await kabirSays('Great — Saturday?');
+      await page.getByText('Great — Saturday?', { exact: true }).waitFor({ timeout: 10000 });
+
+      // Kabir reads Asha's message: the tick appears (both share receipts).
+      const latest = await call(`/conversations/${conversationId}/messages`, null, token, 'GET');
+      await call(`/conversations/${conversationId}/read`, { upTo: latest.messages[0].id }, token);
+      await page
+        .getByText(/· Read$/)
+        .first()
+        .waitFor({ timeout: 10000 });
+
+      // A photo: checked first, then shown.
+      await page.getByRole('button', { name: /^Add a photo/ }).click();
+      const chooser = page.waitForEvent('filechooser');
+      await button('Photo').click();
+      await (await chooser).setFiles(photoPath);
+      await page.getByRole('img', { name: 'Photo you sent' }).waitFor({ timeout: 15000 });
+      await page.getByText('Photo being checked').waitFor({ state: 'detached', timeout: 30000 });
+
+      // A voice note from the (fake) microphone.
+      await page.getByRole('button', { name: /^Add a photo/ }).click();
+      await button('Voice note').click();
+      await page.getByText(/^Recording 0:0\d/).waitFor({ timeout: 10000 });
+      await page.waitForTimeout(1500);
+      await button('Send voice note').click();
+      await page
+        .getByRole('button', { name: /^Play voice note, 0:0[1-3]$/ })
+        .waitFor({ timeout: 15000 });
+
+      // A date idea, which Kabir accepts.
+      await page.getByRole('button', { name: /^Add a photo/ }).click();
+      await button('Date idea').click();
+      await page.getByLabel('The idea').fill('Filter coffee and a walk');
+      await page.getByLabel('When (optional)').fill('Saturday morning');
+      await page.getByLabel('Where, roughly (optional)').fill('Indiranagar');
+      await button('Send idea').click();
+      await page.getByText('Waiting for an answer').waitFor();
+      const withPlan = await call(`/conversations/${conversationId}/messages`, null, token, 'GET');
+      const planId = withPlan.messages.find((m) => m.kind === 'date_plan').id;
+      await call(`/messages/${planId}/plan/accept`, null, token);
+      await page.getByText('You’re both in').waitFor({ timeout: 10000 });
+      await snap('conversation-media-plan');
+
+      // Wingman: consent, an idea, edited and sent by Asha.
+      await page.getByRole('button', { name: /^Add a photo/ }).click();
+      await button('Ask Wingman for ideas').click();
+      await button('Turn on Wingman').click();
+      await button('Start the conversation').click();
+      const idea = page.getByRole('checkbox', { name: /^Hi Kabir/ }).first();
+      await idea.waitFor({ timeout: 10000 });
+      await snap('wingman');
+      await idea.click();
+      await page.getByText('Wingman’s idea — make it yours before sending.').waitFor();
+      const box = page.getByLabel('Message', { exact: true });
+      await box.fill(`${await box.inputValue()} (Asha here)`);
+      await button('Send').click();
+      await page.getByText(/\(Asha here\)$/).waitFor();
+
+      // Privacy settings for this conversation.
+      await button('Conversation settings').click();
+      await page.getByRole('switch', { name: 'Read receipts', checked: true }).click();
+      await page.getByRole('switch', { name: 'Read receipts', checked: false }).waitFor();
+      await snap('conversation-settings');
+      // Tap outside the sheet to close it.
+      await page.mouse.click(195, 60);
+      await page.getByText('Conversation settings', { exact: true }).waitFor({ state: 'detached' });
+
+      // Back in the list; a new message shows a quiet dot, not a count.
+      await button('Back').click();
+      await page.getByRole('tab', { name: /^Messages/ }).waitFor();
+      await page.getByRole('tab', { name: 'Messages' }).click();
+      await page.getByText('Your conversations.', { exact: true }).waitFor();
+      await kabirSays('See you then!');
+      await page.getByRole('tab', { name: 'Messages, something new' }).waitFor({ timeout: 10000 });
+      await page.getByRole('link', { name: new RegExp(`^${kabir}, new message`) }).waitFor();
+      await snap('messages-list');
+      await page.getByRole('tab', { name: 'You' }).click();
+    } finally {
+      kabirSocket.disconnect();
+    }
+  });
+
   await step('persona from settings', async () => {
     await page.getByRole('link', { name: /^Your persona/ }).click();
     await heading('Your persona.')
@@ -674,9 +802,12 @@ async function main() {
     await page.getByLabel('City', { exact: true }).waitFor();
     await snap('settings-location-denied');
     await button('Cancel').click();
-    await context.grantPermissions(['clipboard-read', 'clipboard-write', 'geolocation'], {
-      origin: ORIGIN,
-    });
+    await context.grantPermissions(
+      ['clipboard-read', 'clipboard-write', 'geolocation', 'microphone'],
+      {
+        origin: ORIGIN,
+      },
+    );
     await button('Use my approximate location').click();
     await page.getByText('From your device, approximate.').waitFor();
     await page.getByText('Bengaluru, Karnataka', { exact: true }).waitFor();

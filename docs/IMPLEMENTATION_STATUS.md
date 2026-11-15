@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 14 November 2026, after Milestone 5 (discovery and the connection lifecycle).
+Last updated: 15 November 2026, after Milestone 6 (messaging, media, voice, notifications, Wingman, date ideas).
 
 ## Summary
 
@@ -13,7 +13,8 @@ Last updated: 14 November 2026, after Milestone 5 (discovery and the connection 
 | 4 — Compatibility             | Done                                           |
 | Gap resolution (4 items)      | Done — see below                               |
 | 5 — Discovery                 | Done                                           |
-| 6–8                           | Not started                                    |
+| 6 — Social                    | Done; device push unverified                   |
+| 7–8                           | Not started                                    |
 
 ## Product gap resolution — complete versus still needed
 
@@ -26,6 +27,26 @@ Last updated: 14 November 2026, after Milestone 5 (discovery and the connection 
 | **Discover (first cut)** | Ranked list and profile preview with photo or placeholder, distance band, estimated alignment in words, reasons                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             | Superseded by Milestone 5 below                                                                                                                                                              |
 
 ## What works today
+
+**New in Milestone 6 — conversations.** Mutual connections can now talk:
+
+- **Messages tab**: conversations most recent first, a quiet dot for something new (also on
+  the tab), "Connection ended" when it's read-only. Reached from Connections › Mutual
+  ("Message") or a connected profile.
+- **Conversation**: live text (Socket.IO with the Redis adapter), "typing…", read ticks when
+  both share receipts, optimistic sending with idempotent retries, older messages on scroll.
+- **Photos** checked by the same classifier before the other person sees them; uncertain ones
+  aren't delivered. **Voice notes** up to a minute (expo-audio; M4A on phones, WebM in
+  browsers), playable inline. **Date ideas** the other person can accept or decline, with a
+  safety line once accepted.
+- **Wingman** (opt-in, its own consent): openers, replies or date ideas from what you both
+  show on your profiles; recent messages only if you switch that on for the conversation.
+  Suggestions go into the composer to edit; nothing is sent for you.
+- **Per-conversation privacy**: read receipts (reciprocal), typing, Wingman's access, mute.
+  Remove your own message for both; report theirs (hidden from you at once); end the
+  connection or block from the conversation.
+- **Notifications**: push registration after the first connection (Expo; needs a device
+  build), "New message from …" — never content — and toggles under You → Notifications.
 
 **New in Milestone 5 — discovery.** People can now act on what they see:
 
@@ -110,20 +131,28 @@ delete their account.
 - **Photos are stored on local disk.** Production refuses to start in this mode.
 - **Terms of Service and Privacy Policy documents do not exist**; the consent screen has
   nothing to link to.
-- **Messaging** (Milestone 6): mutual connections are listed, but nobody can write yet.
+- **Push on real devices** is unverified: it needs a development or store build linked to an
+  EAS project. The web build and Expo Go skip registration.
+- **Voice notes are not automatically moderated** (no audio classifier); they rely on reports.
 - No archive import, admin console (moderation is API-only), or request expiry job.
 
-## Verification (run 14 Nov 2026 in the cloud container)
+## Verification (run 15 Nov 2026 in the cloud container)
 
-| Check                             | Result                                                                                                                                                                                                                                                       |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                                         |
-| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                                            |
-| `pnpm test`                       | Pass — validation, design-system, compatibility-engine, api (incl. the real nsfwjs model) and mobile (Orbit layout, 4)                                                                                                                                       |
-| `pnpm test:e2e`                   | Pass — 168 tests in 11 suites against real PostgreSQL, Redis and the queue (new: `connections.e2e-spec.ts`, 14)                                                                                                                                              |
-| `prisma migrate diff --exit-code` | Pass — no drift, 8 migrations                                                                                                                                                                                                                                |
-| `expo export --platform web`      | Pass                                                                                                                                                                                                                                                         |
-| `pnpm e2e:web`                    | Pass — 42 screenshots, no browser errors; adds Orbit (tap, zoom, list), Discover filters, Deep Discover, compatibility screen, save → Saved, incoming request → accept → Mutual, connect with note → Sent → withdraw, pass, block → Blocked people → unblock |
+| Check                             | Result                                                                                                                                                                                                                                                                                                    |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pnpm format:check`, `pnpm lint`  | Pass                                                                                                                                                                                                                                                                                                      |
+| `pnpm build`, `pnpm typecheck`    | Pass (5 packages)                                                                                                                                                                                                                                                                                         |
+| `pnpm test`                       | Pass — validation 46, design-system, compatibility-engine, api 59 (incl. the real nsfwjs model, audio sniffing, Wingman prompt and filter), mobile 4                                                                                                                                                      |
+| `pnpm test:e2e`                   | Pass — 191 tests in 13 suites against real PostgreSQL, Redis and the queue (new: `messaging` 15 incl. sockets, `message-media` 8)                                                                                                                                                                         |
+| `prisma migrate diff --exit-code` | Pass — no drift, 9 migrations                                                                                                                                                                                                                                                                             |
+| `expo export --platform web`      | Pass                                                                                                                                                                                                                                                                                                      |
+| `pnpm e2e:web`                    | Pass — 47 screenshots, no browser errors; adds a conversation: text, live reply and “typing…” over the socket, read tick, photo (checked, then shown), voice note from a fake microphone, date idea accepted by the other person, Wingman opt-in → suggestion → edit → send, privacy settings, unread dot |
+
+Found and fixed while verifying Milestone 6: the global HTTP auth guard crashed on socket
+messages (it now recognises socket contexts, which are authenticated at connect); live
+"list changed" events re-fetched a just-blocked person's profile (only on-screen queries
+refetch now, and blocking stops those queries first); lists kept on screen for over ten
+minutes showed expired signed photo URLs (media-bearing queries now refresh every five).
 
 Found and fixed while verifying Milestone 5: Orbit drew people on top of each other when one
 alignment band was crowded (now spills outward and starts zoomed to fit; unit-tested); the
@@ -209,5 +238,5 @@ pnpm build
 pnpm check && pnpm test:e2e
 ```
 
-Then start Milestone 6 (`docs/IMPLEMENTATION_BACKLOG.md`): messaging between mutual
-connections over Socket.IO, notifications, and Wingman.
+Then start Milestone 7 (`docs/IMPLEMENTATION_BACKLOG.md`): advanced intelligence — learning
+from discovery events and AI archive import.

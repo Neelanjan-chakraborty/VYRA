@@ -1,6 +1,13 @@
 import { QueryClient } from '@tanstack/react-query';
 import { ApiRequestError } from './api';
 
+/**
+ * Photo and voice URLs from the API are signed for ten minutes. Queries that
+ * carry them refetch on this interval while on screen, so nothing shown ever
+ * points at an expired URL.
+ */
+export const MEDIA_REFRESH_MS = 5 * 60_000;
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

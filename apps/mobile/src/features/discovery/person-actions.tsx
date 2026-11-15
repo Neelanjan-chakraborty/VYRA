@@ -44,7 +44,9 @@ type Sheet = 'connect' | 'more' | 'block' | 'report' | 'end' | null;
  */
 export function PersonActions({ userId, name }: { userId: string; name: string }) {
   const router = useRouter();
-  const relationship = useRelationship(userId);
+  // Set as soon as a block is confirmed, so nothing re-fetches someone who is now hidden.
+  const [gone, setGone] = useState(false);
+  const relationship = useRelationship(userId, !gone);
   const save = useSave();
   const pass = usePass();
   const connect = useConnect();
@@ -67,10 +69,19 @@ export function PersonActions({ userId, name }: { userId: string; name: string }
 
   let main;
   if (state.matchId) {
+    const conversationId = state.conversationId;
     main = (
-      <Text variant="bodyStrong" tone="chemistryText" role="status">
-        You’re connected. Messaging arrives in the next release.
-      </Text>
+      <>
+        <Text variant="bodyStrong" tone="chemistryText" role="status">
+          You’re connected.
+        </Text>
+        {conversationId ? (
+          <Button
+            label={`Message ${name}`}
+            onPress={() => router.push(`/conversation/${conversationId}`)}
+          />
+        ) : null}
+      </>
     );
   } else if (state.incomingRequestId) {
     const requestId = state.incomingRequestId;
@@ -226,7 +237,8 @@ export function PersonActions({ userId, name }: { userId: string; name: string }
           label="Block"
           variant="danger"
           loading={block.isPending}
-          onPress={() =>
+          onPress={() => {
+            setGone(true);
             block.mutate(
               { userId, blocked: true },
               {
@@ -234,9 +246,10 @@ export function PersonActions({ userId, name }: { userId: string; name: string }
                   setSheet(null);
                   leave();
                 },
+                onError: () => setGone(false),
               },
-            )
-          }
+            );
+          }}
         />
       </BottomSheet>
 

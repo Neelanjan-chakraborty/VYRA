@@ -23,7 +23,7 @@ only in SQL). How to change it: the `database-migrations` skill.
 | Persona       | `personas`, `persona_versions`, `persona_evidence`, `vyra_vector.persona_embeddings`, `ai_imports`             |
 | Compatibility | `compatibility_weight_sets`, `compatibility_scores`, `compatibility_scenarios`                                 |
 | Discovery     | `discovery_events`, `saved_profiles`, `connection_requests`, `matches`                                         |
-| Messaging     | `conversations`, `conversation_participants`, `messages`                                                       |
+| Messaging     | `conversations`, `conversation_participants`, `messages`, `push_devices`                                       |
 | Optional      | `trends`, `astrology_profiles`                                                                                 |
 | Commercial    | `subscriptions`, `user_feedback`                                                                               |
 | Safety        | `safety_reports`, `blocked_users`, `moderation_events`, `audit_logs`                                           |
@@ -31,7 +31,14 @@ only in SQL). How to change it: the `database-migrations` skill.
 Tables added beyond the original entity list, and why: `otp_challenges` and `auth_sessions`
 (authentication needs them), `user_consents` (consent ledger), `interests` (normalises
 `user_interests`), `compatibility_weight_sets` (versioned weights), `saved_profiles` (a list,
-not just an event), `conversation_participants` (per-person read state and privacy switches).
+not just an event), `conversation_participants` (per-person read state and privacy switches),
+`push_devices` (Expo push tokens; one row per device, moved to whoever registers it last).
+
+Migration `messaging` added `messages.media_status`, `media_duration_ms`, `media_width`,
+`media_height`, `reported_at`; `conversation_participants.shares_typing`;
+`user_profiles.notify_messages` / `notify_requests`; the `WINGMAN` consent type. CHECKs: media
+status only on IMAGE/VOICE; voice duration 1–60 000 ms and only on VOICE; positive media
+dimensions. A conversation is created with its match (one per pair, reused if they reconnect).
 
 ## Design notes
 

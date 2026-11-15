@@ -187,6 +187,32 @@ request can be re-sent at once. Mutual requests become a connection immediately.
 **D-051 · No engagement counters.** No unread badges on tabs, no "X people liked you", and
 reciprocal interest is not a ranking signal. Connections lists what is waiting, calmly.
 
+**D-053 · Socket events carry ids, never content.** Clients refetch over HTTP, so every read
+passes the one access rule and nothing private travels over the socket or into push payloads.
+
+**D-054 · A conversation is hidden from both people across a block, read-only after a
+connection ends.** History is kept for both until account deletion; messages remain in the
+database for reports.
+
+**D-055 · Read receipts are reciprocal.** Turning them off also hides the other person's.
+Typing is shared by default and can be turned off per conversation.
+
+**D-056 · Private photos are not delivered when the classifier is unsure.** Unlike profile
+photos, message photos never go to human review unless someone reports them; the sender is
+told and can send another.
+
+**D-057 · Voice notes have no automated moderation** (product owner's choice to include them).
+They are limited to 60 s and 2 MB, sniffed by content, and reportable per message; a report
+hides the note from the reporter at once.
+
+**D-058 · Push says who, never what.** "New message from Asha"; nothing while the app is open,
+for muted conversations, turned-off types, or across a block. Expo push service behind a
+provider switch (`PUSH_PROVIDER=log|expo`).
+
+**D-059 · Wingman sees profiles by default, messages only with a per-conversation switch plus
+consent; it never sends.** The recipient is not shown that a message started as a suggestion
+(it is the sender's after editing); `aiAssisted` is stored for safety review.
+
 **D-052 · Orbit places people by estimated alignment, angle by a hash of their id.** Rings are
 alignment bands (insufficient data on a dashed outer ring); the angle carries no meaning and is
 stable between visits. Pure function, unit-tested; pan/pinch plus Zoom and Re-centre buttons;

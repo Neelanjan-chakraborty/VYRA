@@ -9,20 +9,31 @@ import { Text } from './text';
 interface TabBarItemProps extends Omit<TabTriggerSlotProps, 'ref'> {
   readonly icon: TabIconName;
   readonly label: string;
+  /** Something new here. A dot, never a count. */
+  readonly dot?: boolean;
 }
 
 /** One destination in the tab bar. Rendered through `TabTrigger asChild`. */
-export function TabBarItem({ icon, label, isFocused = false, ...pressableProps }: TabBarItemProps) {
+export function TabBarItem({
+  icon,
+  label,
+  dot = false,
+  isFocused = false,
+  ...pressableProps
+}: TabBarItemProps) {
   const tint = isFocused ? color.textPrimary : color.textSecondary;
   return (
     <Pressable
       {...pressableProps}
       role="tab"
-      aria-label={label}
+      aria-label={dot ? `${label}, something new` : label}
       aria-selected={isFocused}
       style={styles.item}
     >
-      <TabIcon name={icon} color={tint} />
+      <View>
+        <TabIcon name={icon} color={tint} />
+        {dot ? <View style={styles.dot} /> : null}
+      </View>
       <Text variant="caption" style={[styles.label, { color: tint }]} numberOfLines={1}>
         {label}
       </Text>
@@ -43,4 +54,13 @@ const styles = StyleSheet.create({
   label: { fontSize: 10, lineHeight: 14, letterSpacing: 0, marginTop: space.xs },
   marker: { width: 4, height: 4, borderRadius: 2, marginTop: space.xs },
   markerActive: { backgroundColor: color.accent },
+  dot: {
+    position: 'absolute',
+    top: -1,
+    right: -3,
+    width: 7,
+    height: 7,
+    borderRadius: 4,
+    backgroundColor: color.chemistryText,
+  },
 });

@@ -11,7 +11,7 @@ import {
 import { Platform } from 'react-native';
 import { z } from 'zod';
 import { api } from '@/lib/api';
-import { queryClient } from '@/lib/query-client';
+import { MEDIA_REFRESH_MS, queryClient } from '@/lib/query-client';
 import { useSession } from '@/lib/session';
 
 const ME_KEY = ['me'] as const;
@@ -26,7 +26,7 @@ export function useMe() {
     // often while a photo is still being checked.
     staleTime: 4 * 60_000,
     refetchInterval: (query) =>
-      query.state.data?.photos.some((p) => p.status === 'PENDING') ? 3000 : 8 * 60_000,
+      query.state.data?.photos.some((p) => p.status === 'PENDING') ? 3000 : MEDIA_REFRESH_MS,
   });
 }
 

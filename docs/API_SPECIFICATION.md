@@ -92,9 +92,9 @@ not `APPROVED`.
 
 ### Reports 🔒
 
-| Method | Path          | Description                                                                                                                                      |
-| ------ | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| POST   | `/v1/reports` | Body `{reportedUserId, reason, details?, photoId?}`. `202`. Not yourself (`400`). A photo is hidden for review once 2 different people report it |
+| Method | Path          | Description                                                                                                                                                                                                                                                                                                          |
+| ------ | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| POST   | `/v1/reports` | Body `{reportedUserId, reason, details?, photoId?, messageId?}` (photo or message, not both). `202`. Not yourself (`400`). A photo is hidden for review once 2 different people report it. A message must be one the reporter received from the reported person (else `404`); it is hidden from the reporter at once |
 
 ### Location 🔒
 
@@ -169,8 +169,38 @@ Connections.
 | POST   | `/v1/blocks/:userId`                    | Ends any match, expires pending requests both ways, removes saves both ways, hides both people from each other everywhere. Audited                                                                                                                                                                      |
 | DELETE | `/v1/blocks/:userId`                    | Unblock. Restores eligibility, not the earlier connection                                                                                                                                                                                                                                               |
 
+### Messaging 🔒
+
+Only the two participants of a conversation can see or act on it; anyone else, and both people
+across a block, get `404`. After a connection ends the conversation is read-only (`409` on
+send). Shapes are in `packages/validation/src/messaging.ts`.
+
+| Method | Path                             | Description                                                                                                                                                                                      |
+| ------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | `/v1/conversations`              | `conversationListSchema`: person summary, last-message preview (text cut to 80 chars; media and plans in words), `unread` (a flag, not a count), `readOnly`, the viewer's settings               |
+| GET    | `/v1/conversations/:id`          | One summary                                                                                                                                                                                      |
+| GET    | `/v1/conversations/:id/messages` | `?before=<messageId>&limit≤40`. Newest first, `nextBefore` for older. Each message: kind, plain-text body, media (`checking` / `ready` / `declined`, signed URL only when allowed), plan, `read` |
+| POST   | `/v1/conversations/:id/messages` | `{kind:'text', clientId, body ≤ 2000, aiAssisted?}` or `{kind:'date_plan', clientId, plan:{idea, when?, area?}}`. Idempotent on `clientId`. 30/min                                               |
+| POST   | `/v1/conversations/:id/media`    | Multipart `file` + `kind=image` (JPEG/PNG/WebP ≤ 10 MB, re-encoded, classifier before delivery) or `kind=voice` + `durationMs` (M4A/WebM, ≤ 2 MB, ≤ 60 s from the file when recorded). 20/min    |
+| POST   | `/v1/conversations/:id/read`     | `{upTo: messageId}`. Tells the other person only if the reader shares read receipts                                                                                                              |
+| PATCH  | `/v1/conversations/:id/settings` | Any of `sendsReadReceipts` (reciprocal), `sharesTyping`, `wingmanContextEnabled`, `muted`                                                                                                        |
+| POST   | `/v1/conversations/:id/wingman`  | `{purpose: opener \| reply \| date_idea}` → `{suggestions ≤ 3, usedMessages}`. Needs the `WINGMAN` consent (`409` otherwise). Never sends. 10/min                                                |
+| DELETE | `/v1/messages/:id`               | Sender only; erases text and media for both                                                                                                                                                      |
+| POST   | `/v1/messages/:id/plan/:action`  | `accept` / `decline` by the recipient, `withdraw` by the proposer; anyone else `404`; once only (`409`)                                                                                          |
+| PUT    | `/v1/me/push-devices`            | `{token, platform: ios \| android \| web}`; a token moves to whoever registers it last                                                                                                           |
+| DELETE | `/v1/me/push-devices`            | `{token}`                                                                                                                                                                                        |
+
+`PATCH /v1/me/profile` also takes `notifyMessages` and `notifyRequests`.
+
+**Socket.IO** at path `/v1/socket`, `auth: {token: <access token>}`; refused with
+`unauthorized` otherwise. Server events carry ids only, never text: `conversation.changed`
+`{conversationId, reason: message|removed|read|media|plan|ended}`, `typing` `{conversationId}`
+and `list.changed` `{}`. The only client event is `typing` `{conversationId}` (at most every
+2 s, relayed only if the sender shares typing and the conversation is open to both). Redis
+adapter for several instances.
+
 ## Planned
 
 Endpoint groups arrive with their milestones (see IMPLEMENTATION_BACKLOG.md): `imports`,
-`conversations`, `safety`, `admin`. Each is documented here when it is implemented and tested,
+`safety`, `admin`. Each is documented here when it is implemented and tested,
 not before.

@@ -11,7 +11,7 @@ import {
   recommendationListSchema,
 } from '@vyra/validation';
 import { api } from '@/lib/api';
-import { queryClient } from '@/lib/query-client';
+import { MEDIA_REFRESH_MS, queryClient } from '@/lib/query-client';
 
 export function useRecommendations() {
   return useQuery({
@@ -19,6 +19,7 @@ export function useRecommendations() {
     queryFn: () => api('/discovery/recommendations?limit=30', { schema: recommendationListSchema }),
     // Photo URLs are signed for ten minutes.
     staleTime: 3 * 60_000,
+    refetchInterval: MEDIA_REFRESH_MS,
   });
 }
 
@@ -35,6 +36,7 @@ export function usePublicProfile(userId: string) {
     queryKey: ['people', userId],
     queryFn: () => api(`/people/${userId}`, { schema: publicProfileSchema }),
     staleTime: 3 * 60_000,
+    refetchInterval: MEDIA_REFRESH_MS,
   });
 }
 
@@ -88,12 +90,14 @@ export function useConnections() {
     queryKey: ['connections'],
     queryFn: () => api('/connections', { schema: connectionsSchema }),
     staleTime: 30_000,
+    refetchInterval: MEDIA_REFRESH_MS,
   });
 }
 
-export function useRelationship(userId: string) {
+export function useRelationship(userId: string, enabled = true) {
   return useQuery({
     queryKey: ['relationship', userId],
+    enabled: enabled && userId.length > 0,
     queryFn: () => api(`/people/${userId}/relationship`, { schema: relationshipStateSchema }),
   });
 }

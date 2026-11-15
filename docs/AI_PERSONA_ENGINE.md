@@ -105,3 +105,18 @@ JSON-encoded `<member_data>` block; models `GEMINI_MODEL` (default `gemini-3.8-f
 `openai` is rejected at boot until implemented.
 
 Private data is never used to train shared models.
+
+## Wingman
+
+`AiProvider.suggestMessages(context)` proposes up to three short messages for an opener, a
+reply or a date idea. The context (`WingmanContext`) holds first names, both people's chosen
+interests, the other person's bio and occupation as shown on their profile, shared interests
+and the engine's plain-language reasons. Recent messages (the last 20 text messages, redacted)
+are included only when the person asking turned on "Let Wingman read recent messages" for that
+conversation **and** holds the `WINGMAN_MESSAGE_CONTEXT` consent. Wingman itself needs the
+`WINGMAN` consent. The prompt (`buildWingmanUserPrompt`) puts everything inside one
+JSON-encoded `<conversation_data>` block; output is untrusted and `filterWingmanSuggestions`
+keeps only plain strings ≤ 300 characters without contact details, links, numbers or
+sensitive topics, de-duplicated. Nothing is ever sent automatically: the suggestion goes into
+the composer, the person edits and sends it, and the message records `aiAssisted`. The audit
+log records purpose, count and whether messages were used — never text.

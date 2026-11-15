@@ -49,11 +49,16 @@ compatibility screen · Discover filters with Save/Pass · Connections tab · Bl
 Carried forward: admin moderation UI (Milestone 8 console); learning from discovery events
 (Milestone 7); request expiry job (requests stay pending until answered or withdrawn).
 
-## Milestone 6 — Social
+## Milestone 6 — Social ✅
 
-Socket.IO messaging with Redis adapter (delivery, typing,
-read receipts honouring privacy switches) · media messages · notifications · Wingman
-(suggest-only, opt-in context) · date planning.
+Conversations on match · Socket.IO + Redis adapter (ids-only events, typing, read receipts
+honouring privacy switches) · photo messages (classifier before delivery) · voice notes ·
+date ideas · message removal and reports · push via Expo behind a provider switch ·
+Wingman (own consent, messages only with a per-conversation switch, never sends).
+
+Carried forward: verify push and native audio on a device build (needs an EAS project);
+audio moderation if a suitable open-source classifier is chosen; message retention job
+(Milestone 8); socket disconnect on sign-out.
 
 ## Milestone 7 — Advanced intelligence
 

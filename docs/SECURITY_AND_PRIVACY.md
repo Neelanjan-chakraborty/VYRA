@@ -6,24 +6,29 @@ design for expansion.
 
 ## In place now
 
-| Control                                       | Where                                                                                                                             |
-| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| Fail-fast configuration, values never printed | `apps/api/src/config/env.ts` (+ test)                                                                                             |
-| Security headers                              | `helmet` in `configure-app.ts` (e2e-tested)                                                                                       |
-| CORS allow-list, default deny                 | `CORS_ORIGINS`                                                                                                                    |
-| Baseline rate limiting                        | `ThrottlerGuard`, 120/min per IP                                                                                                  |
-| Uniform errors, no internal leakage           | `ApiExceptionFilter` (e2e-tested)                                                                                                 |
-| Request ids safe against log injection        | `request-id.middleware.ts` (e2e-tested)                                                                                           |
-| Parameterised SQL only                        | Prisma; raw queries use tagged templates                                                                                          |
-| Integrity rules in the database               | CHECK constraints (see DATABASE_SCHEMA.md)                                                                                        |
-| Secrets stored only as hashes                 | Schema design: OTP codes, destinations, refresh tokens                                                                            |
-| No secrets in the repository                  | `.env*` git-ignored; `.env.example` holds local dev values only                                                                   |
-| Response validation on the client             | `apiGet` parses every response with the shared schema                                                                             |
-| Connection actions are IDOR-safe              | Accept/decline only by the recipient, withdraw only by the sender, end only by a participant; anyone else gets `404` (e2e-tested) |
-| One visibility rule for other people          | `PeopleService.visiblePair`: blocks, deletion and suspension always hide; leak suite covers Connections                           |
-| Notes are plain text                          | ≤ 300 chars, control characters stripped, rendered as text, shown only to sender and recipient                                    |
-| Blocks are total and silent                   | End the match, expire requests and remove saves both ways; the other person is not told; audited                                  |
-| Pressure limits                               | Pass hides 30 days; decline blocks re-asking 30 days; ≤ 20 pending; 20 requests/min                                               |
+| Control                                       | Where                                                                                                                                     |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Fail-fast configuration, values never printed | `apps/api/src/config/env.ts` (+ test)                                                                                                     |
+| Security headers                              | `helmet` in `configure-app.ts` (e2e-tested)                                                                                               |
+| CORS allow-list, default deny                 | `CORS_ORIGINS`                                                                                                                            |
+| Baseline rate limiting                        | `ThrottlerGuard`, 120/min per IP                                                                                                          |
+| Uniform errors, no internal leakage           | `ApiExceptionFilter` (e2e-tested)                                                                                                         |
+| Request ids safe against log injection        | `request-id.middleware.ts` (e2e-tested)                                                                                                   |
+| Parameterised SQL only                        | Prisma; raw queries use tagged templates                                                                                                  |
+| Integrity rules in the database               | CHECK constraints (see DATABASE_SCHEMA.md)                                                                                                |
+| Secrets stored only as hashes                 | Schema design: OTP codes, destinations, refresh tokens                                                                                    |
+| No secrets in the repository                  | `.env*` git-ignored; `.env.example` holds local dev values only                                                                           |
+| Response validation on the client             | `apiGet` parses every response with the shared schema                                                                                     |
+| Connection actions are IDOR-safe              | Accept/decline only by the recipient, withdraw only by the sender, end only by a participant; anyone else gets `404` (e2e-tested)         |
+| One visibility rule for other people          | `PeopleService.visiblePair`: blocks, deletion and suspension always hide; leak suite covers Connections                                   |
+| Notes are plain text                          | ≤ 300 chars, control characters stripped, rendered as text, shown only to sender and recipient                                            |
+| Blocks are total and silent                   | End the match, expire requests and remove saves both ways; the other person is not told; audited                                          |
+| One access rule for conversations             | `MessagingService.access`: participants only, never across a block or with a deleted/suspended account; read-only once ended (e2e-tested) |
+| Sockets authenticated like HTTP               | Access token checked against the session at connect; events carry ids only; typing relayed only when shared                               |
+| Message media is scoped                       | Conversation-scoped signed URLs re-checked per request: approved, not removed or reported, no block between the two                       |
+| Message text never logged or audited          | Audit metadata has kinds and counts only (e2e-tested); push payloads name the sender, never the content                                   |
+| Wingman data use                              | Own consent; messages only with a per-conversation switch plus consent; redacted, contained prompt; filtered output; never sends          |
+| Pressure limits                               | Pass hides 30 days; decline blocks re-asking 30 days; ≤ 20 pending; 20 requests/min                                                       |
 
 ## Threat model and planned controls
 
@@ -59,6 +64,15 @@ design for expansion.
 - **Astrology** is opt-in, labelled entertainment, and can be hidden entirely.
 
 ## Not yet done
+
+- **Voice notes are not automatically moderated.** No audio classifier is in use; voice
+  relies on per-message reports (which hide the note from the reporter) and length/size
+  limits. WebM recordings from browsers carry no reliable duration, so the 2 MB limit bounds
+  them.
+- **Push delivery is unverified on devices.** The Expo provider needs a development or store
+  build linked to an EAS project; only the `log` provider runs here.
+- **Socket sessions** are checked at connect; a socket opened before sign-out stays connected
+  until it drops, but receives ids only and every fetch is re-authorised.
 
 - **No real OTP delivery.** Only the development sender exists; it returns the code in the API
   response. Production cannot boot until an SMS/e-mail adapter is added (O-1).

@@ -42,6 +42,7 @@ function Navigator() {
         <Stack.Screen name="settings" />
         <Stack.Screen name="person/[id]/index" />
         <Stack.Screen name="person/[id]/compatibility" />
+        <Stack.Screen name="conversation/[id]" />
       </Stack.Protected>
     </Stack>
   );

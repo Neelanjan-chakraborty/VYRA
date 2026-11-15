@@ -190,6 +190,30 @@ export default function YouScreen() {
           onChange={(isDiscoverable) => updateProfile.mutate({ isDiscoverable })}
         />
       </View>
+      <Text variant="eyebrow" tone="textSecondary" style={styles.section}>
+        Notifications
+      </Text>
+      {(
+        [
+          ['notifyMessages', 'New messages', 'Who wrote to you — never what they said.'],
+          ['notifyRequests', 'Connection requests', 'When someone asks to connect or says yes.'],
+        ] as const
+      ).map(([key, label, description]) => (
+        <View key={key} style={styles.row}>
+          <View style={styles.rowCopy}>
+            <Text variant="bodyStrong">{label}</Text>
+            <Text variant="caption" tone="textSecondary" style={styles.rowValue}>
+              {description}
+            </Text>
+          </View>
+          <Toggle
+            label={`Notifications for ${label.toLowerCase()}`}
+            value={profile[key]}
+            disabled={updateProfile.isPending}
+            onChange={(value) => updateProfile.mutate({ [key]: value })}
+          />
+        </View>
+      ))}
       <ErrorNotice
         message={updateProfile.isError ? errorMessage(updateProfile.error) : undefined}
       />

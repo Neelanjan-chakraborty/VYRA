@@ -105,9 +105,14 @@ function Row({
         ) : null}
         {section === 'mutual' ? (
           <>
-            <Text variant="caption" tone="textSecondary" style={styles.grow}>
-              Messaging arrives in the next release.
-            </Text>
+            {item.conversationId ? (
+              <Button
+                label="Message"
+                aria-label={`Message ${person.displayName}`}
+                style={styles.grow}
+                onPress={() => router.push(`/conversation/${item.conversationId}`)}
+              />
+            ) : null}
             <Button label="End" variant="quiet" onPress={() => onEnd(item)} />
           </>
         ) : null}
