@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { COMPATIBILITY_DIMENSIONS, COMPATIBILITY_SCENARIOS } from './domain.js';
+import {
+  COMPATIBILITY_DIMENSIONS,
+  COMPATIBILITY_SCENARIOS,
+  compatibilityWeightsSchema,
+} from './domain.js';
 import { distanceFilterStatusSchema } from './location.js';
 import { PERSONA_ATTRIBUTES } from './persona.js';
 
@@ -255,3 +259,42 @@ export const publicProfileSchema = z.object({
   sharedInterests: z.array(z.string()),
 });
 export type PublicProfile = z.infer<typeof publicProfileSchema>;
+
+// ─────────────────────────── learned weights (admin) ───────────────────────────
+
+export const weightSetStatusSchema = z.enum(['PROPOSED', 'APPROVED', 'REJECTED']);
+
+/** Aggregates only: counts, coefficients and held-out ranking quality. Never people. */
+export const fitMetricsSchema = z.object({
+  samples: z.number().int(),
+  positives: z.number().int(),
+  negatives: z.number().int(),
+  trainSize: z.number().int(),
+  validationSize: z.number().int(),
+  coefficients: z.array(z.number()).length(6),
+  aucCurrent: z.number(),
+  aucProposed: z.number(),
+});
+export type FitMetrics = z.infer<typeof fitMetricsSchema>;
+
+export const weightSetViewSchema = z.object({
+  version: z.string(),
+  weights: compatibilityWeightsSchema,
+  status: weightSetStatusSchema,
+  isActive: z.boolean(),
+  basedOn: z.string().nullable(),
+  metrics: fitMetricsSchema.nullable(),
+  notes: z.string().nullable(),
+  createdAt: z.iso.datetime(),
+  decidedAt: z.iso.datetime().nullable(),
+});
+export type WeightSetView = z.infer<typeof weightSetViewSchema>;
+export const weightSetListSchema = z.object({ weightSets: z.array(weightSetViewSchema) });
+
+export const fitResultSchema = z.object({
+  status: z.enum(['proposed', 'insufficient_data', 'no_improvement']),
+  /** The new PROPOSED version, when one was created. */
+  version: z.string().nullable(),
+  metrics: fitMetricsSchema.nullable(),
+});
+export type FitResult = z.infer<typeof fitResultSchema>;

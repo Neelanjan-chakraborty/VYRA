@@ -58,3 +58,10 @@ export function ineligibilityMany(viewer, candidates) {
     .ineligibilityMany(JSON.stringify(viewer), JSON.stringify(candidates))
     .map((reason) => reason ?? null);
 }
+
+/** Learns proposed dimension weights from decisions, within the engine's guardrails. */
+export function fitWeights(samples, current, options) {
+  return JSON.parse(
+    native.fitWeights(JSON.stringify(samples), JSON.stringify(current), JSON.stringify(options)),
+  );
+}

@@ -49,3 +49,34 @@ export declare function ineligibilityMany(
   viewer: Person,
   candidates: readonly Person[],
 ): (IneligibleReason | null)[];
+export interface LearningSample {
+  /** Dimension scores in COMPATIBILITY_DIMENSIONS order; null when unknown. */
+  readonly scores: readonly (number | null)[];
+  readonly positive: boolean;
+}
+export interface FitOptions {
+  readonly minSamples: number;
+  readonly minPerClass: number;
+  readonly l2: number;
+  readonly iterations: number;
+  readonly learningRate: number;
+}
+export interface FitOutcome {
+  readonly status: 'proposed' | 'insufficient_data' | 'no_improvement';
+  readonly weights: Weights | null;
+  readonly metrics: {
+    readonly samples: number;
+    readonly positives: number;
+    readonly negatives: number;
+    readonly trainSize: number;
+    readonly validationSize: number;
+    readonly coefficients: number[];
+    readonly aucCurrent: number;
+    readonly aucProposed: number;
+  } | null;
+}
+export declare function fitWeights(
+  samples: readonly LearningSample[],
+  current: Weights,
+  options: FitOptions,
+): FitOutcome;

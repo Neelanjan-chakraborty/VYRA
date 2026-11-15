@@ -45,6 +45,11 @@ export class CompatibilityService {
     @Inject(ENGINE) private readonly engine: Engine,
   ) {}
 
+  /** Forget the cached weight set, e.g. right after a new one is approved. */
+  invalidateWeights(): void {
+    this.weightsCache = null;
+  }
+
   /** The active, validated weight set. Cached briefly; a bad row fails loudly. */
   async activeWeights(): Promise<{ version: string; weights: Weights }> {
     if (this.weightsCache && Date.now() - this.weightsCache.loadedAt < WEIGHTS_CACHE_MS)

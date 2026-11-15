@@ -107,3 +107,13 @@ pub fn ineligibility_many(viewer: String, candidates: String) -> Result<Vec<Opti
         .map(|r| r.map(str::to_string))
         .collect())
 }
+
+/// Proposes new dimension weights from decisions (see `vyra_engine::learning`).
+/// `samples`: `[{ scores: [6 × number|null], positive }]`; returns the outcome as JSON.
+#[napi]
+pub fn fit_weights(samples: String, current: String, options: String) -> Result<String> {
+    let samples: Vec<vyra_engine::Sample> = parse("samples", &samples)?;
+    let current: Weights = parse("weights", &current)?;
+    let options: vyra_engine::FitOptions = parse("options", &options)?;
+    to_json(&vyra_engine::fit_weights(&samples, &current, &options))
+}

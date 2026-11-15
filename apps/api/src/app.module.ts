@@ -14,6 +14,7 @@ import { CompatibilityModule } from './modules/compatibility/compatibility.modul
 import { HealthModule } from './modules/health/health.module.js';
 import { ConnectionsModule } from './modules/connections/connections.module.js';
 import { ConsentsModule } from './modules/consents/consents.module.js';
+import { LearningModule } from './modules/learning/learning.module.js';
 import { LocationModule } from './modules/location/location.module.js';
 import { MeModule } from './modules/me/me.module.js';
 import { MessagingModule } from './modules/messaging/messaging.module.js';
@@ -53,6 +54,7 @@ import { SafetyModule } from './modules/safety/safety.module.js';
     CompatibilityModule,
     ConnectionsModule,
     MessagingModule,
+    LearningModule,
     SafetyModule,
   ],
   providers: [

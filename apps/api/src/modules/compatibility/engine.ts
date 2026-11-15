@@ -2,6 +2,7 @@ import { Logger } from '@nestjs/common';
 import * as reference from '@vyra/compatibility-engine';
 import type { IneligibleReason, Person, Weights } from '@vyra/compatibility-engine';
 import type { CompatibilityResult } from '@vyra/validation';
+import type { FitOptions, FitOutcome, LearningSample } from '@vyra/engine-native';
 import type { Env } from '../../config/env.js';
 
 export const ENGINE = Symbol('ENGINE');
@@ -33,6 +34,12 @@ export interface Engine {
     weightsVersion: string,
     limit: number,
   ): Recommended[];
+  /** Weight learning exists only in the Rust engine. */
+  fitWeights?(
+    samples: readonly LearningSample[],
+    current: Weights,
+    options: FitOptions,
+  ): FitOutcome;
 }
 
 const typescriptEngine: Engine = {
@@ -76,6 +83,7 @@ export async function createEngine(env: Env): Promise<Engine> {
       score: native.score,
       highlights: (result, weights) => native.highlights(result, weights),
       recommend: native.recommend,
+      fitWeights: native.fitWeights,
     };
   } catch (error) {
     if (env.NODE_ENV === 'production')

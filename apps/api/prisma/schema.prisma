@@ -479,12 +479,26 @@ model AiImport {
 
 /// A versioned set of dimension weights. Exactly one is active at a time
 /// (enforced by a partial unique index in the migration).
+enum WeightSetStatus {
+  /// Learned from behaviour; waiting for a person to approve or reject it.
+  PROPOSED
+  APPROVED
+  REJECTED
+}
+
 model CompatibilityWeightSet {
   version   String   @id @db.VarChar(40)
   weights   Json
   isActive  Boolean  @default(false) @map("is_active")
   notes     String?  @db.VarChar(400)
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  status    WeightSetStatus @default(APPROVED)
+  /// The active version a proposal was learned against.
+  basedOn   String?  @map("based_on") @db.VarChar(40)
+  /// Sample counts, coefficients and held-out AUC (current vs proposed). Aggregates only.
+  metrics   Json?
+  decidedById String?   @map("decided_by_id") @db.Uuid
+  decidedAt   DateTime? @map("decided_at") @db.Timestamptz(3)
 
   scores CompatibilityScore[]
 
