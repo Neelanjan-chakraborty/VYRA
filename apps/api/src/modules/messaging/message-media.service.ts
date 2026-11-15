@@ -3,6 +3,7 @@ import {
   BadRequestException,
   Inject,
   Injectable,
+  Logger,
   type OnModuleInit,
   UnsupportedMediaTypeException,
 } from '@nestjs/common';
@@ -78,6 +79,8 @@ function protectionFields(p: Protection) {
  */
 @Injectable()
 export class MessageMediaService implements OnModuleInit {
+  private readonly logger = new Logger(MessageMediaService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly messaging: MessagingService,
@@ -211,7 +214,8 @@ export class MessageMediaService implements OnModuleInit {
         ffmpeg: this.env.FFMPEG_PATH,
         ffprobe: this.env.FFPROBE_PATH,
       });
-    } catch {
+    } catch (error) {
+      this.logger.warn(`Voice note refused (${file.size} bytes): ${(error as Error).message}`);
       throw new BadRequestException('That voice note could not be read.');
     }
     if (voice.durationMs > VOICE_MAX_MS + 500)

@@ -91,7 +91,12 @@ export async function transcodeVoice(
     };
   } catch (error) {
     if (error instanceof AudioTranscodeError) throw error;
-    throw new AudioTranscodeError('unreadable audio');
+    // What ffmpeg said (never the audio itself), so a failure can be diagnosed.
+    const stderr = (error as { stderr?: unknown }).stderr;
+    const reason = (typeof stderr === 'string' && stderr.trim()) || (error as Error).message;
+    throw new AudioTranscodeError(
+      `unreadable audio: ${reason.replaceAll(dir, '<tmp>').slice(0, 300)}`,
+    );
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
