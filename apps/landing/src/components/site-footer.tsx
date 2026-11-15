@@ -65,7 +65,13 @@ export function SiteFooter() {
           <p>
             © {YEAR} {site.name}. For adults aged 18 and over.
           </p>
-          <p>Estimated alignment is not a prediction of how a relationship will go.</p>
+          <p>
+            Photographs are licensed stock images of models, not VYRA members.{' '}
+            <Link href="/about#image-credits" className="prose-link">
+              Image credits
+            </Link>
+            . Estimated alignment is not a prediction of how a relationship will go.
+          </p>
         </div>
       </div>
     </footer>

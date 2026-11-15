@@ -195,15 +195,23 @@ others. The byline is "The VYRA team", with "not reviewed by a clinician or lawy
 Supersedes part of D-043: the first Vercel deploy must work. It stays noindex until
 `NEXT_PUBLIC_SITE_URL` is set.
 
+**D-053 · The website's photography is stock, of models, and says so.** Eight licensed
+photographs and seven icons, chosen for the brand, carry visible "stock photo, models, not
+members" labels, credits on /about, and honest alt text. No caption implies a member, a
+testimonial or a result. Product visuals remain real captures of the app. Patterns, rings and
+stickers are drawn in CSS and SVG, not taken from stock. Licence terms are unread; confirm
+before launch (see apps/landing/README.md).
+
 ## Open (need the product owner)
 
-| #   | Question                                               | Needed by     | Default if unanswered                                                    |
-| --- | ------------------------------------------------------ | ------------- | ------------------------------------------------------------------------ |
-| O-1 | SMS and e-mail OTP vendors                             | Milestone 2   | Interface + local fake that logs nothing sensitive; no real sends        |
-| O-2 | Object-storage vendor                                  | Milestone 2   | S3-compatible interface + local disk adapter for development             |
-| O-3 | LLM provider for persona generation                    | Milestone 3   | Gemini (a key was planned); mock in tests                                |
-| O-4 | Hosting provider and region                            | Milestone 8   | Undecided                                                                |
-| O-5 | Payment provider and plans                             | Milestone 8   | Store billing interfaces only                                            |
-| O-6 | Legal review of age verification and DPDP obligations  | Before launch | Date-of-birth self-declaration only                                      |
-| O-7 | Website production domain, contact address, legal text | Before launch | Site stays a non-indexable preview; legal and contact pages stay noindex |
-| O-8 | Allow or disallow AI training crawlers on the website  | Before launch | Not named in robots.txt, so the general allow rule applies               |
+| #   | Question                                                                           | Needed by     | Default if unanswered                                                    |
+| --- | ---------------------------------------------------------------------------------- | ------------- | ------------------------------------------------------------------------ |
+| O-1 | SMS and e-mail OTP vendors                                                         | Milestone 2   | Interface + local fake that logs nothing sensitive; no real sends        |
+| O-2 | Object-storage vendor                                                              | Milestone 2   | S3-compatible interface + local disk adapter for development             |
+| O-3 | LLM provider for persona generation                                                | Milestone 3   | Gemini (a key was planned); mock in tests                                |
+| O-4 | Hosting provider and region                                                        | Milestone 8   | Undecided                                                                |
+| O-5 | Payment provider and plans                                                         | Milestone 8   | Store billing interfaces only                                            |
+| O-6 | Legal review of age verification and DPDP obligations                              | Before launch | Date-of-birth self-declaration only                                      |
+| O-7 | Website production domain, contact address, legal text                             | Before launch | Site stays a non-indexable preview; legal and contact pages stay noindex |
+| O-8 | Allow or disallow AI training crawlers on the website                              | Before launch | Not named in robots.txt, so the general allow rule applies               |
+| O-9 | Confirm the stock licence covers a commercial website, and the attribution wording | Before launch | Credits stay visible on /about and in the footer                         |

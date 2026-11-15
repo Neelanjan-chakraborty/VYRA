@@ -1,4 +1,5 @@
 import type { MetadataRoute } from 'next';
+import { pagePhotos, photos } from '@/content/photos';
 import { indexableArticlePages, indexablePages } from '@/lib/routes';
 import { absoluteUrl, locales, site } from '@/lib/site';
 
@@ -12,6 +13,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   return [...indexablePages, ...indexableArticlePages].map((page) => ({
     url: absoluteUrl(page.path),
     lastModified: page.updated,
+    images: (pagePhotos[page.path] ?? []).map((key) => absoluteUrl(photos[key].image.src)),
     alternates: {
       languages: Object.fromEntries(
         locales.map((locale) => [locale.code, absoluteUrl(`${locale.pathPrefix}${page.path}`)]),

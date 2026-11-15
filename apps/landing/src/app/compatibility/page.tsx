@@ -64,6 +64,8 @@ export default function CompatibilityPage() {
     <>
       <PageHero
         page={pages.compatibility}
+        photo="dessert"
+        icon="compatibility"
         index="04"
         theme="theme-oxblood"
         title={
@@ -135,6 +137,7 @@ export default function CompatibilityPage() {
 
       <Chapter
         id="limits"
+        icon="privacy"
         index="02"
         label="Step one: limits"
         title={
@@ -167,6 +170,7 @@ export default function CompatibilityPage() {
 
       <Chapter
         id="dimensions"
+        icon="compatibility"
         index="03"
         label="Step two: six dimensions"
         theme="theme-ivory"
@@ -221,6 +225,7 @@ export default function CompatibilityPage() {
 
       <Chapter
         id="example"
+        icon="ai"
         index="04"
         label="A worked example"
         theme="theme-oxblood"
@@ -236,8 +241,8 @@ export default function CompatibilityPage() {
               well described; the other has gaps: no weekend rhythm and no planning style.
             </p>
             <p>
-              Notice the Lifestyle row. Half of it is unknown, so it is scored on what is known and
-              then counts for less.
+              Notice the Lifestyle and Mutual preferences rows. Part of each is unknown for one of
+              the two people, so each is scored on what is known and then counts for less.
             </p>
           </>
         }
@@ -369,6 +374,7 @@ export default function CompatibilityPage() {
 
       <ClosingCta
         location="compatibility_closing"
+        photo="barLaugh"
         title={
           <>
             Less mystery.

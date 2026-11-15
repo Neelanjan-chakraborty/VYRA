@@ -33,6 +33,8 @@ export default function AiPersonaPage() {
     <>
       <PageHero
         page={pages.aiPersona}
+        photo="restaurantPhone"
+        icon="persona"
         index="03"
         title={
           <>
@@ -50,6 +52,7 @@ export default function AiPersonaPage() {
 
       <Chapter
         id="what"
+        icon="persona"
         index="01"
         label="What is in it"
         theme="theme-ivory"
@@ -90,6 +93,7 @@ export default function AiPersonaPage() {
 
       <Chapter
         id="sources"
+        icon="chat"
         index="02"
         label="Where it comes from"
         title={
@@ -137,6 +141,7 @@ export default function AiPersonaPage() {
 
       <Chapter
         id="ask-your-ai"
+        icon="ai"
         index="03"
         label="Ask your AI"
         theme="theme-ivory"
@@ -202,6 +207,7 @@ export default function AiPersonaPage() {
 
       <Chapter
         id="confidence"
+        icon="compatibility"
         index="04"
         label="Evidence and confidence"
         theme="theme-oxblood"
@@ -331,6 +337,7 @@ export default function AiPersonaPage() {
 
       <ClosingCta
         location="ai_persona_closing"
+        photo="neonStreet"
         title={
           <>
             Described by AI.

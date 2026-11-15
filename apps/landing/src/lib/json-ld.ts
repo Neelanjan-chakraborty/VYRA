@@ -1,4 +1,5 @@
 import { type PageDef, pages } from './routes';
+import { type PhotoKey, photos } from '@/content/photos';
 import { entity } from './entity';
 import { absoluteUrl, defaultLocale, site } from './site';
 
@@ -43,7 +44,27 @@ export function websiteJsonLd() {
   };
 }
 
-export function webPageJsonLd(page: PageDef) {
+/** The picture that leads a page, with the credit shown beside it. Only used where it is visible. */
+export function imageObjectJsonLd(photo: PhotoKey, path: string) {
+  const item = photos[photo];
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'ImageObject',
+    '@id': `${absoluteUrl(path)}#primaryimage`,
+    name: item.title,
+    url: absoluteUrl(item.image.src),
+    contentUrl: absoluteUrl(item.image.src),
+    width: item.image.width,
+    height: item.image.height,
+    description: item.alt,
+    caption: item.caption,
+    creditText: `${item.credit.author} on ${item.credit.via}`,
+    representativeOfPage: true,
+    inLanguage: defaultLocale.code,
+  };
+}
+
+export function webPageJsonLd(page: PageDef, primaryImage?: PhotoKey) {
   return {
     '@context': 'https://schema.org',
     '@type': page.schemaType ?? 'WebPage',
@@ -55,6 +76,9 @@ export function webPageJsonLd(page: PageDef) {
     dateModified: page.updated,
     isPartOf: { '@id': WEBSITE_ID },
     about: { '@id': ORGANIZATION_ID },
+    ...(primaryImage
+      ? { primaryImageOfPage: { '@id': `${absoluteUrl(page.path)}#primaryimage` } }
+      : {}),
   };
 }
 
@@ -72,6 +96,7 @@ export function breadcrumbJsonLd(page: PageDef) {
 /** An educational article. The author is the organisation: no individual byline is verified. */
 export function articleJsonLd(article: {
   readonly path: string;
+  readonly photo: PhotoKey;
   readonly headline: string;
   readonly description: string;
   readonly datePublished: string;
@@ -86,7 +111,7 @@ export function articleJsonLd(article: {
     description: article.description,
     datePublished: article.datePublished,
     dateModified: article.dateModified,
-    image: absoluteUrl('/og.png'),
+    image: absoluteUrl(photos[article.photo].image.src),
     inLanguage: defaultLocale.code,
     mainEntityOfPage: absoluteUrl(article.path),
     isPartOf: { '@id': WEBSITE_ID },

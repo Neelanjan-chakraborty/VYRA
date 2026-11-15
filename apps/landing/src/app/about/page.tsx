@@ -7,6 +7,7 @@ import { OrbitField } from '@/components/orbit-field';
 import { PageHero } from '@/components/page-hero';
 import { Reveal } from '@/components/reveal';
 import { entity } from '@/lib/entity';
+import { iconCredits, photos, type PhotoKey } from '@/content/photos';
 import { pageMetadata, pages } from '@/lib/routes';
 
 export const metadata: Metadata = pageMetadata('about');
@@ -47,6 +48,8 @@ export default function AboutPage() {
     <>
       <PageHero
         page={pages.about}
+        photo="pizzaFriends"
+        icon="chat"
         index="07"
         title={
           <>
@@ -123,6 +126,7 @@ export default function AboutPage() {
 
       <Chapter
         id="why"
+        icon="chat"
         index="01"
         label="Why"
         theme="theme-ivory"
@@ -179,6 +183,50 @@ export default function AboutPage() {
               </Reveal>
             ))}
           </ol>
+        </div>
+      </section>
+
+      <section id="image-credits" data-section="image-credits" className="theme-ink">
+        <div className="shell py-16 sm:py-24">
+          <div className="grid-12 gap-y-8">
+            <div className="col-span-12 lg:col-span-4">
+              <p className="t-eyebrow text-accent">Image credits</p>
+              <h2 className="t-headline mt-4">Who made the pictures.</h2>
+            </div>
+            <div className="col-span-12 text-muted lg:col-span-7 lg:col-start-6">
+              <p>
+                The photographs on this site are licensed stock images of models. They are not
+                pictures of VYRA members, testimonials or results, and none shows the app’s features
+                at work. The screens of the app, where they appear, are real captures of the current
+                build. Credit is given to each photographer, with a link to the source.
+              </p>
+              <ul className="mt-8 border-t border-line">
+                {(Object.keys(photos) as PhotoKey[]).map((key) => (
+                  <li
+                    key={key}
+                    className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 border-b border-line py-3"
+                  >
+                    <a
+                      href={photos[key].credit.source}
+                      rel="noopener external"
+                      className="prose-link text-fg"
+                    >
+                      {photos[key].title}
+                    </a>
+                    <span className="t-small">
+                      {photos[key].credit.author} on {photos[key].credit.via}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+              <p className="t-small mt-6">
+                Icons, drawn in the surrounding text colour:{' '}
+                {iconCredits.map((icon) => `${icon.name} by ${icon.author}`).join(', ')}, via
+                Magnific. The orbit motif, halftone patterns, stickers and rings are drawn for VYRA
+                in CSS and SVG.
+              </p>
+            </div>
+          </div>
         </div>
       </section>
 
@@ -257,6 +305,7 @@ export default function AboutPage() {
 
       <ClosingCta
         location="about_closing"
+        photo="walkingCouple"
         title={
           <>
             Understand first.

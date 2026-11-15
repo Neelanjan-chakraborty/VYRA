@@ -2,8 +2,10 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { EngineReadout } from '@/components/engine-readout';
 import { Answer } from '@/components/answer';
+import { Halftone, OrbitRing, RegisterMark, RotatingBadge } from '@/components/art';
 import { ClosingCta } from '@/components/closing-cta';
 import { EnterCta } from '@/components/enter-cta';
+import { Icon, Medallion } from '@/components/icon';
 import { JsonLd } from '@/components/json-ld';
 import { Marquee } from '@/components/marquee';
 import { OrbitField } from '@/components/orbit-field';
@@ -11,10 +13,12 @@ import { Parallax } from '@/components/parallax';
 import { PhoneShot } from '@/components/phone-shot';
 import { Reveal } from '@/components/reveal';
 import { SectionLabel } from '@/components/section-label';
+import { StockPhoto } from '@/components/stock-photo';
 import { type Status, StatusTag } from '@/components/status-tag';
 import { FurtherReading } from '@/components/further-reading';
 import { entity } from '@/lib/entity';
-import { webPageJsonLd } from '@/lib/json-ld';
+import { imageObjectJsonLd, webPageJsonLd } from '@/lib/json-ld';
+import type { IconName } from '@/lib/icon-data';
 import { pageMetadata, pages } from '@/lib/routes';
 import { screens } from '@/lib/screens';
 
@@ -48,17 +52,45 @@ const ecosystem: readonly { name: string; status: Status; text: string }[] = [
   },
 ];
 
-const controls = [
-  'Every AI feature is optional and asks first.',
-  'You see, edit and approve anything VYRA infers about you.',
-  'Nothing is ever sent in your name without you pressing send.',
-  'You can delete your account and data at any time.',
+const controls: readonly (readonly [IconName, string])[] = [
+  ['ai', 'Every AI feature is optional and asks first.'],
+  ['persona', 'You see, edit and approve anything VYRA infers about you.'],
+  ['chat', 'Nothing is ever sent in your name without you pressing send.'],
+  ['privacy', 'You can delete your account and data at any time.'],
+];
+
+const pillars: readonly { icon: IconName; title: string; text: string; href: string }[] = [
+  {
+    icon: 'persona',
+    title: 'AI persona',
+    text: 'A description of you that you read, correct and approve.',
+    href: '/ai-persona',
+  },
+  {
+    icon: 'compatibility',
+    title: 'Compatibility',
+    text: 'Estimated alignment, with the working shown.',
+    href: '/compatibility',
+  },
+  {
+    icon: 'location',
+    title: 'Discovery',
+    text: 'People read in full, ranked with reasons.',
+    href: '/features#discovery',
+  },
+  {
+    icon: 'privacy',
+    title: 'Safety',
+    text: 'Consent per purpose, a rough location, deletion in the app.',
+    href: '/safety',
+  },
 ];
 
 export default function HomePage() {
   return (
     <>
-      <JsonLd data={webPageJsonLd(pages.home)} />
+      <JsonLd data={webPageJsonLd(pages.home, 'neonStreet')} />
+      <JsonLd data={imageObjectJsonLd('neonStreet', pages.home.path)} />
 
       {/* ───────────── Hero ───────────── */}
       <section data-section="hero" className="theme-ink relative overflow-hidden">
@@ -99,24 +131,34 @@ export default function HomePage() {
               </div>
             </div>
 
-            {/* Real screens from the app, set against the headline. */}
-            <div className="relative mt-14 h-[112vw] sm:h-[78vw] lg:absolute lg:-right-[1vw] lg:top-0 lg:mt-0 lg:h-auto lg:w-[41vw] lg:max-w-[43rem]">
+            {/* A stock photograph and a real screen from the app, set against the headline. */}
+            <div className="relative mt-16 h-[124vw] sm:h-[82vw] lg:absolute lg:-right-[1vw] lg:top-0 lg:mt-0 lg:h-[43vw] lg:w-[43vw] lg:max-w-[46rem] 2xl:h-[46rem]">
               <Parallax
-                travel={70}
-                className="absolute left-[2%] top-[9%] w-[47%] -rotate-[7deg] lg:left-[13%] lg:top-[19vw] lg:w-[43%] 2xl:top-[19rem]"
+                travel={-40}
+                className="absolute right-[3%] top-0 w-[56%] lg:right-[2%] lg:w-[52%]"
               >
-                <PhoneShot {...screens.interests} sizes="(min-width: 1024px) 20vw, 47vw" eager />
+                <StockPhoto
+                  photo="neonStreet"
+                  eager
+                  sizes="(min-width: 1024px) 24vw, 56vw"
+                  frame="aspect-[2/3] rounded-t-[999px]"
+                  caption="label"
+                  tone="warm"
+                  className="[&_figcaption]:text-right"
+                />
+                <OrbitRing className="-inset-[26%] size-[152%]" rotate={-16} dot="70%" />
               </Parallax>
               <Parallax
-                travel={-50}
-                className="absolute right-[2%] top-0 w-[53%] rotate-[4deg] lg:right-[3%] lg:w-[51%]"
+                travel={60}
+                className="absolute bottom-[4%] left-[0%] w-[48%] -rotate-[6deg] lg:bottom-[2%] lg:left-[4%] lg:w-[42%]"
               >
                 <PhoneShot
                   {...screens.personaReview}
-                  sizes="(min-width: 1024px) 23vw, 53vw"
+                  sizes="(min-width: 1024px) 20vw, 50vw"
                   eager
                 />
               </Parallax>
+              <RotatingBadge className="absolute bottom-[1%] right-[0%] size-[28%] lg:bottom-[0%] lg:right-[2%] lg:size-[22%]" />
             </div>
           </div>
         </div>
@@ -156,20 +198,67 @@ export default function HomePage() {
               .
             </p>
           </Answer>
+          <ul className="mt-14 grid border-t border-line sm:grid-cols-2 lg:grid-cols-4">
+            {pillars.map((pillar) => (
+              <li
+                key={pillar.title}
+                className="border-b border-line lg:border-b-0 lg:border-r lg:last:border-r-0"
+              >
+                <Link
+                  href={pillar.href as never}
+                  className="group flex h-full flex-col gap-5 px-1 py-7 lg:px-7 lg:first:pl-0"
+                >
+                  <Medallion
+                    name={pillar.icon}
+                    className="transition-colors group-hover:bg-cherry group-hover:text-ivory"
+                  />
+                  <span className="t-title">{pillar.title}</span>
+                  <span className="text-muted">{pillar.text}</span>
+                  <span
+                    className="arrow-link mt-auto w-fit border-0 pb-0 text-sm"
+                    aria-hidden="true"
+                  >
+                    Read more <span className="arrow">→</span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
       {/* ───────────── The problem, the opening ───────────── */}
-      <section data-section="problem" className="theme-ivory">
-        <div className="shell py-20 sm:py-32">
+      <section data-section="problem" className="theme-ivory relative overflow-hidden">
+        <Halftone
+          className="-left-10 top-28 h-72 w-[26rem] text-accent opacity-25"
+          fade="right"
+          size={12}
+          dot={1.8}
+        />
+        <div className="shell relative py-20 sm:py-32">
           <SectionLabel index="01">The problem</SectionLabel>
           <div className="grid-12 mt-10 gap-y-12 sm:mt-16">
-            <Reveal className="col-span-12 lg:col-span-8">
+            <Reveal className="col-span-12 lg:col-span-7">
               <h2 className="t-display">
                 A swipe measures reflexes. <em className="text-accent">Not chemistry.</em>
               </h2>
             </Reveal>
-            <div className="col-span-12 grid gap-10 md:col-span-10 md:grid-cols-2 lg:col-span-9 lg:col-start-4">
+            <Reveal
+              delay={0.1}
+              className="relative col-span-10 col-start-2 sm:col-span-7 sm:col-start-3 lg:col-span-4 lg:col-start-9 lg:row-span-2 lg:-mt-10"
+            >
+              <div className="rotate-[2deg]">
+                <StockPhoto
+                  photo="pizzaFriends"
+                  sizes="(min-width: 1024px) 30vw, 80vw"
+                  frame="aspect-[4/5]"
+                  tone="warm"
+                />
+              </div>
+              <RegisterMark className="absolute -left-3 -top-3" />
+              <RegisterMark className="absolute -right-3 top-[-0.75rem]" />
+            </Reveal>
+            <div className="col-span-12 grid gap-10 md:grid-cols-2 lg:col-span-7">
               <Reveal>
                 <h3 className="t-eyebrow text-muted">What a photo can’t tell you</h3>
                 <p className="t-lede mt-4">
@@ -215,7 +304,9 @@ export default function HomePage() {
       {/* ───────────── AI persona ───────────── */}
       <section data-section="persona" className="theme-ink relative overflow-hidden">
         <div className="shell py-20 sm:py-32">
-          <SectionLabel index="02">AI persona</SectionLabel>
+          <SectionLabel index="02" icon="persona">
+            AI persona
+          </SectionLabel>
           <div className="grid-12 mt-10 gap-y-14 sm:mt-16">
             <div className="col-span-12 lg:col-span-6">
               <Reveal>
@@ -262,18 +353,29 @@ export default function HomePage() {
                 </div>
               </Reveal>
             </div>
-            <div className="relative col-span-12 h-[118vw] sm:h-[80vw] lg:col-span-5 lg:col-start-8 lg:h-auto lg:min-h-[48rem]">
-              <Parallax
-                travel={60}
-                className="absolute left-0 top-0 w-[56%] rotate-[-3deg] lg:w-[62%]"
-              >
-                <PhoneShot {...screens.personaApproved} sizes="(min-width: 1024px) 24vw, 56vw" />
+            <div className="relative col-span-12 h-[132vw] sm:h-[88vw] lg:col-span-5 lg:col-start-8 lg:h-auto lg:min-h-[50rem]">
+              <Parallax travel={-40} className="absolute right-0 top-0 w-[64%] lg:w-[68%]">
+                <StockPhoto
+                  photo="restaurantPhone"
+                  sizes="(min-width: 1024px) 26vw, 64vw"
+                  frame="aspect-[4/5] rounded-[50%]"
+                  caption="label"
+                  tone="warm"
+                  className="[&_figcaption]:text-right"
+                />
+                <OrbitRing className="-inset-[24%] size-[148%]" rotate={-22} dot="40%" />
               </Parallax>
               <Parallax
-                travel={-60}
-                className="absolute right-0 top-[22%] w-[50%] rotate-[5deg] lg:w-[54%]"
+                travel={60}
+                className="absolute bottom-[6%] left-0 w-[50%] rotate-[-4deg] lg:bottom-[4%] lg:w-[48%]"
               >
-                <PhoneShot {...screens.askAiPick} sizes="(min-width: 1024px) 21vw, 50vw" />
+                <PhoneShot {...screens.personaApproved} sizes="(min-width: 1024px) 20vw, 50vw" />
+              </Parallax>
+              <Parallax
+                travel={-30}
+                className="absolute bottom-0 right-[2%] w-[34%] rotate-[5deg] max-sm:hidden lg:right-0 lg:w-[38%]"
+              >
+                <PhoneShot {...screens.askAiPick} sizes="(min-width: 1024px) 16vw, 40vw" />
               </Parallax>
             </div>
           </div>
@@ -281,9 +383,11 @@ export default function HomePage() {
       </section>
 
       {/* ───────────── Compatibility ───────────── */}
-      <section data-section="compatibility" className="theme-oxblood">
+      <section data-section="compatibility" className="theme-oxblood overflow-hidden">
         <div className="shell py-20 sm:py-32">
-          <SectionLabel index="03">Compatibility</SectionLabel>
+          <SectionLabel index="03" icon="compatibility">
+            Compatibility
+          </SectionLabel>
           <div className="grid-12 mt-10 gap-y-14 sm:mt-16">
             <Reveal className="col-span-12 lg:col-span-5">
               <h2 className="t-display">
@@ -307,6 +411,15 @@ export default function HomePage() {
                 </Link>
                 <StatusTag status="partial" />
               </div>
+              <div className="relative mt-14">
+                <StockPhoto
+                  photo="walkingCouple"
+                  sizes="(min-width: 1024px) 40vw, 94vw"
+                  frame="aspect-[16/10]"
+                  tone="duotone"
+                />
+                <RotatingBadge className="absolute -right-3 -top-8 size-24 sm:-right-5 sm:size-28" />
+              </div>
             </Reveal>
             <Reveal delay={0.1} className="col-span-12 lg:col-span-6 lg:col-start-7">
               <EngineReadout />
@@ -318,7 +431,9 @@ export default function HomePage() {
       {/* ───────────── Discovery ───────────── */}
       <section data-section="discovery" className="theme-ivory overflow-hidden">
         <div className="shell py-20 sm:py-32">
-          <SectionLabel index="04">Discovery</SectionLabel>
+          <SectionLabel index="04" icon="location">
+            Discovery
+          </SectionLabel>
           <div className="grid-12 mt-10 gap-y-14 sm:mt-16">
             <div className="relative order-last col-span-12 h-[112vw] sm:h-[76vw] lg:order-none lg:col-span-5 lg:h-auto lg:min-h-[46rem]">
               <Parallax
@@ -333,6 +448,16 @@ export default function HomePage() {
               >
                 <PhoneShot {...screens.discover} sizes="(min-width: 1024px) 24vw, 54vw" />
               </Parallax>
+              <div className="absolute bottom-[2%] left-[2%] w-[38%] lg:bottom-[4%] lg:left-0 lg:w-[34%]">
+                <StockPhoto
+                  photo="barLaugh"
+                  sizes="(min-width: 1024px) 14vw, 38vw"
+                  frame="aspect-square rounded-full"
+                  caption={false}
+                  tone="warm"
+                />
+                <OrbitRing className="-inset-[30%] size-[160%]" rotate={-12} dot="20%" />
+              </div>
             </div>
             <div className="col-span-12 lg:col-span-6 lg:col-start-7">
               <Reveal>
@@ -372,23 +497,32 @@ export default function HomePage() {
 
       {/* ───────────── From match to meeting ───────────── */}
       <section data-section="ecosystem" className="theme-ink">
-        <div className="shell py-20 sm:py-32">
-          <SectionLabel index="05">Beyond the match</SectionLabel>
-          <div className="grid-12 mt-10 gap-y-12 sm:mt-16">
-            <Reveal className="col-span-12 lg:col-span-7">
-              <h2 className="t-display">
+        <div className="relative">
+          <StockPhoto
+            photo="selfieNight"
+            sizes="100vw"
+            frame="aspect-[4/5] sm:aspect-[16/9] lg:aspect-[21/9]"
+            caption="label"
+            className="[&_figcaption]:shell [&_figcaption]:py-3"
+          >
+            <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/55 to-transparent" />
+            <div className="shell absolute inset-x-0 bottom-0 pb-8 sm:pb-14">
+              <SectionLabel index="05">Beyond the match</SectionLabel>
+              <h2 className="t-display mt-8 max-w-[14ch]">
                 The point is to <em className="text-accent">meet.</em>
               </h2>
-            </Reveal>
-            <Reveal delay={0.1} className="col-span-12 md:col-span-8 lg:col-span-4 lg:col-start-9">
-              <p className="t-lede text-muted">
-                A good suggestion is only the start. What follows is being built around one rule:
-                the app helps, and you decide. None of the features below is in the app yet, and
-                each is marked as such.
-              </p>
-            </Reveal>
-          </div>
-          <ol className="mt-14 border-t border-line sm:mt-20">
+            </div>
+          </StockPhoto>
+        </div>
+        <div className="shell pb-20 pt-14 sm:pb-32 sm:pt-20">
+          <Reveal className="max-w-2xl">
+            <p className="t-lede text-muted">
+              A good suggestion is only the start. What follows is being built around one rule: the
+              app helps, and you decide. None of the features below is in the app yet, and each is
+              marked as such.
+            </p>
+          </Reveal>
+          <ol className="mt-14 border-t border-line sm:mt-16">
             {ecosystem.map((item, index) => (
               <Reveal
                 as="li"
@@ -414,7 +548,9 @@ export default function HomePage() {
       {/* ───────────── Privacy and control ───────────── */}
       <section data-section="privacy" className="theme-ivory overflow-hidden">
         <div className="shell py-20 sm:py-32">
-          <SectionLabel index="06">Privacy and control</SectionLabel>
+          <SectionLabel index="06" icon="privacy">
+            Privacy and control
+          </SectionLabel>
           <div className="grid-12 mt-10 gap-y-14 sm:mt-16">
             <div className="col-span-12 lg:col-span-7">
               <Reveal>
@@ -428,11 +564,9 @@ export default function HomePage() {
               </Reveal>
               <Reveal delay={0.1}>
                 <ol className="mt-10 border-t border-line">
-                  {controls.map((line, index) => (
-                    <li key={line} className="flex gap-6 border-b border-line py-5">
-                      <span className="t-eyebrow pt-2 text-accent" aria-hidden="true">
-                        {String(index + 1).padStart(2, '0')}
-                      </span>
+                  {controls.map(([icon, line]) => (
+                    <li key={line} className="flex items-center gap-6 border-b border-line py-5">
+                      <Icon name={icon} className="size-9 shrink-0 text-accent" />
                       <span className="t-title">{line}</span>
                     </li>
                   ))}
@@ -452,18 +586,32 @@ export default function HomePage() {
                 </div>
               </Reveal>
             </div>
-            <div className="relative col-span-12 h-[112vw] sm:h-[76vw] lg:col-span-4 lg:col-start-9 lg:h-auto lg:min-h-[44rem]">
+            <div className="relative col-span-12 h-[124vw] sm:h-[84vw] lg:col-span-4 lg:col-start-9 lg:h-auto lg:min-h-[48rem]">
               <Parallax
-                travel={50}
-                className="absolute left-0 top-0 w-[54%] rotate-[-4deg] lg:w-[72%]"
+                travel={-40}
+                className="absolute right-0 top-0 w-[58%] rotate-[3deg] lg:w-[66%]"
               >
-                <PhoneShot {...screens.consent} sizes="(min-width: 1024px) 23vw, 54vw" />
+                <StockPhoto
+                  photo="nightPhone"
+                  sizes="(min-width: 1024px) 22vw, 58vw"
+                  frame="aspect-[4/5]"
+                  caption="label"
+                  tone="warm"
+                />
+                <RegisterMark className="absolute -left-3 -top-3" />
+                <RegisterMark className="absolute -right-3 -top-3" />
               </Parallax>
               <Parallax
-                travel={-50}
-                className="absolute right-0 top-[20%] w-[48%] rotate-[4deg] lg:top-[34%] lg:w-[60%]"
+                travel={50}
+                className="absolute bottom-[3%] left-0 w-[50%] rotate-[-4deg] lg:bottom-[2%] lg:w-[58%]"
               >
-                <PhoneShot {...screens.deleteConfirm} sizes="(min-width: 1024px) 19vw, 48vw" />
+                <PhoneShot {...screens.consent} sizes="(min-width: 1024px) 20vw, 50vw" />
+              </Parallax>
+              <Parallax
+                travel={-30}
+                className="absolute bottom-0 right-[2%] w-[38%] rotate-[5deg] max-sm:hidden lg:right-0 lg:w-[40%]"
+              >
+                <PhoneShot {...screens.deleteConfirm} sizes="(min-width: 1024px) 14vw, 38vw" />
               </Parallax>
             </div>
           </div>
@@ -474,6 +622,7 @@ export default function HomePage() {
 
       <ClosingCta
         location="home_closing"
+        photo="dessert"
         title={
           <>
             Stop guessing.

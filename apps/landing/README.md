@@ -84,6 +84,28 @@ Nothing loads without consent. With `NEXT_PUBLIC_GA_MEASUREMENT_ID` set, a banne
 `cta: enter_vyra` is the sign-up intent. Page views, scroll depth and engagement time come
 from GA4 enhanced measurement.
 
+## Imagery
+
+Eight licensed stock photographs, seven licensed icons, and art drawn for VYRA in CSS and SVG
+(the orbit rings, halftone dots, the turning sticker, registration marks, the duotone treatment).
+
+| Piece         | Where                                                   | Rules                                                                                                                                                                                                                                                                                                                                                                       |
+| ------------- | ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Photographs   | `src/content/photos.ts`, files in `src/assets/photos`   | Models, never members. Each has descriptive alt text, a short title, a caption, a credit and a source link. Shown with `<StockPhoto>`, which gives it a descriptive file name in its URL, intrinsic width and height, `srcset` and `sizes`, lazy loading (eager only for a page's lead picture), a blur placeholder and a visible "Stock photo · models, not members" label |
+| Icons         | `src/lib/icon-data.ts` (generated), drawn with `<Icon>` | Plain data, not inlined third-party markup; coloured by the surrounding text; hidden from assistive technology unless given a label                                                                                                                                                                                                                                         |
+| Credits       | `/about#image-credits` and the footer                   | Every photograph and icon, with author and source                                                                                                                                                                                                                                                                                                                           |
+| Image sitemap | `src/app/sitemap.ts`, `pagePhotos` in `photos.ts`       | Lists the photographs each page shows. The audit fails if the list and the page disagree                                                                                                                                                                                                                                                                                    |
+
+To add a photograph: put the original in a scratch folder as `p<id>.jpg`, add its id and a
+descriptive name to `scripts/build-photos.mjs`, run `node scripts/build-photos.mjs <folder>` (this
+caps the size and strips camera metadata, including location), then add the entry to
+`photos.ts`, list it in `pagePhotos`, and run the audit. Icons work the same way with
+`scripts/build-icons.mjs`. The originals are large and are not committed.
+
+**Licence.** The photographs and icons came from Magnific's stock library. The licence text was
+not read when they were chosen; they are credited as a matter of course, and whoever owns the
+account should confirm that the licence covers use on a commercial website before launch.
+
 ## Honest visuals
 
 - App screenshots in `src/assets/screens` are real, from `scripts/capture-app-screens.cjs`
@@ -91,6 +113,8 @@ from GA4 enhanced measurement.
   empty and labelled.
 - `src/content/engine-sample.json` is real output of `@vyra/compatibility-engine` for two
   invented profiles (`pnpm --filter @vyra/landing engine-sample`). Do not edit it by hand.
+- Stock photographs are labelled as stock photographs of models, on the picture and in the
+  footer. Nothing in a caption or alt text implies a member, a testimonial or a result.
 - Every capability carries a status: in the app today, first version in the app, in development, planned.
   Keep them current with `docs/IMPLEMENTATION_STATUS.md`.
 

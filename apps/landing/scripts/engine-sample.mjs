@@ -41,7 +41,7 @@ const preferences = {
   maxDistanceKm: null,
   showGenders: [],
   includeUnlistedGenders: true,
-  dealBreakers: [],
+  criteria: [],
 };
 const interest = (slug, label) => ({ slug, label });
 

@@ -277,6 +277,49 @@
   animation: marquee 48s linear infinite;
 }
 
+/* Photographs: one shared treatment keeps eight different shoots feeling like one. */
+.photo-frame img {
+  transition: transform 1.2s var(--vyra-ease-standard);
+}
+.photo-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* A touch of ink at the edges, so every picture sits in the page. */
+  background: radial-gradient(120% 90% at 50% 40%, transparent 55%, rgb(16 15 19 / 0.38));
+}
+.tone-warm img {
+  filter: saturate(1.08) contrast(1.04) sepia(0.12);
+}
+.tone-duotone img {
+  filter: grayscale(1) contrast(1.15) brightness(0.9);
+}
+.tone-duotone::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--vyra-cherry);
+  mix-blend-mode: multiply;
+}
+@media (hover: hover) {
+  figure:hover .photo-frame img {
+    transform: scale(1.035);
+  }
+}
+
+/* The turning type of the round sticker. */
+@keyframes badge-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.badge-spin {
+  animation: badge-turn 28s linear infinite;
+}
+
 /* The orbiting point in the hero mark. */
 @keyframes orbit {
   to {
@@ -308,8 +351,12 @@
 @media (prefers-reduced-motion: reduce) {
   .marquee-track,
   .orbit-dot,
-  .orbit-draw {
+  .orbit-draw,
+  .badge-spin {
     animation: none;
+  }
+  .photo-frame img {
+    transition: none;
   }
   .orbit-draw {
     stroke-dasharray: none;

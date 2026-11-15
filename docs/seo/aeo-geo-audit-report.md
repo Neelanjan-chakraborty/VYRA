@@ -23,41 +23,42 @@ promised.**
 ## 2. Automated audit
 
 `pnpm --filter @vyra/landing seo:audit`, with `CHECK_EXTERNAL=1`:
-**1051 of 1051 checks passed.**
+**1251 of 1251 checks passed.**
 
 | Area                                   | Checks   | Passed   | Result   |
 | -------------------------------------- | -------- | -------- | -------- |
-| `/`                                    | 49       | 49       | Pass     |
-| `/features`                            | 51       | 51       | Pass     |
-| `/how-it-works`                        | 51       | 51       | Pass     |
-| `/ai-persona`                          | 51       | 51       | Pass     |
-| `/compatibility`                       | 51       | 51       | Pass     |
-| `/safety`                              | 51       | 51       | Pass     |
-| `/learn`                               | 51       | 51       | Pass     |
-| `/learn/relationship-compatibility`    | 64       | 64       | Pass     |
-| `/learn/personality-and-relationships` | 64       | 64       | Pass     |
-| `/learn/communication-styles`          | 64       | 64       | Pass     |
-| `/learn/ai-in-relationship-discovery`  | 64       | 64       | Pass     |
-| `/learn/dating-beyond-swiping`         | 64       | 64       | Pass     |
-| `/learn/online-dating-safety`          | 64       | 64       | Pass     |
-| `/about`                               | 51       | 51       | Pass     |
-| `/contact`                             | 51       | 51       | Pass     |
-| `/privacy`                             | 51       | 51       | Pass     |
-| `/terms`                               | 51       | 51       | Pass     |
+| `/`                                    | 62       | 62       | Pass     |
+| `/features`                            | 64       | 64       | Pass     |
+| `/how-it-works`                        | 64       | 64       | Pass     |
+| `/ai-persona`                          | 64       | 64       | Pass     |
+| `/compatibility`                       | 64       | 64       | Pass     |
+| `/safety`                              | 64       | 64       | Pass     |
+| `/learn`                               | 64       | 64       | Pass     |
+| `/learn/relationship-compatibility`    | 77       | 77       | Pass     |
+| `/learn/personality-and-relationships` | 77       | 77       | Pass     |
+| `/learn/communication-styles`          | 77       | 77       | Pass     |
+| `/learn/ai-in-relationship-discovery`  | 77       | 77       | Pass     |
+| `/learn/dating-beyond-swiping`         | 77       | 77       | Pass     |
+| `/learn/online-dating-safety`          | 77       | 77       | Pass     |
+| `/about`                               | 64       | 64       | Pass     |
+| `/contact`                             | 53       | 53       | Pass     |
+| `/privacy`                             | 53       | 53       | Pass     |
+| `/terms`                               | 53       | 53       | Pass     |
 | `site`                                 | 2        | 2        | Pass     |
 | `entity`                               | 5        | 5        | Pass     |
 | `content`                              | 2        | 2        | Pass     |
 | `references`                           | 12       | 12       | Pass     |
-| `links`                                | 20       | 20       | Pass     |
+| `links`                                | 21       | 21       | Pass     |
 | `assets`                               | 7        | 7        | Pass     |
 | `redirects`                            | 7        | 7        | Pass     |
 | `status`                               | 18       | 18       | Pass     |
 | `robots.txt`                           | 17       | 17       | Pass     |
 | `llms.txt`                             | 8        | 8        | Pass     |
 | `indexnow`                             | 1        | 1        | Pass     |
-| `sitemap.xml`                          | 7        | 7        | Pass     |
+| `sitemap.xml`                          | 8        | 8        | Pass     |
+| `images`                               | 10       | 10       | Pass     |
 | `headers`                              | 2        | 2        | Pass     |
-| **Total**                              | **1051** | **1051** | **Pass** |
+| **Total**                              | **1251** | **1251** | **Pass** |
 
 | Page                                   | Title                                                         | Length | Description length |
 | -------------------------------------- | ------------------------------------------------------------- | ------ | ------------------ |
@@ -99,14 +100,28 @@ promised.**
 | No private surface             | `/app`, `/admin`, `/dashboard`, `/login`, `/account`, `/api/users` return 404                                                                                                                                                      |
 | Server-rendered content        | 150+ words of main content in the raw HTML of every page, fetched without a browser                                                                                                                                                |
 
+### Imagery checks (added 15 November 2026)
+
+| Requirement            | How it is checked                                                                                                                                                                        |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Descriptive alt text   | Every photograph: 50+ characters, unique on its page, never naming a member, user or match                                                                                               |
+| Descriptive file names | The served URL carries three or more words, not a hash                                                                                                                                   |
+| Responsive delivery    | `srcset` and `sizes` on every photograph; AVIF or WebP at 1080 px under 260 KB (all eight pass; 13–29 KB at phone widths)                                                                |
+| Loading                | At most two eager photographs per page; the rest lazy; width and height declared                                                                                                         |
+| Honest labelling       | The footer on every page states the photographs are stock images of models; every captioned photograph is labelled "Stock photo"                                                         |
+| Credits                | The About page links a source for every photograph                                                                                                                                       |
+| Image sitemap          | Each page lists exactly the photographs it shows; every sitemap image is served as an image on the production origin                                                                     |
+| Structured data        | ImageObject on each lead photograph: visible on the page, credited, dimensioned, on the production origin, and referenced by the WebPage (`primaryImageOfPage`) or the Article (`image`) |
+| Icons                  | Every inline SVG is hidden from assistive technology or has a role and label                                                                                                             |
+
 ### Other deployment modes
 
-| Mode                                                                   | Result                                                                      |
-| ---------------------------------------------------------------------- | --------------------------------------------------------------------------- |
-| Preview (no production flag)                                           | 894 of 894: noindex everywhere, `Disallow: /`, empty sitemap, no `llms.txt` |
-| Production flag without `NEXT_PUBLIC_SITE_URL` (a first Vercel deploy) | 894 of 894: builds, serves, stays non-indexable                             |
-| `VYRA_AI_TRAINING_CRAWLERS=disallow`, IndexNow key set                 | 1039 of 1039 (external link check off)                                      |
-| `VYRA_AI_TRAINING_CRAWLERS=allow`                                      | 1039 of 1039 (external link check off)                                      |
+| Mode                                                                   | Result                                                                               |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Preview (no production flag)                                           | 1077 of 1077: noindex everywhere, `Disallow: /`, empty sitemap, no `llms.txt`        |
+| Production flag without `NEXT_PUBLIC_SITE_URL` (a first Vercel deploy) | 1077 of 1077: builds, serves, stays non-indexable                                    |
+| `VYRA_AI_TRAINING_CRAWLERS=disallow`, IndexNow key set                 | 1239 of 1239 (external link check off)                                               |
+| `VYRA_AI_TRAINING_CRAWLERS=allow`                                      | 1017 of 1017 before the imagery work; not re-run since (differs by one robots group) |
 
 ## 3. Structured data validation
 
@@ -122,15 +137,25 @@ Article are types Google may show as an enhancement, and it may choose not to.
 
 ## 4. Browser and performance
 
-Playwright, 13 pages at 390 and 1440 pixels wide: passed. No console errors, no overflow, no
+Playwright, 13 pages at 390 and 1440 pixels wide: passed, with no horizontal overflow even as the stickers turn. No console errors, no overflow, no
 broken images, one H1 per page, nothing left hidden by an animation, reduced motion honoured.
 
-Lighthouse 13, mobile, lab, localhost:
+Lighthouse 13, mobile, lab, localhost, after the imagery was added:
 
 | Page                                | Performance | Accessibility | Best practices | SEO | LCP   | CLS | TBT    |
 | ----------------------------------- | ----------- | ------------- | -------------- | --- | ----- | --- | ------ |
-| `/`                                 | 100         | 100           | 100            | 100 | 0.9 s | 0   | 80 ms  |
-| `/learn/relationship-compatibility` | 99          | 100           | 100            | 100 | 0.9 s | 0   | 110 ms |
+| `/`                                 | 99          | 100           | 100            | 100 | 1.1 s | 0   | 110 ms |
+| `/about`                            | 100         | 100           | 100            | 100 | 0.9 s | 0   | 60 ms  |
+| `/learn/relationship-compatibility` | 97          | 100           | 100            | 100 | 0.9 s | 0   | 190 ms |
+| `/features`                         | 92          | 100           | 100            | 100 | 3.3 s | 0   | 70 ms  |
+
+The `/features` figure needs explaining. There the lead photograph is the largest paint, and
+Lighthouse's default throttling model (a simulation) estimates 3.3 s for it. The browser's
+observed LCP was 150–210 ms on every run, the photograph is a 13–29 KB AVIF, and with real
+network throttling in the browser (Lighthouse's `devtools` method) the same page scores 98 with
+LCP 1.9 s, against 98 and 1.7 s for the text-led `/about`. It is a modelling artefact, not a slow
+page, but it is recorded here rather than hidden. This run also found and fixed an accessibility
+regression: a dimmed photo label at 4.18:1 contrast.
 
 Lab figures on the same machine as the server. They are not field Core Web Vitals.
 

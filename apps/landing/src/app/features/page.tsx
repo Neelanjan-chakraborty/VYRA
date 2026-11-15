@@ -56,6 +56,8 @@ export default function FeaturesPage() {
     <>
       <PageHero
         page={pages.features}
+        photo="walkingCouple"
+        icon="compatibility"
         index="01"
         title={
           <>
@@ -85,6 +87,7 @@ export default function FeaturesPage() {
 
       <Chapter
         id="persona"
+        icon="persona"
         index="01"
         label="AI persona"
         theme="theme-ivory"
@@ -146,6 +149,7 @@ export default function FeaturesPage() {
 
       <Chapter
         id="compatibility"
+        icon="compatibility"
         index="02"
         label="Compatibility"
         theme="theme-oxblood"
@@ -191,6 +195,7 @@ export default function FeaturesPage() {
 
       <Chapter
         id="discovery"
+        icon="location"
         index="03"
         label="Discovery"
         title={
@@ -240,6 +245,7 @@ export default function FeaturesPage() {
 
       <Chapter
         id="profile"
+        icon="photo"
         index="04"
         label="Profile and onboarding"
         theme="theme-ivory"
@@ -334,6 +340,7 @@ export default function FeaturesPage() {
 
       <ClosingCta
         location="features_closing"
+        photo="pizzaFriends"
         title={
           <>
             Fewer profiles.

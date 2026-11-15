@@ -13,6 +13,8 @@ export default function LearnPage() {
     <>
       <PageHero
         page={pages.learn}
+        photo="barLaugh"
+        icon="chat"
         index="06"
         title={
           <>
@@ -100,6 +102,7 @@ export default function LearnPage() {
 
       <ClosingCta
         location="learn_closing"
+        photo="neonStreet"
         title={
           <>
             Know more.

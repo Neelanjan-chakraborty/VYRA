@@ -101,9 +101,19 @@ const get = (path, init) => fetch(base + path, { redirect: 'manual', ...init });
 const canonicalFor = (path) => (path === '/' ? origin : origin + path);
 const meta = (root, selector) => root.querySelector(selector)?.getAttribute('content') ?? null;
 
+/** True when an element, or anything above it, is hidden from assistive technology. */
+const hiddenFromAssistiveTech = (svg) => {
+  for (let node = svg; node; node = node.parentNode) {
+    if (node.getAttribute?.('aria-hidden') === 'true') return true;
+  }
+  return false;
+};
+
 const titles = new Map();
 const descriptions = new Map();
 const paragraphs = new Map();
+const pagePhotoNames = new Map();
+const photoSources = new Map();
 const externalLinks = new Set();
 const internalLinks = new Map();
 const assets = new Set();
@@ -276,6 +286,84 @@ for (const page of PAGES) {
     if (src?.startsWith('/')) assets.add(src.replaceAll('&amp;', '&'));
   }
 
+  // Photographs: the attributes that make a picture understandable to a crawler and a person.
+  const photoImgs = images.filter((img) =>
+    /static%2Fmedia%2F[^&]*\.jpg/i.test(img.getAttribute('src') ?? ''),
+  );
+  const photoNames = photoImgs.map(
+    (img) => /static%2Fmedia%2F([a-z0-9-]+)\./i.exec(img.getAttribute('src') ?? '')?.[1] ?? '',
+  );
+  pagePhotoNames.set(page.path, new Set(photoNames));
+  for (const [i, img] of photoImgs.entries()) {
+    const name = photoNames[i];
+    if (name && !photoSources.has(name))
+      photoSources.set(name, (img.getAttribute('src') ?? '').replaceAll('&amp;', '&'));
+  }
+  const footerText = (root.querySelector('footer')?.text ?? '').replace(/\s+/g, ' ');
+  check(
+    group,
+    'footer states that photographs are stock images of models, not members',
+    /stock images of models, not VYRA members/.test(footerText),
+  );
+  if (photoImgs.length > 0) {
+    const alts = photoImgs.map((img) => img.getAttribute('alt') ?? '');
+    check(
+      group,
+      'photographs have long descriptive alt text (50+ characters), unique on the page',
+      alts.every((alt) => alt.length >= 50) && new Set(alts).size === alts.length,
+      alts.map((alt) => alt.length).join(','),
+    );
+    check(
+      group,
+      'photographs describe, and do not name or promise, anything',
+      alts.every((alt) => !/\b(vyra|member|user|match(ed)?|couple who|real)\b/i.test(alt)),
+    );
+    check(
+      group,
+      'photograph file names are descriptive words, not hashes',
+      photoNames.every((name) => name.split('-').length >= 3),
+      photoNames.join(' '),
+    );
+    check(
+      group,
+      'photographs declare srcset and sizes for responsive delivery',
+      photoImgs.every((img) => img.getAttribute('srcset') && img.getAttribute('sizes')),
+    );
+    check(
+      group,
+      'at most two photographs load eagerly; the rest are lazy',
+      photoImgs.filter((img) => img.getAttribute('loading') === 'eager').length <= 2 &&
+        photoImgs.every((img) => ['eager', 'lazy'].includes(img.getAttribute('loading') ?? '')),
+    );
+    const captioned = photoImgs.map((img) => {
+      let node = img.parentNode;
+      while (node && node.rawTagName !== 'figure') node = node.parentNode;
+      return node?.querySelector('figcaption') ?? null;
+    });
+    check(
+      group,
+      'every photograph with a caption labels itself a stock photo',
+      captioned.every((caption) => caption === null || /Stock photo/.test(caption.text)),
+    );
+    check(
+      group,
+      'at least one photograph on the page carries a visible caption',
+      captioned.some(Boolean),
+    );
+  }
+  const svgs = root.querySelectorAll('svg');
+  const unlabelled = svgs.filter(
+    (svg) =>
+      !hiddenFromAssistiveTech(svg) &&
+      !(svg.getAttribute('role') === 'img' && Boolean(svg.getAttribute('aria-label'))),
+  );
+  check(
+    group,
+    'every inline SVG is hidden from assistive technology or has a role and label',
+    unlabelled.length === 0,
+    `${unlabelled.length} unlabelled`,
+  );
+
   // Links.
   const anchors = root.querySelectorAll('a[href]');
   const vague = anchors.filter((a) =>
@@ -368,6 +456,43 @@ for (const page of PAGES) {
   );
   if (!expectPreview)
     check(group, 'JSON-LD URLs are on the production origin', !/localhost|127\.0\.0\.1/.test(text));
+  // The lead photograph's structured data must describe a picture that is on the page.
+  const imageObject = parsed.find((item) => item['@type'] === 'ImageObject');
+  if (imageObject) {
+    const leadName = /media\/([a-z0-9-]+)\./i.exec(imageObject.contentUrl ?? '')?.[1];
+    check(
+      group,
+      'ImageObject describes a photograph that is visible on the page',
+      Boolean(leadName) && photoNames.includes(leadName),
+    );
+    check(
+      group,
+      'ImageObject has a credit, dimensions, a name and a stable @id',
+      Boolean(imageObject.creditText) &&
+        Number(imageObject.width) > 0 &&
+        Number(imageObject.height) > 0 &&
+        Boolean(imageObject.name) &&
+        String(imageObject['@id']).endsWith('#primaryimage'),
+    );
+    if (!expectPreview)
+      check(
+        group,
+        'ImageObject URL is on the production origin',
+        String(imageObject.contentUrl).startsWith(`${origin}/`),
+        imageObject.contentUrl,
+      );
+    const lead = parsed.find((item) =>
+      ['WebPage', 'AboutPage', 'ContactPage', 'CollectionPage'].includes(item['@type']),
+    );
+    const article = parsed.find((item) => item['@type'] === 'Article');
+    check(
+      group,
+      'the page or article points at its ImageObject',
+      (lead && lead.primaryImageOfPage?.['@id'] === imageObject['@id']) ||
+        (article && article.image === imageObject.contentUrl),
+    );
+  }
+
   // Entity consistency: one description of VYRA, everywhere.
   const organizations = parsed.filter((item) => item['@type'] === 'Organization');
   check(
@@ -829,6 +954,86 @@ if (expectPreview) {
     'sitemap.xml',
     'excludes noindex pages',
     PAGES.filter((p) => !p.index).every((p) => !locs.includes(canonicalFor(p.path))),
+  );
+}
+
+// Image sitemap, and the pictures it lists.
+if (!expectPreview) {
+  const blocks = [...sitemapXml.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => m[1]);
+  const byPage = new Map(
+    blocks.map((block) => [
+      /<loc>([^<]+)<\/loc>/.exec(block)?.[1],
+      new Set(
+        [...block.matchAll(/<image:loc>[^<]*?media\/([a-z0-9-]+)\.[^<]*<\/image:loc>/gi)].map(
+          (m) => m[1],
+        ),
+      ),
+    ]),
+  );
+  const wrong = [];
+  for (const page of PAGES.filter((p) => p.index)) {
+    const listed = byPage.get(canonicalFor(page.path)) ?? new Set();
+    const shown = pagePhotoNames.get(page.path) ?? new Set();
+    const missing = [...shown].filter((name) => !listed.has(name));
+    const phantom = [...listed].filter((name) => !shown.has(name));
+    if (missing.length || phantom.length)
+      wrong.push(`${page.path}: missing [${missing}] phantom [${phantom}]`);
+  }
+  check(
+    'sitemap.xml',
+    'each page lists exactly the photographs it shows as sitemap images',
+    wrong.length === 0,
+    wrong.join(' | '),
+  );
+  const imageUrls = [
+    ...new Set([...sitemapXml.matchAll(/<image:loc>([^<]+)<\/image:loc>/g)].map((m) => m[1])),
+  ];
+  const bad = [];
+  for (const url of imageUrls) {
+    const response = await get(url.replace(origin, ''));
+    if (
+      response.status !== 200 ||
+      !(response.headers.get('content-type') ?? '').startsWith('image/')
+    )
+      bad.push(url);
+  }
+  check(
+    'images',
+    `all ${imageUrls.length} sitemap images are served as images on the production origin`,
+    imageUrls.length > 0 &&
+      bad.length === 0 &&
+      imageUrls.every((url) => url.startsWith(`${origin}/`)),
+    bad.join(' '),
+  );
+}
+// What a visitor is sent: modern format at a phone-to-laptop width, under a sensible weight.
+for (const [name, src] of photoSources) {
+  const target = new URL(src, base);
+  target.searchParams.set('w', '1080');
+  target.searchParams.set('q', '75');
+  const response = await fetch(target, {
+    headers: { accept: 'image/avif,image/webp,image/*' },
+    redirect: 'manual',
+  });
+  const bytes = (await response.arrayBuffer()).byteLength;
+  const type = response.headers.get('content-type') ?? '';
+  check(
+    'images',
+    `${name} is delivered as AVIF or WebP at 1080 px, under 260 KB`,
+    response.status === 200 && /avif|webp/.test(type) && bytes < 260 * 1024,
+    `${type}, ${Math.round(bytes / 1024)} KB`,
+  );
+}
+if (!expectPreview) {
+  const credits = parse(await (await get('/about')).text());
+  const creditLinks = credits.querySelectorAll(
+    '#image-credits a[href^="https://www.magnific.com/"]',
+  );
+  check(
+    'images',
+    'the About page credits every photograph, with a link to its source',
+    creditLinks.length >= photoSources.size && creditLinks.length > 0,
+    `${creditLinks.length} credits for ${photoSources.size} photographs`,
   );
 }
 

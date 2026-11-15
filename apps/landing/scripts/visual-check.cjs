@@ -90,7 +90,12 @@ async function main() {
 
       await page.evaluate(() => window.scrollTo(0, 0));
       await page.waitForTimeout(300);
-      await page.screenshot({ path: path.join(out, `${device}-${name}.png`), fullPage: true });
+      // One pixel per CSS pixel: a long page at 2× passes Chromium's 16384px texture limit and comes back blank.
+      await page.screenshot({
+        path: path.join(out, `${device}-${name}.png`),
+        fullPage: true,
+        scale: 'css',
+      });
       if (name === 'home' || name === 'features')
         await page.screenshot({ path: path.join(out, `${device}-${name}-fold.png`) });
     }

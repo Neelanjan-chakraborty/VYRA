@@ -44,6 +44,8 @@ pnpm --filter @vyra/landing dev   # website on :3100; `seo:audit` and `visual:ch
 - Website copy must match what is built: real screenshots only, and every capability labelled
   built / first version / in development / planned. Never add a domain, address, statistic,
   testimonial or legal claim that has not been supplied.
+- Website imagery: stock photographs go through `apps/landing/src/content/photos.ts` with alt text,
+  caption, credit and a visible stock label, and never imply a member, testimonial or result.
 - UI work: follow the `vyra-design-system` skill. Tokens only, no raw hex or font sizes in screens.
 - Persona and anything sent to a model: follow the `persona-engineering` skill.
 - Scoring, gates or ranking: follow the `compatibility-engine` skill.

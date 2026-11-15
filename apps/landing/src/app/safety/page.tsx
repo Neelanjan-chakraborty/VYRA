@@ -4,6 +4,8 @@ import { Chapter } from '@/components/chapter';
 import { ClosingCta } from '@/components/closing-cta';
 import { FurtherReading } from '@/components/further-reading';
 import { PageHero } from '@/components/page-hero';
+import { Icon } from '@/components/icon';
+import type { IconName } from '@/lib/icon-data';
 import { Reveal } from '@/components/reveal';
 import { ShotFigure } from '@/components/shot-figure';
 import { type Status, StatusTag } from '@/components/status-tag';
@@ -11,6 +13,16 @@ import { pageMetadata, pages } from '@/lib/routes';
 import { screens } from '@/lib/screens';
 
 export const metadata: Metadata = pageMetadata('safety');
+
+const protectionIcons: Readonly<Record<string, IconName>> = {
+  'Adults only': 'persona',
+  'No passwords to steal': 'privacy',
+  'Photos are checked first': 'photo',
+  'Location stays vague': 'location',
+  'No sensitive traits': 'privacy',
+  'AI output is not trusted': 'ai',
+};
+const controlIcons: readonly IconName[] = ['ai', 'persona', 'privacy', 'location', 'photo'];
 
 const protections: readonly (readonly [string, string])[] = [
   [
@@ -87,6 +99,8 @@ export default function SafetyPage() {
     <>
       <PageHero
         page={pages.safety}
+        photo="selfieNight"
+        icon="privacy"
         index="05"
         title={
           <>
@@ -104,6 +118,7 @@ export default function SafetyPage() {
 
       <Chapter
         id="protections"
+        icon="privacy"
         index="01"
         label="What is in place"
         theme="theme-ivory"
@@ -125,9 +140,15 @@ export default function SafetyPage() {
           <Reveal className="col-span-12 lg:col-span-8">
             <ul className="grid border-t border-line sm:grid-cols-2 sm:gap-x-[clamp(1.5rem,3vw,3.5rem)]">
               {protections.map(([title, text]) => (
-                <li key={title} className="border-b border-line py-6">
-                  <h3 className="t-title">{title}</h3>
-                  <p className="mt-2 text-muted">{text}</p>
+                <li key={title} className="flex gap-5 border-b border-line py-6">
+                  <Icon
+                    name={protectionIcons[title] ?? 'privacy'}
+                    className="mt-1 size-9 shrink-0 text-accent"
+                  />
+                  <div>
+                    <h3 className="t-title">{title}</h3>
+                    <p className="mt-2 text-muted">{text}</p>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -142,6 +163,7 @@ export default function SafetyPage() {
 
       <Chapter
         id="controls"
+        icon="persona"
         index="02"
         label="Your controls"
         title={
@@ -169,12 +191,10 @@ export default function SafetyPage() {
                   key={title}
                   className="grid-12 items-baseline gap-y-1 border-b border-line py-6"
                 >
-                  <span
-                    className="t-eyebrow col-span-2 text-accent sm:col-span-1"
-                    aria-hidden="true"
-                  >
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
+                  <Icon
+                    name={controlIcons[index] ?? 'privacy'}
+                    className="col-span-2 size-8 text-accent sm:col-span-1"
+                  />
                   <h3 className="t-title col-span-10 sm:col-span-5">{title}</h3>
                   <p className="col-span-12 text-muted sm:col-span-6">{text}</p>
                 </li>
@@ -186,6 +206,7 @@ export default function SafetyPage() {
 
       <Chapter
         id="ai"
+        icon="ai"
         index="03"
         label="AI, kept in its place"
         theme="theme-oxblood"
@@ -268,6 +289,7 @@ export default function SafetyPage() {
 
       <ClosingCta
         location="safety_closing"
+        photo="nightPhone"
         title={
           <>
             Your data.

@@ -96,6 +96,8 @@ export default function HowItWorksPage() {
     <>
       <PageHero
         page={pages.howItWorks}
+        photo="nightPhone"
+        icon="chat"
         index="02"
         title={
           <>
@@ -213,6 +215,7 @@ export default function HowItWorksPage() {
 
       <Chapter
         id="availability"
+        icon="privacy"
         index="09"
         label="Availability"
         theme="theme-ivory"
@@ -285,6 +288,7 @@ export default function HowItWorksPage() {
 
       <ClosingCta
         location="how_it_works_closing"
+        photo="selfieNight"
         title={
           <>
             Eight steps.

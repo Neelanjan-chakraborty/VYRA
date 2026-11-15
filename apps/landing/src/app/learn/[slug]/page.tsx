@@ -1,10 +1,13 @@
 import type { Metadata, Route } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import { Halftone, RegisterMark, RotatingBadge } from '@/components/art';
 import { ClosingCta } from '@/components/closing-cta';
 import { JsonLd } from '@/components/json-ld';
+import { StockPhoto } from '@/components/stock-photo';
+import { articlePhoto, type PhotoKey } from '@/content/photos';
 import { type Block, articles, getArticle } from '@/content/learn';
-import { articleJsonLd, breadcrumbTrailJsonLd } from '@/lib/json-ld';
+import { articleJsonLd, breadcrumbTrailJsonLd, imageObjectJsonLd } from '@/lib/json-ld';
 import { articlePages, metadataFor, pages } from '@/lib/routes';
 
 // Only the articles that exist are pages; any other slug is a 404.
@@ -86,17 +89,30 @@ function renderBlock(block: Block, key: number) {
   );
 }
 
+/** The photograph that closes each article: never the one that opens it. */
+const closingPhoto = {
+  'relationship-compatibility': 'walkingCouple',
+  'personality-and-relationships': 'restaurantPhone',
+  'communication-styles': 'dessert',
+  'ai-in-relationship-discovery': 'neonStreet',
+  'dating-beyond-swiping': 'pizzaFriends',
+  'online-dating-safety': 'selfieNight',
+} as const satisfies Record<keyof typeof articlePhoto, PhotoKey>;
+
 export default async function ArticlePage({ params }: Props) {
   const { slug } = await params;
   const article = getArticle(slug);
   if (!article) notFound();
   const path = `/learn/${article.slug}`;
+  const photo = articlePhoto[article.slug as keyof typeof articlePhoto];
+  const closing = closingPhoto[article.slug as keyof typeof closingPhoto];
 
   return (
     <>
       <JsonLd
         data={articleJsonLd({
           path,
+          photo,
           headline: article.question,
           description: article.description,
           datePublished: article.published,
@@ -104,6 +120,7 @@ export default async function ArticlePage({ params }: Props) {
           citations: article.references.map((reference) => reference.url),
         })}
       />
+      <JsonLd data={imageObjectJsonLd(photo, path)} />
       <JsonLd
         data={breadcrumbTrailJsonLd([
           { name: pages.home.label, path: '/' },
@@ -113,8 +130,12 @@ export default async function ArticlePage({ params }: Props) {
       />
 
       <article>
-        <header className="theme-ink">
-          <div className="shell pb-14 pt-10 sm:pb-20 sm:pt-14">
+        <header className="theme-ink relative overflow-hidden">
+          <Halftone
+            className="-right-10 top-24 hidden h-72 w-96 text-accent opacity-40 lg:block"
+            fade="right"
+          />
+          <div className="shell relative pb-14 pt-10 sm:pb-20 sm:pt-14">
             <div className="flex items-center justify-between border-b border-line pb-4">
               <nav aria-label="Breadcrumb">
                 <ol className="t-eyebrow flex flex-wrap items-center gap-3 text-muted">
@@ -156,6 +177,18 @@ export default async function ArticlePage({ params }: Props) {
                 <dt>Review</dt>
                 <dd className="text-fg">Not reviewed by a clinician or lawyer</dd>
               </dl>
+            </div>
+            <div className="relative mt-14 sm:mt-20">
+              <StockPhoto
+                photo={photo}
+                eager
+                sizes="(min-width: 1600px) 1500px, 94vw"
+                frame="aspect-[4/5] sm:aspect-[16/9] lg:aspect-[21/9] rounded-[var(--vyra-radius-s)]"
+                tone="warm"
+              />
+              <RegisterMark className="absolute -left-2.5 -top-2.5 hidden sm:block" />
+              <RegisterMark className="absolute -right-2.5 -top-2.5 hidden sm:block" />
+              <RotatingBadge className="absolute -top-10 right-3 size-24 sm:-top-14 sm:right-8 sm:size-32" />
             </div>
           </div>
         </header>
@@ -285,6 +318,7 @@ export default async function ArticlePage({ params }: Props) {
 
       <ClosingCta
         location={`learn_${article.slug}_closing`}
+        photo={closing}
         title={
           <>
             Fewer guesses.

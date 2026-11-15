@@ -36,3 +36,25 @@ screens are shown as they are, violet buttons included, not recoloured.
 Production build, 14 November 2026. Full-page captures of the home and features pages at
 desktop (1440) and mobile (390), the first screen of each, the mobile menu, the About page,
 the Learn hub and an article, and two further inner pages. Regenerate with `pnpm --filter @vyra/landing visual:check`.
+
+## Stock imagery used on the website
+
+Eight stock photographs and seven icons, selected on 15 November 2026 from Magnific's library
+(AI-generated images excluded) for a Gen-Z, India-first, editorial feel. They are pictures of
+models and are never presented as VYRA members. Authors, source pages and alt text are in
+`apps/landing/src/content/photos.ts`; the same credits are on the website at `/about#image-credits`.
+
+| Photograph                                                                                                                                  | Author        |
+| ------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| Woman with her phone in red neon light                                                                                                      | teksomolika   |
+| Couple sharing a dessert in a restaurant; woman looking at her phone in a restaurant; friends laughing over pizza                           | ASphotofamily |
+| Woman checking her phone on a night street; friends taking a selfie at night; couple walking and talking at night; couple laughing in a bar | Magnific      |
+
+Icons: persona (hari-sabana), compatibility (Iconir), privacy (yaicon), chat (Nur syifa
+fauziah), AI (Magnific), photo (afif fudin), location (prinda895).
+
+Selection notes: the stock halftone and sticker vectors were previewed and not used, because their
+artwork carries demo text and a loud look that does not suit the brand; the halftone, rings and
+sticker on the site are drawn in CSS and SVG instead. The downloads drew no credits from the
+account's shared pool (balance 82,663 before and after). The licence terms were not read; see the
+note in `apps/landing/README.md`.
