@@ -21,13 +21,14 @@ import { Platform } from 'react-native';
 import { nativeFilePart } from '@/lib/native-file';
 import { api } from '@/lib/api';
 import { MEDIA_REFRESH_MS, queryClient } from '@/lib/query-client';
+import { randomUuid } from '@/lib/uuid';
 
 export const CONVERSATIONS_KEY = ['conversations'] as const;
 export const messagesKey = (id: string) => ['messages', id] as const;
 
 /** A client-generated id; resending with it never creates a second message. */
 export function newClientId(): string {
-  return globalThis.crypto.randomUUID();
+  return randomUuid();
 }
 
 export function useConversations() {
