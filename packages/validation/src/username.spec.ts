@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { assistantPromptUrl, buildQuestionnairePrompt } from './assistant-questionnaire.js';
 import {
   normalizeUsername,
   searchQuerySchema,
@@ -46,5 +47,18 @@ describe('search query', () => {
     expect(searchQuerySchema.safeParse({ q: 'a' }).success).toBe(false);
     expect(searchQuerySchema.safeParse({ q: 'x'.repeat(41) }).success).toBe(false);
     expect(searchQuerySchema.safeParse({ q: 'ok', limit: 99 }).success).toBe(false);
+  });
+});
+
+describe('assistant prompt links', () => {
+  it('puts the whole prompt in the link for ChatGPT and Gemini only', () => {
+    const prompt = buildQuestionnairePrompt('chatgpt');
+    for (const id of ['chatgpt', 'gemini'] as const) {
+      const url = assistantPromptUrl(id, prompt) ?? '';
+      expect(new URL(url).searchParams.get('q')).toBe(prompt);
+      expect(url.length).toBeLessThan(8000);
+    }
+    expect(assistantPromptUrl('claude', prompt)).toBeNull();
+    expect(assistantPromptUrl('other', prompt)).toBeNull();
   });
 });

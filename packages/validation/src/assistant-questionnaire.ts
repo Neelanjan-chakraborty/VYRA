@@ -32,6 +32,19 @@ export const ASSISTANTS: readonly AssistantInfo[] = [
   { id: 'other', name: 'Another assistant', url: null, remembers: false },
 ];
 
+/**
+ * A link that opens the assistant with the questions already in the message
+ * box, for the assistants that accept one. Neither OpenAI nor Google documents
+ * the parameter, so callers also put the questions on the clipboard and say so.
+ * Null for assistants with no such link.
+ */
+export function assistantPromptUrl(id: AssistantId, prompt: string): string | null {
+  const text = encodeURIComponent(prompt);
+  if (id === 'chatgpt') return `https://chatgpt.com/?q=${text}`;
+  if (id === 'gemini') return `https://gemini.google.com/app?q=${text}`;
+  return null;
+}
+
 export function assistantInfo(id: AssistantId): AssistantInfo {
   return ASSISTANTS.find((a) => a.id === id) ?? (ASSISTANTS.at(-1) as AssistantInfo);
 }

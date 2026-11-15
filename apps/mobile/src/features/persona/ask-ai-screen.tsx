@@ -2,6 +2,7 @@ import { color, radius, space, typography } from '@vyra/design-system';
 import {
   ASSISTANTS,
   assistantInfo,
+  assistantPromptUrl,
   buildQuestionnairePrompt,
   QUESTIONNAIRE_ATTRIBUTES,
   QUESTIONNAIRE_REPLY_MAX_CHARS,
@@ -48,6 +49,14 @@ export function AskAiScreen({ mode }: { readonly mode: 'onboarding' | 'settings'
   async function copyPrompt() {
     await Clipboard.setStringAsync(prompt);
     setCopied(true);
+  }
+
+  /** Copies the questions, then opens the assistant with them pre-filled where it can. */
+  async function openWithQuestions() {
+    if (!assistant) return;
+    await copyPrompt();
+    const url = assistantPromptUrl(assistant, prompt);
+    if (url) await Linking.openURL(url);
   }
 
   async function pasteFromClipboard() {
@@ -123,7 +132,18 @@ export function AskAiScreen({ mode }: { readonly mode: 'onboarding' | 'settings'
             </Text>
           ) : null}
         </View>
-        {info.url ? (
+        {assistant && assistantPromptUrl(assistant, prompt) ? (
+          <>
+            <Button
+              label={`Open ${info.name} with the questions`}
+              variant="secondary"
+              onPress={() => void openWithQuestions()}
+            />
+            <Text variant="caption" tone="textSecondary">
+              The questions are copied too. If they don’t appear in the message box, paste them.
+            </Text>
+          </>
+        ) : info.url ? (
           <Button
             label={`Open ${info.name}`}
             variant="quiet"
