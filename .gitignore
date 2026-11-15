@@ -40,3 +40,7 @@ visual-check-output/
 # Next.js (apps/landing)
 .next/
 next-env.d.ts
+
+# Rust
+/target/
+*.node

@@ -1,0 +1,181 @@
+{
+  "socialEnergy": {
+    "kind": "scale",
+    "label": "Social energy",
+    "low": "Recharges alone",
+    "high": "Recharges around people"
+  },
+  "emotionalExpressiveness": {
+    "kind": "scale",
+    "label": "Emotional expression",
+    "low": "Keeps feelings private",
+    "high": "Shares feelings openly"
+  },
+  "intellectualCuriosity": {
+    "kind": "scale",
+    "label": "Curiosity",
+    "low": "Prefers the familiar",
+    "high": "Chases new ideas"
+  },
+  "adventureOrientation": {
+    "kind": "scale",
+    "label": "Adventure",
+    "low": "Loves routine and comfort",
+    "high": "Seeks the unfamiliar"
+  },
+  "planningStyle": {
+    "kind": "scale",
+    "label": "Planning",
+    "low": "Spontaneous",
+    "high": "Plans ahead"
+  },
+  "conflictApproach": {
+    "kind": "scale",
+    "label": "In disagreements",
+    "low": "Needs space first",
+    "high": "Talks it through right away"
+  },
+  "affectionExpression": {
+    "kind": "scale",
+    "label": "Affection",
+    "low": "Shows care quietly",
+    "high": "Shows care openly"
+  },
+  "communicationStyle": {
+    "kind": "enum",
+    "label": "Communication style",
+    "options": [
+      {
+        "value": "concise",
+        "label": "Brief and direct"
+      },
+      {
+        "value": "expansive",
+        "label": "Detailed and expressive"
+      },
+      {
+        "value": "playful",
+        "label": "Playful and teasing"
+      },
+      {
+        "value": "reflective",
+        "label": "Thoughtful and considered"
+      }
+    ]
+  },
+  "lifestylePace": {
+    "kind": "enum",
+    "label": "Pace of life",
+    "options": [
+      {
+        "value": "homebody",
+        "label": "Mostly at home"
+      },
+      {
+        "value": "balanced",
+        "label": "A mix of in and out"
+      },
+      {
+        "value": "outgoing",
+        "label": "Mostly out and about"
+      }
+    ]
+  },
+  "weekendRhythm": {
+    "kind": "enum",
+    "label": "A good weekend",
+    "options": [
+      {
+        "value": "restful",
+        "label": "Slow and restful"
+      },
+      {
+        "value": "social",
+        "label": "Full of people"
+      },
+      {
+        "value": "adventurous",
+        "label": "Somewhere new"
+      },
+      {
+        "value": "productive",
+        "label": "Getting things done"
+      }
+    ]
+  },
+  "values": {
+    "kind": "list",
+    "label": "What matters most",
+    "max": 5,
+    "userStatedOnly": false,
+    "vocabulary": [
+      {
+        "value": "honesty",
+        "label": "Honesty"
+      },
+      {
+        "value": "kindness",
+        "label": "Kindness"
+      },
+      {
+        "value": "ambition",
+        "label": "Ambition"
+      },
+      {
+        "value": "curiosity",
+        "label": "Curiosity"
+      },
+      {
+        "value": "family",
+        "label": "Family"
+      },
+      {
+        "value": "independence",
+        "label": "Independence"
+      },
+      {
+        "value": "humour",
+        "label": "Humour"
+      },
+      {
+        "value": "loyalty",
+        "label": "Loyalty"
+      },
+      {
+        "value": "creativity",
+        "label": "Creativity"
+      },
+      {
+        "value": "stability",
+        "label": "Stability"
+      },
+      {
+        "value": "adventure",
+        "label": "Adventure"
+      },
+      {
+        "value": "growth",
+        "label": "Growth"
+      },
+      {
+        "value": "community",
+        "label": "Community"
+      },
+      {
+        "value": "calm",
+        "label": "Calm"
+      },
+      {
+        "value": "generosity",
+        "label": "Generosity"
+      }
+    ]
+  },
+  "boundaries": {
+    "kind": "list",
+    "label": "Boundaries",
+    "max": 5,
+    "userStatedOnly": true,
+    "vocabulary": null
+  }
+}

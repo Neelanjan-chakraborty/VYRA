@@ -23,7 +23,10 @@
     "db:deploy": "pnpm --filter @vyra/api db:deploy",
     "db:generate": "pnpm --filter @vyra/api db:generate",
     "services:start": "bash scripts/dev-services.sh",
-    "e2e:web": "node scripts/e2e-web.cjs"
+    "e2e:web": "node scripts/e2e-web.cjs",
+    "engine:catalogue": "node scripts/engine-catalogue.mjs",
+    "engine:fixtures": "node scripts/engine-fixtures.mjs",
+    "rust:check": "cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace"
   },
   "devDependencies": {
     "oxlint": "^1.93.0",
