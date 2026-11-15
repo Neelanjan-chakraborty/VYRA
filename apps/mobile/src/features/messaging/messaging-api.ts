@@ -92,6 +92,7 @@ function pendingMessage(
     media: null,
     plan: null,
     event: null,
+    theme: null,
     read: false,
     replyTo: null,
     reactions: [],

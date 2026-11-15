@@ -47,7 +47,6 @@ export interface ConversationAccess {
     wingmanContextEnabled: boolean;
     mutedAt: Date | null;
     restricted: boolean;
-    theme: string;
   };
   readonly otherId: string;
   readonly other: {
@@ -59,6 +58,8 @@ export interface ConversationAccess {
   };
   /** Active connection, nobody blocked, both accounts usable. */
   readonly writable: boolean;
+  /** The conversation's shared theme. */
+  readonly theme: string;
 }
 
 /**
@@ -156,6 +157,7 @@ export class MessagingService {
       otherId: other.userId,
       other,
       writable: conversation.match.endedAt === null,
+      theme: conversation.theme,
     };
   }
 
@@ -192,8 +194,22 @@ export class MessagingService {
       case 'DATE_PLAN':
         return 'Date idea';
       case 'SYSTEM':
-        return 'You’re connected';
+        return this.systemEvent(message).event === 'theme'
+          ? message.senderId === viewerId
+            ? 'You changed the theme'
+            : 'Theme changed'
+          : 'You’re connected';
     }
+  }
+
+  /** What a system message records: a connection, or a theme change. */
+  private systemEvent(message: Message): Pick<MessageView, 'event' | 'theme'> {
+    const payload = (message.payload ?? {}) as { event?: unknown; theme?: unknown };
+    if (payload.event === 'theme') {
+      const theme = chatThemeSchema.safeParse(payload.theme);
+      return { event: 'theme', theme: theme.success ? theme.data : 'default' };
+    }
+    return { event: 'connected', theme: null };
   }
 
   /** Media the viewer may not see yet is left out entirely, not shown as a placeholder. */
@@ -272,7 +288,7 @@ export class MessagingService {
       removed,
       media,
       plan,
-      event: message.kind === 'SYSTEM' ? 'connected' : null,
+      ...(message.kind === 'SYSTEM' ? this.systemEvent(message) : { event: null, theme: null }),
       read:
         mine &&
         bothShare &&
@@ -302,7 +318,7 @@ export class MessagingService {
       wingmanContextEnabled: access.me.wingmanContextEnabled,
       muted: access.me.mutedAt !== null,
       restricted: access.me.restricted,
-      theme: chatThemeSchema.catch('default').parse(access.me.theme),
+      theme: chatThemeSchema.catch('default').parse(access.theme),
     };
   }
 
@@ -334,6 +350,7 @@ export class MessagingService {
         otherId: other.userId,
         other,
         writable: row.conversation.match.endedAt === null,
+        theme: row.conversation.theme,
       };
       const last = await this.prisma.message.findFirst({
         where: {
@@ -535,6 +552,20 @@ export class MessagingService {
     update: Partial<ConversationSettings>,
   ): Promise<ConversationSettings> {
     const access = await this.access(userId, conversationId);
+    // The theme is shared: either person can change it, and both see a note.
+    let theme = access.theme;
+    if (update.theme !== undefined && update.theme !== access.theme) {
+      if (!access.writable) throw new ConflictException('This connection has ended.');
+      theme = update.theme;
+      await this.prisma.conversation.update({ where: { id: conversationId }, data: { theme } });
+      await this.store({
+        conversationId,
+        senderId: userId,
+        kind: 'SYSTEM',
+        payload: { event: 'theme', theme },
+      });
+      this.changed(access, userId, 'message');
+    }
     const row = await this.prisma.conversationParticipant.update({
       where: { conversationId_userId: { conversationId, userId } },
       data: {
@@ -547,13 +578,12 @@ export class MessagingService {
           : { wingmanContextEnabled: update.wingmanContextEnabled }),
         ...(update.muted === undefined ? {} : { mutedAt: update.muted ? new Date() : null }),
         ...(update.restricted === undefined ? {} : { restricted: update.restricted }),
-        ...(update.theme === undefined ? {} : { theme: update.theme }),
       },
     });
     // Read receipts are reciprocal (and restriction hides them), so the other side's ticks may change too.
     if (update.sendsReadReceipts !== undefined || update.restricted !== undefined)
       this.changed(access, userId, 'read');
-    return this.settings({ ...access, me: row });
+    return this.settings({ ...access, me: row, theme });
   }
 
   /** The sender removes a message for both people. Text and media are erased, not hidden. */

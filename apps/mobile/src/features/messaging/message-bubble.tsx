@@ -41,6 +41,14 @@ export function MessageBubble({
   onReact,
   theme,
 }: BubbleProps) {
+  if (message.kind === 'system' && message.event === 'theme') {
+    const label = chatThemes[message.theme ?? 'default'].label;
+    return (
+      <Text variant="caption" tone="textSecondary" style={styles.system}>
+        {message.mine ? 'You' : otherName} changed the theme to {label}
+      </Text>
+    );
+  }
   if (message.kind === 'system') {
     return (
       <Text variant="caption" tone="textSecondary" style={styles.system}>

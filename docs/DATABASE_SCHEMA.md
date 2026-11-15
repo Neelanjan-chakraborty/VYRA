@@ -124,6 +124,7 @@ within the disclosed window.
   message; `emoji` from a fixed set validated by the API.
 - `scheduled_messages`: `body`, `send_at`, `status` (`PENDING` / `SENT` / `CANCELLED` /
   `FAILED`), `message_id` once sent; partial index on pending rows.
-- `conversation_participants`: `restricted`, `theme` (CHECK format).
+- `conversation_participants`: `restricted`. `conversations.theme` (CHECK format; shared,
+  migration `shared_theme` moved it from participants).
 - `user_profiles`: `notify_preview` (CHECK `name` / `hidden`), `default_read_receipts`,
   `default_shares_typing` (copied into new conversations).

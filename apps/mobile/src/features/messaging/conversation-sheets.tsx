@@ -274,7 +274,7 @@ export function SettingsSheet(props: {
       <View style={styles.themeBlock}>
         <Text variant="bodyStrong">Theme</Text>
         <Text variant="caption" tone="textSecondary">
-          Colours your messages here. Only you see it.
+          Colours your messages. You both see it, and either of you can change it.
         </Text>
         <View style={styles.themes} role="radiogroup" aria-label="Theme">
           {CHAT_THEMES.map((theme) => (

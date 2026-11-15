@@ -145,8 +145,8 @@ delete their account.
 (six emoji, one each), reply with a quote, pin it for both of you (up to three, shown in a bar
 at the top), edit your own text for 15 minutes ("Edited"), forward your own text to up to five
 other conversations, or remove/report as before. "Send later" schedules a message up to a week
-ahead and lists what's waiting, with cancel. Conversation settings add a theme (five design-system
-presets, only you see it) and Restrict. You → Notifications can hide who a notification is from;
+ahead and lists what's waiting, with cancel. Conversation settings add a shared theme (five
+design-system presets; both see it, either can change it, with a note in the chat) and Restrict. You → Notifications can hide who a notification is from;
 You → Message privacy sets read-receipt and typing defaults for new conversations. Phases B–E
 (ephemeral media and video, device protection, relationship tools, abuse rules) are next.
 

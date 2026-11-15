@@ -146,8 +146,10 @@ export const messageSchema = z.object({
   removed: z.boolean(),
   media: messageMediaSchema.nullable(),
   plan: datePlanPayloadSchema.nullable(),
-  /** System messages only, e.g. "connected". */
-  event: z.enum(['connected']).nullable(),
+  /** System messages only: "connected", or "theme" when someone changed the shared theme. */
+  event: z.enum(['connected', 'theme']).nullable(),
+  /** The theme chosen, for "theme" events. */
+  theme: chatThemeSchema.nullable(),
   /** The viewer's own messages only: the other person has read it (when both share receipts). */
   read: z.boolean(),
   replyTo: replyPreviewSchema.nullable(),
@@ -179,6 +181,7 @@ export const conversationSettingsSchema = z.object({
   muted: z.boolean(),
   /** No notifications from them; your read receipts and typing are never sent to them. */
   restricted: z.boolean(),
+  /** Shared: both people see it, and either can change it. */
   theme: chatThemeSchema,
 });
 export type ConversationSettings = z.infer<typeof conversationSettingsSchema>;

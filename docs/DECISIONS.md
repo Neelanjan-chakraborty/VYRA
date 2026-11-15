@@ -253,8 +253,7 @@ Edits are allowed for 15 minutes and keep no history — the message just says "
 Forwarding is limited to your own text: someone else's words and every photo or voice note stay
 in the conversation they were sent to. Scheduled messages are BullMQ delayed jobs keyed by the
 schedule id (which is also the message's `clientId`, so a retried job never sends twice), sent
-only while the connection is still open. Themes are design-system presets, per person, and only
-the person who picked one sees it.
+only while the connection is still open. Themes are design-system presets (see D-069).
 
 **D-067 · Restrict is quiet, one-sided and reversible.** The restricted person still sees the
 conversation, but gets no pushes from you and never sees your read receipts or typing (the
@@ -264,6 +263,11 @@ gateway checks the same flag). They aren't told. Restriction is the gentler step
 read-receipt and typing defaults when they open. Changing a default doesn't touch existing
 conversations, so earlier choices made in a conversation are never overridden. "Hidden"
 notification previews leave out the sender's name as well as the content.
+
+**D-069 · The chat theme is shared** (product owner's request, replacing per-person themes).
+It lives on the conversation; either person can change it while the connection is open, and a
+system line ("Asha changed the theme to Dusk") tells both. Re-choosing the current theme adds no
+line. Per-person choices from before were cosmetic and were not carried over.
 
 ## Open (need the product owner)
 

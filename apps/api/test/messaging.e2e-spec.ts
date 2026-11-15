@@ -645,9 +645,9 @@ describe('Messaging (e2e)', () => {
       const { a, b, conversationId } = await connected();
       const token = `ExponentPushToken[${randomUUID()}]`;
       await http().put('/v1/me/push-devices').set(b.auth).send({ token, platform: 'android' });
-      await settings(b, conversationId, { restricted: true, theme: 'dusk' })
+      await settings(b, conversationId, { restricted: true })
         .expect(200)
-        .expect((r) => expect(r.body).toMatchObject({ restricted: true, theme: 'dusk' }));
+        .expect((r) => expect(r.body).toMatchObject({ restricted: true }));
       const sent = await send(a, conversationId, 'hey?').expect(201);
       expect(push.sent.filter((m) => m.token === token)).toHaveLength(0);
       await http()
@@ -659,13 +659,36 @@ describe('Messaging (e2e)', () => {
       // a is never told, and their own settings are unchanged.
       expect(
         (await http().get(`/v1/conversations/${conversationId}`).set(a.auth)).body.settings,
-      ).toMatchObject({ restricted: false, theme: 'default' });
+      ).toMatchObject({ restricted: false });
 
       const [socketA, socketB] = [await signedIn(sockets, a), await signedIn(sockets, b)];
       socketB.send({ t: 'typing', c: conversationId });
       expect(await nextEvent(socketA, SOCKET_EVENTS.typing, 800)).toBeNull();
       socketA.send({ t: 'typing', c: conversationId });
       expect(await nextEvent(socketB, SOCKET_EVENTS.typing)).toEqual({ conversationId });
+    });
+
+    it('shares the theme: either person changes it, both see it and a note', async () => {
+      const { a, b, conversationId } = await connected();
+      const theme = async (user: TestUser) =>
+        (await http().get(`/v1/conversations/${conversationId}`).set(user.auth)).body.settings
+          .theme;
+      await settings(a, conversationId, { theme: 'dusk' }).expect(200);
+      expect([await theme(a), await theme(b)]).toEqual(['dusk', 'dusk']);
+      const [note] = (await page(b, conversationId)).messages;
+      expect(note).toMatchObject({ kind: 'system', event: 'theme', theme: 'dusk', mine: false });
+      expect((await list(b))[0]?.lastMessage?.preview).toBe('Theme changed');
+
+      await settings(b, conversationId, { theme: 'sage' }).expect(200);
+      expect([await theme(a), await theme(b)]).toEqual(['sage', 'sage']);
+      // Setting the same theme again adds no second note.
+      await settings(b, conversationId, { theme: 'sage' }).expect(200);
+      const notes = (await page(a, conversationId)).messages.filter((m) => m.event === 'theme');
+      expect(notes.map((m) => [m.theme, m.mine])).toEqual([
+        ['sage', false],
+        ['dusk', true],
+      ]);
+      await settings(a, conversationId, { theme: 'neon' }).expect(422);
     });
 
     it('starts new conversations from privacy defaults, and can hide who a push is from', async () => {

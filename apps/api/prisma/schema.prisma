@@ -676,6 +676,8 @@ model Conversation {
   matchId       String    @unique @map("match_id") @db.Uuid
   createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   lastMessageAt DateTime? @map("last_message_at") @db.Timestamptz(3)
+  /// Chat theme preset both people see (design-system key). Either can change it.
+  theme         String    @default("default") @db.VarChar(20)
 
   match        Match                     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
@@ -700,8 +702,6 @@ model ConversationParticipant {
   /// This person restricted the other: no notifications from them, and no read
   /// receipts or typing sent to them. The other person isn't told.
   restricted            Boolean   @default(false)
-  /// Chat theme preset this person sees (design-system key).
-  theme                 String    @default("default") @db.VarChar(20)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
