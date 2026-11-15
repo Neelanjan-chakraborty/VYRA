@@ -25,10 +25,13 @@ export function VoiceNote({
   url,
   durationMs,
   mine,
+  tint: themeTint,
 }: {
   readonly url: string;
   readonly durationMs: number | null;
   readonly mine: boolean;
+  /** Text colour of the bubble it sits in (chat themes). */
+  readonly tint?: string;
 }) {
   const player = useAudioPlayer({ uri: url });
   const status = useAudioPlayerStatus(player);
@@ -37,7 +40,7 @@ export function VoiceNote({
   useEffect(() => {
     if (status.didJustFinish) void player.seekTo(0);
   }, [status.didJustFinish, player]);
-  const tint = mine ? color.textOnAccent : color.textPrimary;
+  const tint = themeTint ?? (mine ? color.textOnAccent : color.textPrimary);
   return (
     <Pressable
       role="button"
@@ -55,7 +58,7 @@ export function VoiceNote({
           <Path d="M8 5.5v13l11-6.5z" fill={tint} />
         )}
       </Svg>
-      <View style={[styles.track, { backgroundColor: mine ? color.accentPressed : color.border }]}>
+      <View style={[styles.track, { backgroundColor: color.border }]}>
         <View
           style={[
             styles.progress,

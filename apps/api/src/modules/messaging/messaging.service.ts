@@ -11,9 +11,12 @@ import {
   type MessageView,
   type SendMessage,
   SOCKET_EVENTS,
+  chatThemeSchema,
+  EDIT_WINDOW_MINUTES,
+  reactionSchema,
 } from '@vyra/validation';
 import { PrismaService } from '../../database/prisma.service.js';
-import { type Message, Prisma } from '../../generated/prisma/client.js';
+import { type Message, type MessageReaction, Prisma } from '../../generated/prisma/client.js';
 import { CompatibilityService } from '../compatibility/compatibility.service.js';
 import { PeopleService } from '../compatibility/people.service.js';
 import { MediaUrlService } from '../storage/media-url.service.js';
@@ -22,6 +25,13 @@ import { NotificationService } from './notification.service.js';
 import { RealtimeService } from '../realtime/realtime.service.js';
 
 const NOT_FOUND = 'Not found.';
+
+/** What `view()` needs besides the row itself. */
+export const VIEW_INCLUDE = { reactions: true, replyTo: true } as const;
+export type ViewableMessage = Message & {
+  reactions?: readonly MessageReaction[];
+  replyTo?: Message | null;
+};
 const PREVIEW_LENGTH = 80;
 
 type Tx = Prisma.TransactionClient;
@@ -36,9 +46,17 @@ export interface ConversationAccess {
     sharesTyping: boolean;
     wingmanContextEnabled: boolean;
     mutedAt: Date | null;
+    restricted: boolean;
+    theme: string;
   };
   readonly otherId: string;
-  readonly other: { lastReadAt: Date | null; sendsReadReceipts: boolean; sharesTyping: boolean };
+  readonly other: {
+    lastReadAt: Date | null;
+    sendsReadReceipts: boolean;
+    sharesTyping: boolean;
+    /** The other person restricted the viewer. */
+    restricted: boolean;
+  };
   /** Active connection, nobody blocked, both accounts usable. */
   readonly writable: boolean;
 }
@@ -71,11 +89,24 @@ export class MessagingService {
     userAId: string,
     userBId: string,
   ): Promise<string> {
+    // New conversations start from each person's privacy defaults.
+    const profiles = await tx.userProfile.findMany({
+      where: { userId: { in: [userAId, userBId] } },
+      select: { userId: true, defaultReadReceipts: true, defaultSharesTyping: true },
+    });
+    const defaults = (userId: string) => {
+      const profile = profiles.find((p) => p.userId === userId);
+      return {
+        userId,
+        sendsReadReceipts: profile?.defaultReadReceipts ?? true,
+        sharesTyping: profile?.defaultSharesTyping ?? true,
+      };
+    };
     const conversation = await tx.conversation.upsert({
       where: { matchId },
       create: {
         matchId,
-        participants: { create: [{ userId: userAId }, { userId: userBId }] },
+        participants: { create: [defaults(userAId), defaults(userBId)] },
       },
       update: {},
     });
@@ -146,7 +177,7 @@ export class MessagingService {
 
   // ─────────────────────────── reading ───────────────────────────
 
-  private preview(message: Message, viewerId: string): string {
+  preview(message: Message, viewerId: string): string {
     if (message.deletedAt) return 'Message removed';
     if (message.reportedAt && message.senderId !== viewerId) return 'Message reported';
     switch (message.kind) {
@@ -166,12 +197,12 @@ export class MessagingService {
   }
 
   /** Media the viewer may not see yet is left out entirely, not shown as a placeholder. */
-  private visibleTo(message: Message, viewerId: string): boolean {
+  visibleTo(message: Message, viewerId: string): boolean {
     if (message.senderId === viewerId || message.kind === 'SYSTEM') return true;
     return message.mediaStatus !== 'REJECTED';
   }
 
-  view(message: Message, access: ConversationAccess, viewerId: string): MessageView {
+  view(message: ViewableMessage, access: ConversationAccess, viewerId: string): MessageView {
     const mine = message.senderId === viewerId;
     const removed = message.deletedAt !== null || (!mine && message.reportedAt !== null);
     const kind = (
@@ -212,7 +243,25 @@ export class MessagingService {
       !removed && message.kind === 'DATE_PLAN'
         ? (datePlanPayloadSchema.safeParse(message.payload).data ?? null)
         : null;
-    const bothShare = access.me.sendsReadReceipts && access.other.sendsReadReceipts;
+    // Receipts flow only when both share them and the other person hasn't restricted the viewer.
+    const bothShare =
+      access.me.sendsReadReceipts && access.other.sendsReadReceipts && !access.other.restricted;
+    const reactions = new Map<string, { count: number; mine: boolean }>();
+    if (!removed)
+      for (const r of message.reactions ?? []) {
+        const entry = reactions.get(r.emoji) ?? { count: 0, mine: false };
+        reactions.set(r.emoji, {
+          count: entry.count + 1,
+          mine: entry.mine || r.userId === viewerId,
+        });
+      }
+    const replyTo = message.replyTo
+      ? {
+          id: message.replyTo.id,
+          mine: message.replyTo.senderId === viewerId,
+          preview: this.preview(message.replyTo, viewerId),
+        }
+      : null;
     return {
       id: message.id,
       conversationId: message.conversationId,
@@ -229,6 +278,19 @@ export class MessagingService {
         bothShare &&
         access.other.lastReadAt !== null &&
         access.other.lastReadAt >= message.createdAt,
+      replyTo,
+      reactions: [...reactions].flatMap(([emoji, r]) => {
+        const parsed = reactionSchema.safeParse(emoji);
+        return parsed.success ? [{ emoji: parsed.data, ...r }] : [];
+      }),
+      edited: !removed && message.editedAt !== null,
+      pinned: !removed && message.pinnedAt !== null,
+      forwarded: message.forwarded,
+      editable:
+        mine &&
+        !removed &&
+        message.kind === 'TEXT' &&
+        Date.now() - message.createdAt.getTime() < EDIT_WINDOW_MINUTES * 60_000,
       createdAt: message.createdAt.toISOString(),
     };
   }
@@ -239,6 +301,8 @@ export class MessagingService {
       sharesTyping: access.me.sharesTyping,
       wingmanContextEnabled: access.me.wingmanContextEnabled,
       muted: access.me.mutedAt !== null,
+      restricted: access.me.restricted,
+      theme: chatThemeSchema.catch('default').parse(access.me.theme),
     };
   }
 
@@ -341,6 +405,7 @@ export class MessagingService {
       },
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: limit + 1,
+      include: VIEW_INCLUDE,
     });
     const page = rows.slice(0, limit);
     return {
@@ -358,6 +423,7 @@ export class MessagingService {
     const access = await this.writable(userId, conversationId);
     const existing = await this.prisma.message.findUnique({
       where: { conversationId_clientId: { conversationId, clientId: input.clientId } },
+      include: VIEW_INCLUDE,
     });
     // A retry of a send that already succeeded returns the same message.
     if (existing) {
@@ -373,6 +439,7 @@ export class MessagingService {
             kind: 'TEXT',
             body: input.body,
             aiAssisted: input.aiAssisted ?? false,
+            replyToId: await this.replyTarget(conversationId, input.replyToId),
           }
         : {
             conversationId,
@@ -399,9 +466,9 @@ export class MessagingService {
   }
 
   /** Writes a message and moves the conversation to the top of both lists. */
-  async store(data: Prisma.MessageUncheckedCreateInput): Promise<Message> {
+  async store(data: Prisma.MessageUncheckedCreateInput) {
     return this.prisma.$transaction(async (tx) => {
-      const message = await tx.message.create({ data });
+      const message = await tx.message.create({ data, include: VIEW_INCLUDE });
       await tx.conversation.update({
         where: { id: data.conversationId },
         data: { lastMessageAt: message.createdAt },
@@ -410,13 +477,25 @@ export class MessagingService {
     });
   }
 
+  /** A reply must quote a message in the same conversation that still exists. */
+  async replyTarget(conversationId: string, replyToId: string | undefined) {
+    if (!replyToId) return null;
+    const target = await this.prisma.message.findFirst({
+      where: { id: replyToId, conversationId, deletedAt: null, kind: { not: 'SYSTEM' } },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException('That message is no longer available.');
+    return target.id;
+  }
+
   async notifyNewMessage(access: ConversationAccess, senderId: string): Promise<void> {
     const recipient = await this.prisma.conversationParticipant.findUnique({
       where: {
         conversationId_userId: { conversationId: access.conversationId, userId: access.otherId },
       },
     });
-    if (!recipient || recipient.mutedAt) return;
+    // Restricted people's messages arrive quietly.
+    if (!recipient || recipient.mutedAt || recipient.restricted) return;
     await this.notifications.notify(access.otherId, {
       kind: 'message',
       fromUserId: senderId,
@@ -441,7 +520,8 @@ export class MessagingService {
     });
     if (updated.count === 0) return;
     // The other person only hears about it when this person shares read receipts.
-    if (access.me.sendsReadReceipts) this.changed(access, userId, 'read');
+    // Nor when this person restricted them.
+    if (access.me.sendsReadReceipts && !access.me.restricted) this.changed(access, userId, 'read');
     else
       this.realtime.emit([userId], SOCKET_EVENTS.conversationChanged, {
         conversationId,
@@ -466,10 +546,13 @@ export class MessagingService {
           ? {}
           : { wingmanContextEnabled: update.wingmanContextEnabled }),
         ...(update.muted === undefined ? {} : { mutedAt: update.muted ? new Date() : null }),
+        ...(update.restricted === undefined ? {} : { restricted: update.restricted }),
+        ...(update.theme === undefined ? {} : { theme: update.theme }),
       },
     });
-    // Read receipts are reciprocal, so the other side's ticks may change too.
-    if (update.sendsReadReceipts !== undefined) this.changed(access, userId, 'read');
+    // Read receipts are reciprocal (and restriction hides them), so the other side's ticks may change too.
+    if (update.sendsReadReceipts !== undefined || update.restricted !== undefined)
+      this.changed(access, userId, 'read');
     return this.settings({ ...access, me: row });
   }
 
@@ -494,6 +577,8 @@ export class MessagingService {
         mediaWidth: null,
         mediaHeight: null,
         payload: Prisma.DbNull,
+        pinnedAt: null,
+        reactions: { deleteMany: {} },
       },
     });
     for (const key of [message.mediaKey, message.mediaThumbKey, message.mediaAltKey])

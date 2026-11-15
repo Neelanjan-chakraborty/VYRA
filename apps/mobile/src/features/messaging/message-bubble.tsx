@@ -1,5 +1,5 @@
-import { color, radius, space } from '@vyra/design-system';
-import type { MessageView } from '@vyra/validation';
+import { type ChatTheme, chatThemes, color, radius, space } from '@vyra/design-system';
+import type { MessageView, Reaction } from '@vyra/validation';
 import { Image } from 'expo-image';
 import { Platform, Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
@@ -25,6 +25,9 @@ interface BubbleProps {
   readonly canAct: boolean;
   readonly onActions: (message: MessageView) => void;
   readonly onPlan: (message: MessageView, action: 'accept' | 'decline' | 'withdraw') => void;
+  /** Tapping a reaction chip: yours toggles off, another replaces yours. */
+  readonly onReact: (message: MessageView, emoji: Reaction | null) => void;
+  readonly theme: ChatTheme;
 }
 
 /** One message. Text is always rendered as plain text, never as markup or links. */
@@ -35,6 +38,8 @@ export function MessageBubble({
   canAct,
   onActions,
   onPlan,
+  onReact,
+  theme,
 }: BubbleProps) {
   if (message.kind === 'system') {
     return (
@@ -44,7 +49,15 @@ export function MessageBubble({
     );
   }
   const mine = message.mine;
-  const status = pending ? 'Sending…' : mine && message.read ? 'Read' : null;
+  const palette = chatThemes[theme];
+  const ink = mine ? palette.mineText : color.textPrimary;
+  const status = [
+    message.pinned ? 'Pinned' : null,
+    message.edited ? 'Edited' : null,
+    pending ? 'Sending…' : mine && message.read ? 'Read' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   let content;
   if (message.removed) {
     content = (
@@ -54,7 +67,7 @@ export function MessageBubble({
     );
   } else if (message.kind === 'text') {
     content = (
-      <Text selectable style={{ color: mine ? color.textOnAccent : color.textPrimary }}>
+      <Text selectable style={{ color: ink }}>
         {message.body}
       </Text>
     );
@@ -76,7 +89,7 @@ export function MessageBubble({
         {media.status !== 'ready' ? (
           <Text
             variant="caption"
-            style={[styles.mediaNote, { color: mine ? color.textOnAccent : color.textSecondary }]}
+            style={[styles.mediaNote, { color: mine ? ink : color.textSecondary }]}
           >
             {media.status === 'checking'
               ? 'Photo being checked'
@@ -89,10 +102,12 @@ export function MessageBubble({
     // iOS's native player can't read Ogg; the server also stores the same audio as CAF.
     const voiceUrl =
       Platform.OS === 'ios' && message.media.altUrl ? message.media.altUrl : message.media.url;
-    content = <VoiceNote url={voiceUrl} durationMs={message.media.durationMs} mine={mine} />;
+    content = (
+      <VoiceNote url={voiceUrl} durationMs={message.media.durationMs} mine={mine} tint={ink} />
+    );
   } else if (message.kind === 'date_plan' && message.plan) {
     const { plan } = message;
-    const tint = mine ? color.textOnAccent : color.textPrimary;
+    const tint = ink;
     content = (
       <View style={styles.plan}>
         <Text variant="eyebrow" style={{ color: tint }}>
@@ -138,23 +153,59 @@ export function MessageBubble({
     content = <Text tone="textSecondary">Unavailable</Text>;
   }
 
+  const actionable = !message.removed && !pending;
   return (
     <View style={[styles.row, mine ? styles.rowMine : styles.rowTheirs]}>
+      {message.forwarded && !message.removed ? (
+        <Text variant="caption" tone="textSecondary" style={styles.label}>
+          Forwarded
+        </Text>
+      ) : null}
       <Pressable
-        onLongPress={!message.removed && !pending ? () => onActions(message) : undefined}
-        accessibilityActions={
-          !message.removed && !pending ? [{ name: 'activate', label: 'Message options' }] : []
-        }
+        onLongPress={actionable ? () => onActions(message) : undefined}
+        accessibilityActions={actionable ? [{ name: 'activate', label: 'Message options' }] : []}
         onAccessibilityAction={() => onActions(message)}
         style={[
           styles.bubble,
-          mine ? styles.mine : styles.theirs,
+          mine ? [styles.mine, { backgroundColor: palette.mine }] : styles.theirs,
           message.kind === 'image' && styles.mediaBubble,
           pending && styles.dim,
         ]}
       >
+        {message.replyTo && !message.removed ? (
+          <View
+            style={[styles.quote, { borderLeftColor: mine ? ink : color.accent }]}
+            aria-label={`Replying to ${message.replyTo.mine ? 'you' : otherName}`}
+          >
+            <Text variant="caption" style={{ color: ink }}>
+              {message.replyTo.mine ? 'You' : otherName}
+            </Text>
+            <Text variant="caption" numberOfLines={2} style={{ color: ink }}>
+              {message.replyTo.preview}
+            </Text>
+          </View>
+        ) : null}
         {content}
       </Pressable>
+      {message.reactions.length > 0 ? (
+        <View style={styles.reactions}>
+          {message.reactions.map((r) => (
+            <Pressable
+              key={r.emoji}
+              role="button"
+              aria-label={`${r.emoji} ${r.count}${r.mine ? ', yours. Tap to remove' : ''}`}
+              disabled={!canAct}
+              onPress={() => onReact(message, r.mine ? null : r.emoji)}
+              style={[styles.chip, r.mine && styles.chipMine]}
+            >
+              <Text variant="caption">
+                {r.emoji}
+                {r.count > 1 ? ` ${r.count}` : ''}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+      ) : null}
       <Text variant="caption" tone="textSecondary" style={styles.meta}>
         {time(message.createdAt)}
         {status ? ` · ${status}` : ''}
@@ -169,7 +220,7 @@ const styles = StyleSheet.create({
   rowMine: { alignSelf: 'flex-end', alignItems: 'flex-end' },
   rowTheirs: { alignSelf: 'flex-start', alignItems: 'flex-start' },
   bubble: { borderRadius: radius.l, paddingHorizontal: space.m, paddingVertical: space.s },
-  mine: { backgroundColor: color.accent, borderBottomRightRadius: radius.s },
+  mine: { borderBottomRightRadius: radius.s },
   theirs: { backgroundColor: color.surfaceRaised, borderBottomLeftRadius: radius.s },
   mediaBubble: { padding: space.xs },
   removed: { fontStyle: 'italic' },
@@ -181,4 +232,25 @@ const styles = StyleSheet.create({
   planActions: { flexDirection: 'row', gap: space.s, marginTop: space.s },
   withdraw: { alignSelf: 'flex-start', paddingHorizontal: 0 },
   meta: { marginTop: space.xxs },
+  label: { marginBottom: space.xxs },
+  quote: {
+    borderLeftWidth: 2,
+    paddingLeft: space.s,
+    marginBottom: space.xs,
+    opacity: 0.85,
+    maxWidth: 260,
+  },
+  reactions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.xxs, marginTop: space.xxs },
+  chip: {
+    minHeight: 28,
+    minWidth: 36,
+    paddingHorizontal: space.s,
+    borderRadius: radius.l,
+    backgroundColor: color.surfaceRaised,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: color.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chipMine: { borderColor: color.accent },
 });

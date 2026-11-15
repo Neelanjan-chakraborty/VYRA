@@ -1,12 +1,16 @@
-import { color, space } from '@vyra/design-system';
+import { chatThemes, color, MIN_TOUCH_TARGET, radius, space } from '@vyra/design-system';
 import {
+  CHAT_THEMES,
   type ConversationSettings,
   DATE_PLAN_LIMITS,
+  MAX_FORWARD_TARGETS,
   type MessageView,
+  type Reaction,
+  REACTIONS,
   type WingmanPurpose,
 } from '@vyra/validation';
 import { useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { Text } from '@/components/text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
@@ -16,7 +20,17 @@ import { TextField } from '@/components/ui/text-field';
 import { Toggle } from '@/components/ui/toggle';
 import { useConsents, useSetConsent } from '@/features/persona/persona-api';
 import { errorMessage } from '@/lib/api';
-import { useSendPlan, useWingman } from './messaging-api';
+import {
+  useCancelScheduled,
+  useConversations,
+  useForward,
+  usePin,
+  usePinned,
+  useScheduled,
+  useScheduleMessage,
+  useSendPlan,
+  useWingman,
+} from './messaging-api';
 
 function SettingRow(props: {
   label: string;
@@ -45,6 +59,7 @@ export function AddSheet(props: {
   onVoice: () => void;
   onPlan: () => void;
   onWingman: () => void;
+  onSchedule: () => void;
 }) {
   return (
     <BottomSheet visible={props.visible} title="Add to the conversation" onClose={props.onClose}>
@@ -53,6 +68,7 @@ export function AddSheet(props: {
         <Button label="Voice note" variant="secondary" onPress={props.onVoice} />
         <Button label="Date idea" variant="secondary" onPress={props.onPlan} />
         <Button label="Ask Wingman for ideas" variant="secondary" onPress={props.onWingman} />
+        <Button label="Send later" variant="secondary" onPress={props.onSchedule} />
       </View>
     </BottomSheet>
   );
@@ -249,6 +265,34 @@ export function SettingsSheet(props: {
         value={settings.muted}
         onChange={(v) => props.onChange({ muted: v })}
       />
+      <SettingRow
+        label={`Restrict ${props.name}`}
+        description="Their messages arrive quietly, with no notifications. They can’t see when you’ve read or are typing. They aren’t told."
+        value={settings.restricted}
+        onChange={(v) => props.onChange({ restricted: v })}
+      />
+      <View style={styles.themeBlock}>
+        <Text variant="bodyStrong">Theme</Text>
+        <Text variant="caption" tone="textSecondary">
+          Colours your messages here. Only you see it.
+        </Text>
+        <View style={styles.themes} role="radiogroup" aria-label="Theme">
+          {CHAT_THEMES.map((theme) => (
+            <Pressable
+              key={theme}
+              role="radio"
+              aria-checked={settings.theme === theme}
+              aria-label={chatThemes[theme].label}
+              onPress={() => props.onChange({ theme })}
+              style={[
+                styles.swatch,
+                { backgroundColor: chatThemes[theme].mine },
+                settings.theme === theme && styles.swatchChosen,
+              ]}
+            />
+          ))}
+        </View>
+      </View>
       <View style={styles.stack}>
         <Button
           label={`View ${props.name}’s profile`}
@@ -271,28 +315,36 @@ const REPORT_REASONS = [
   { value: 'OTHER', label: 'Something else' },
 ] as const;
 
-/** Remove your own message, or report theirs (which hides it from you). */
+/**
+ * Everything you can do to one message: react, reply, pin, edit or forward your
+ * own text, remove your own, or report theirs (which hides it from you).
+ */
 export function MessageActionsSheet(props: {
   message: MessageView | null;
+  canAct: boolean;
   onClose: () => void;
+  onReact: (message: MessageView, emoji: Reaction | null) => void;
+  onReply: (message: MessageView) => void;
+  onPin: (message: MessageView) => void;
+  onEdit: (message: MessageView) => void;
+  onForward: (message: MessageView) => void;
   onRemove: (message: MessageView) => void;
   onReport: (message: MessageView, reason: (typeof REPORT_REASONS)[number]['value']) => void;
 }) {
   const { message } = props;
+  const [reporting, setReporting] = useState(false);
+  const close = () => {
+    setReporting(false);
+    props.onClose();
+  };
+  const myReaction = message?.reactions.find((r) => r.mine)?.emoji ?? null;
   return (
     <BottomSheet
       visible={message !== null}
-      title={message?.mine ? 'Your message' : 'Report this message?'}
-      onClose={props.onClose}
+      title={reporting ? 'Report this message?' : message?.mine ? 'Your message' : 'Message'}
+      onClose={close}
     >
-      {message?.mine ? (
-        <>
-          <Text tone="textSecondary" style={styles.intro}>
-            Removing deletes it for both of you.
-          </Text>
-          <Button label="Remove message" variant="danger" onPress={() => props.onRemove(message)} />
-        </>
-      ) : message ? (
+      {message && reporting ? (
         <>
           <Text tone="textSecondary" style={styles.intro}>
             It will be hidden from you and sent to our team.
@@ -307,7 +359,253 @@ export function MessageActionsSheet(props: {
             />
           ))}
         </>
+      ) : message ? (
+        <>
+          {props.canAct ? (
+            <View style={styles.reactionRow} role="group" aria-label="React">
+              {REACTIONS.map((emoji) => (
+                <Pressable
+                  key={emoji}
+                  role="button"
+                  aria-label={myReaction === emoji ? `Remove ${emoji}` : `React ${emoji}`}
+                  aria-selected={myReaction === emoji}
+                  onPress={() => props.onReact(message, myReaction === emoji ? null : emoji)}
+                  style={[styles.reaction, myReaction === emoji && styles.reactionChosen]}
+                >
+                  <Text variant="title">{emoji}</Text>
+                </Pressable>
+              ))}
+            </View>
+          ) : null}
+          <View style={styles.stack}>
+            {props.canAct ? (
+              <>
+                <Button label="Reply" variant="secondary" onPress={() => props.onReply(message)} />
+                <Button
+                  label={message.pinned ? 'Unpin' : 'Pin for both of you'}
+                  variant="secondary"
+                  onPress={() => props.onPin(message)}
+                />
+              </>
+            ) : null}
+            {props.canAct && message.editable ? (
+              <Button label="Edit" variant="secondary" onPress={() => props.onEdit(message)} />
+            ) : null}
+            {props.canAct && message.mine && message.kind === 'text' ? (
+              <Button
+                label="Forward"
+                variant="secondary"
+                onPress={() => props.onForward(message)}
+              />
+            ) : null}
+            {message.mine ? (
+              <Button
+                label="Remove for both of you"
+                variant="danger"
+                onPress={() => props.onRemove(message)}
+              />
+            ) : (
+              <Button label="Report" variant="danger" onPress={() => setReporting(true)} />
+            )}
+          </View>
+        </>
       ) : null}
+    </BottomSheet>
+  );
+}
+
+/** Your own text, to up to five of your other conversations. */
+export function ForwardSheet(props: {
+  message: MessageView | null;
+  fromConversationId: string;
+  onClose: () => void;
+}) {
+  const conversations = useConversations();
+  const forward = useForward();
+  const [chosen, setChosen] = useState<string[]>([]);
+  const targets = (conversations.data?.conversations ?? []).filter(
+    (c) => c.id !== props.fromConversationId && !c.readOnly,
+  );
+  const close = () => {
+    setChosen([]);
+    forward.reset();
+    props.onClose();
+  };
+  return (
+    <BottomSheet visible={props.message !== null} title="Forward to" onClose={close}>
+      <Text tone="textSecondary" style={styles.intro}>
+        Only your own messages can be forwarded. Photos and voice notes stay where they were sent.
+      </Text>
+      {targets.length === 0 ? (
+        <Text tone="textSecondary">You don’t have other conversations yet.</Text>
+      ) : (
+        targets.map((c) => (
+          <SelectRow
+            key={c.id}
+            kind="checkbox"
+            label={c.person.displayName}
+            selected={chosen.includes(c.id)}
+            onPress={() =>
+              setChosen((list) =>
+                list.includes(c.id)
+                  ? list.filter((x) => x !== c.id)
+                  : list.length >= MAX_FORWARD_TARGETS
+                    ? list
+                    : [...list, c.id],
+              )
+            }
+          />
+        ))
+      )}
+      <ErrorNotice message={forward.isError ? errorMessage(forward.error) : undefined} />
+      <Button
+        label={chosen.length > 1 ? `Forward to ${chosen.length}` : 'Forward'}
+        disabled={chosen.length === 0}
+        loading={forward.isPending}
+        style={styles.footnote}
+        onPress={() =>
+          props.message &&
+          forward.mutate(
+            { messageId: props.message.id, conversationIds: chosen },
+            { onSuccess: close },
+          )
+        }
+      />
+    </BottomSheet>
+  );
+}
+
+function at(daysAhead: number, hour: number): Date {
+  const d = new Date();
+  d.setDate(d.getDate() + daysAhead);
+  d.setHours(hour, 0, 0, 0);
+  return d;
+}
+
+/** Times to offer: soon, this evening, tomorrow morning, the weekend. */
+function scheduleChoices(now = new Date()): { label: string; when: Date }[] {
+  const choices = [{ label: 'In 1 hour', when: new Date(now.getTime() + 3_600_000) }];
+  const tonight = at(0, 20);
+  if (tonight.getTime() - now.getTime() > 3_600_000)
+    choices.push({ label: 'Tonight, 8 pm', when: tonight });
+  choices.push({ label: 'Tomorrow, 9 am', when: at(1, 9) });
+  choices.push({ label: 'Tomorrow, 7 pm', when: at(1, 19) });
+  const toSaturday = (6 - now.getDay() + 7) % 7 || 7;
+  if (toSaturday > 1) choices.push({ label: 'Saturday, 10 am', when: at(toSaturday, 10) });
+  return choices;
+}
+
+/** Send the draft later (up to a week ahead), and see or cancel what's waiting. */
+export function ScheduleSheet(props: {
+  conversationId: string;
+  visible: boolean;
+  draft: string;
+  onClose: () => void;
+  onScheduled: () => void;
+}) {
+  const schedule = useScheduleMessage(props.conversationId);
+  const scheduled = useScheduled(props.conversationId, props.visible);
+  const cancel = useCancelScheduled(props.conversationId);
+  const body = props.draft.trim();
+  const waiting = scheduled.data?.scheduled ?? [];
+  return (
+    <BottomSheet visible={props.visible} title="Send later" onClose={props.onClose}>
+      {body ? (
+        <>
+          <Text tone="textSecondary" numberOfLines={2} style={styles.intro}>
+            “{body}”
+          </Text>
+          <View style={styles.row}>
+            {scheduleChoices().map((choice) => (
+              <Button
+                key={choice.label}
+                label={choice.label}
+                variant="secondary"
+                style={styles.purpose}
+                disabled={schedule.isPending}
+                onPress={() =>
+                  schedule.mutate(
+                    { body, sendAt: choice.when.toISOString() },
+                    { onSuccess: props.onScheduled },
+                  )
+                }
+              />
+            ))}
+          </View>
+        </>
+      ) : (
+        <Text tone="textSecondary" style={styles.intro}>
+          Write a message first, then choose when it goes.
+        </Text>
+      )}
+      <ErrorNotice message={schedule.isError ? errorMessage(schedule.error) : undefined} />
+      {waiting.length > 0 ? (
+        <>
+          <Text variant="eyebrow" tone="textSecondary" style={styles.footnote}>
+            Waiting to send
+          </Text>
+          {waiting.map((item) => (
+            <View key={item.id} style={styles.setting}>
+              <View style={styles.settingCopy}>
+                <Text numberOfLines={2}>{item.body}</Text>
+                <Text
+                  variant="caption"
+                  tone={item.status === 'FAILED' ? 'danger' : 'textSecondary'}
+                >
+                  {item.status === 'FAILED'
+                    ? 'Couldn’t be sent'
+                    : new Date(item.sendAt).toLocaleString([], {
+                        weekday: 'short',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                </Text>
+              </View>
+              <Button
+                label={item.status === 'FAILED' ? 'Dismiss' : 'Cancel'}
+                variant="quiet"
+                onPress={() => cancel.mutate(item.id)}
+              />
+            </View>
+          ))}
+        </>
+      ) : null}
+    </BottomSheet>
+  );
+}
+
+/** The conversation's pinned messages. Either person can unpin. */
+export function PinnedSheet(props: {
+  conversationId: string;
+  visible: boolean;
+  otherName: string;
+  canAct: boolean;
+  onClose: () => void;
+}) {
+  const pinned = usePinned(props.conversationId, props.visible);
+  const pin = usePin(props.conversationId);
+  return (
+    <BottomSheet visible={props.visible} title="Pinned" onClose={props.onClose}>
+      {(pinned.data?.messages ?? []).map((m) => (
+        <View key={m.id} style={styles.setting}>
+          <View style={styles.settingCopy}>
+            <Text variant="caption" tone="textSecondary">
+              {m.mine ? 'You' : props.otherName}
+            </Text>
+            <Text numberOfLines={3}>
+              {m.body ??
+                (m.kind === 'image' ? 'Photo' : m.kind === 'voice' ? 'Voice note' : 'Date idea')}
+            </Text>
+          </View>
+          {props.canAct ? (
+            <Button
+              label="Unpin"
+              variant="quiet"
+              onPress={() => pin.mutate({ messageId: m.id, pinned: false })}
+            />
+          ) : null}
+        </View>
+      ))}
     </BottomSheet>
   );
 }
@@ -327,4 +625,32 @@ const styles = StyleSheet.create({
     borderTopColor: color.border,
   },
   settingCopy: { flex: 1, gap: space.xxs },
+  reactionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: space.m },
+  reaction: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: MIN_TOUCH_TARGET / 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reactionChosen: {
+    backgroundColor: color.surfaceRaised,
+    borderWidth: 1,
+    borderColor: color.accent,
+  },
+  themeBlock: {
+    gap: space.xxs,
+    paddingVertical: space.m,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: color.border,
+  },
+  themes: { flexDirection: 'row', gap: space.m, marginTop: space.s },
+  swatch: {
+    width: MIN_TOUCH_TARGET,
+    height: MIN_TOUCH_TARGET,
+    borderRadius: radius.l,
+    borderWidth: 2,
+    borderColor: color.border,
+  },
+  swatchChosen: { borderColor: color.textPrimary },
 });

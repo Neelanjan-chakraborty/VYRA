@@ -52,6 +52,8 @@ export const sendMessageSchema = z.discriminatedUnion('kind', [
     body: messageBodySchema,
     /** The text started as a Wingman suggestion the sender edited or kept. */
     aiAssisted: z.boolean().default(false),
+    /** A message in the same conversation this one answers. */
+    replyToId: z.uuid().optional(),
   }),
   z.object({ kind: z.literal('date_plan'), clientId: z.uuid(), plan: datePlanInputSchema }),
 ]);
@@ -87,6 +89,51 @@ export const messageMediaSchema = z.object({
 });
 export type MessageMedia = z.infer<typeof messageMediaSchema>;
 
+/** Reactions are one of these, one per person per message. */
+export const REACTIONS = ['❤️', '😂', '😮', '😢', '👍', '🔥'] as const;
+export const reactionSchema = z.enum(REACTIONS);
+export const reactionInputSchema = z.object({ emoji: reactionSchema });
+export type Reaction = z.infer<typeof reactionSchema>;
+
+/** Text can be edited for this long after sending. */
+export const EDIT_WINDOW_MINUTES = 15;
+export const MAX_PINNED = 3;
+export const MAX_FORWARD_TARGETS = 5;
+export const SCHEDULE_MAX_DAYS = 7;
+
+export const CHAT_THEMES = ['default', 'dusk', 'ivory', 'sage', 'amber'] as const;
+export const chatThemeSchema = z.enum(CHAT_THEMES);
+
+export const editMessageSchema = z.object({ body: messageBodySchema });
+export const forwardMessageSchema = z.object({
+  conversationIds: z.array(z.uuid()).min(1).max(MAX_FORWARD_TARGETS),
+});
+
+export const scheduleMessageSchema = z.object({
+  body: messageBodySchema,
+  sendAt: z.iso.datetime(),
+});
+export const scheduledMessageSchema = z.object({
+  id: z.uuid(),
+  conversationId: z.uuid(),
+  body: z.string(),
+  sendAt: z.iso.datetime(),
+  status: z.enum(['PENDING', 'SENT', 'CANCELLED', 'FAILED']),
+});
+export type ScheduledMessageView = z.infer<typeof scheduledMessageSchema>;
+export const scheduledListSchema = z.object({ scheduled: z.array(scheduledMessageSchema) });
+export type ScheduledList = z.infer<typeof scheduledListSchema>;
+/** Pending scheduled messages one person may hold in one conversation. */
+export const MAX_SCHEDULED_PER_CONVERSATION = 10;
+
+/** A short look at the message being replied to. */
+export const replyPreviewSchema = z.object({
+  id: z.uuid(),
+  mine: z.boolean(),
+  /** Text cut short, or the kind in words ("Photo"); "Message removed" when gone. */
+  preview: z.string(),
+});
+
 export const messageSchema = z.object({
   id: z.uuid(),
   conversationId: z.uuid(),
@@ -103,6 +150,16 @@ export const messageSchema = z.object({
   event: z.enum(['connected']).nullable(),
   /** The viewer's own messages only: the other person has read it (when both share receipts). */
   read: z.boolean(),
+  replyTo: replyPreviewSchema.nullable(),
+  /** Grouped: each emoji with its count and whether the viewer chose it. */
+  reactions: z.array(
+    z.object({ emoji: reactionSchema, count: z.number().int(), mine: z.boolean() }),
+  ),
+  edited: z.boolean(),
+  pinned: z.boolean(),
+  forwarded: z.boolean(),
+  /** The viewer may still edit it (own text, within the edit window). */
+  editable: z.boolean(),
   createdAt: z.iso.datetime(),
 });
 export type MessageView = z.infer<typeof messageSchema>;
@@ -120,6 +177,9 @@ export const conversationSettingsSchema = z.object({
   /** Wingman may read recent messages in this conversation when this person asks it for help. */
   wingmanContextEnabled: z.boolean(),
   muted: z.boolean(),
+  /** No notifications from them; your read receipts and typing are never sent to them. */
+  restricted: z.boolean(),
+  theme: chatThemeSchema,
 });
 export type ConversationSettings = z.infer<typeof conversationSettingsSchema>;
 export const conversationSettingsUpdateSchema = conversationSettingsSchema
@@ -173,10 +233,24 @@ export const SOCKET_EVENTS = {
 } as const;
 export const conversationChangedEventSchema = z.object({
   conversationId: z.uuid(),
-  reason: z.enum(['message', 'removed', 'read', 'media', 'plan', 'ended']),
+  reason: z.enum([
+    'message',
+    'removed',
+    'read',
+    'media',
+    'plan',
+    'ended',
+    'reaction',
+    'edited',
+    'pinned',
+  ]),
   /** Who caused it (an id only), so an app can tell its own actions from the other person's. */
   by: z.uuid().optional(),
 });
 export type ConversationChangedEvent = z.infer<typeof conversationChangedEventSchema>;
 export const typingEventSchema = z.object({ conversationId: z.uuid() });
 export type TypingEvent = z.infer<typeof typingEventSchema>;
+
+/** The conversation's pinned messages, most recently pinned first. */
+export const pinnedListSchema = z.object({ messages: z.array(messageSchema).max(MAX_PINNED) });
+export type PinnedList = z.infer<typeof pinnedListSchema>;

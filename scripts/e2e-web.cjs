@@ -752,14 +752,59 @@ async function main() {
       await button('Send').click();
       await page.getByText(/\(Asha here\)$/).waitFor();
 
+      // Long-press a message for its actions: react, reply, pin, edit.
+      const hold = (text) => page.getByText(text, { exact: true }).first().click({ delay: 900 });
+      await hold('Great — Saturday?');
+      await button('React 🔥').click();
+      await button('🔥 1, yours. Tap to remove').waitFor({ timeout: 10000 });
+      await hold('Great — Saturday?');
+      await button('Reply').click();
+      await page.getByText(`Replying to ${kabir}`).waitFor();
+      await page.getByLabel('Message', { exact: true }).fill('Saturday works for me');
+      await button('Send').click();
+      await page.getByLabel(`Replying to ${kabir}`).first().waitFor({ timeout: 10000 });
+      await hold('Hi Kabir! Chai sounds good.');
+      await button('Pin for both of you').click();
+      await button('1 pinned. Show pinned messages').waitFor({ timeout: 10000 });
+      await hold('Saturday works for me');
+      await button('Edit').click();
+      await page.getByText('Editing your message').waitFor();
+      await page.getByLabel('Message', { exact: true }).fill('Saturday works for me!');
+      await button('Save').click();
+      await page.getByText('Saturday works for me!', { exact: true }).waitFor({ timeout: 10000 });
+      await page
+        .getByText(/· Edited/)
+        .first()
+        .waitFor();
+      await snap('conversation-actions');
+
+      // Send later: shown as waiting, then cancelled.
+      await page.getByLabel('Message', { exact: true }).fill('Good morning!');
+      await page.getByRole('button', { name: /^Add a photo/ }).click();
+      await button('Send later').click();
+      await button('Tomorrow, 9 am').click();
+      await button('Send later')
+        .waitFor({ state: 'detached' })
+        .catch(() => undefined);
+      await page.getByRole('button', { name: /^Add a photo/ }).click();
+      await button('Send later').click();
+      await page.getByText('Waiting to send').waitFor({ timeout: 10000 });
+      await snap('conversation-schedule');
+      await button('Cancel').click();
+      await page.getByText('Waiting to send').waitFor({ state: 'detached', timeout: 10000 });
+      await page.mouse.click(195, 60);
+
       // Privacy settings for this conversation.
       await button('Conversation settings').click();
+      await page.getByRole('radio', { name: 'Dusk' }).click();
+      await page.getByRole('radio', { name: 'Dusk', checked: true }).waitFor({ timeout: 10000 });
       await page.getByRole('switch', { name: 'Read receipts', checked: true }).click();
       await page.getByRole('switch', { name: 'Read receipts', checked: false }).waitFor();
       await snap('conversation-settings');
-      // Tap outside the sheet to close it.
-      await page.mouse.click(195, 60);
+      // The sheet now fills the screen; Escape closes it.
+      await page.keyboard.press('Escape');
       await page.getByText('Conversation settings', { exact: true }).waitFor({ state: 'detached' });
+      await snap('conversation-theme');
 
       // Back in the list; a new message shows a quiet dot, not a count.
       await button('Back').click();

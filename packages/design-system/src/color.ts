@@ -50,3 +50,16 @@ export const color = {
 } as const;
 
 export type ColorToken = keyof typeof color;
+
+/**
+ * Chat themes a person can pick per conversation. Only the colour of their own
+ * bubbles changes; text contrast is checked by `contrast.spec.ts`.
+ */
+export const chatThemes = {
+  default: { label: 'Violet', mine: palette.violet, mineText: palette.obsidian },
+  dusk: { label: 'Dusk', mine: palette.burgundy, mineText: palette.ivory },
+  ivory: { label: 'Ivory', mine: palette.ivory, mineText: palette.obsidian },
+  sage: { label: 'Sage', mine: palette.sage, mineText: palette.obsidian },
+  amber: { label: 'Amber', mine: palette.amber, mineText: palette.obsidian },
+} as const;
+export type ChatTheme = keyof typeof chatThemes;

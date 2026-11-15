@@ -5,7 +5,7 @@ import { API_BASE_URL, refreshSession } from '@/lib/api';
 import { queryClient } from '@/lib/query-client';
 import { useSession } from '@/lib/session';
 import { GatewayClient } from './gateway-client';
-import { CONVERSATIONS_KEY, messagesKey } from './messaging-api';
+import { CONVERSATIONS_KEY, messagesKey, pinnedKey } from './messaging-api';
 
 /** The Rust realtime gateway (crates/vyra-realtime). */
 const REALTIME_URL =
@@ -75,6 +75,8 @@ export function useRealtime(): void {
           if (!event.success) return;
           void queryClient.invalidateQueries({ queryKey: messagesKey(event.data.conversationId) });
           void queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY });
+          if (['pinned', 'removed', 'edited'].includes(event.data.reason))
+            void queryClient.invalidateQueries({ queryKey: pinnedKey(event.data.conversationId) });
           // Their new message ends "typing…" (your own message doesn't).
           const me = queryClient.getQueryData<{ id: string }>(['me'])?.id;
           if (

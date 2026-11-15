@@ -214,6 +214,51 @@ export default function YouScreen() {
           />
         </View>
       ))}
+      <View style={styles.row}>
+        <View style={styles.rowCopy}>
+          <Text variant="bodyStrong">Show who it’s from</Text>
+          <Text variant="caption" tone="textSecondary" style={styles.rowValue}>
+            {profile.notifyPreview === 'hidden'
+              ? 'Notifications just say “New message”.'
+              : 'Notifications include their name.'}
+          </Text>
+        </View>
+        <Toggle
+          label="Show who notifications are from"
+          value={profile.notifyPreview !== 'hidden'}
+          disabled={updateProfile.isPending}
+          onChange={(value) => updateProfile.mutate({ notifyPreview: value ? 'name' : 'hidden' })}
+        />
+      </View>
+
+      <Text variant="eyebrow" tone="textSecondary" style={styles.section}>
+        Message privacy
+      </Text>
+      {(
+        [
+          [
+            'defaultReadReceipts',
+            'Read receipts',
+            'For new conversations. Off means you won’t see theirs either.',
+          ],
+          ['defaultSharesTyping', 'Show when I’m typing', 'For new conversations.'],
+        ] as const
+      ).map(([key, label, description]) => (
+        <View key={key} style={styles.row}>
+          <View style={styles.rowCopy}>
+            <Text variant="bodyStrong">{label}</Text>
+            <Text variant="caption" tone="textSecondary" style={styles.rowValue}>
+              {description} Each conversation can still change it.
+            </Text>
+          </View>
+          <Toggle
+            label={`${label} by default`}
+            value={profile[key]}
+            disabled={updateProfile.isPending}
+            onChange={(value) => updateProfile.mutate({ [key]: value })}
+          />
+        </View>
+      ))}
       <ErrorNotice
         message={updateProfile.isError ? errorMessage(updateProfile.error) : undefined}
       />

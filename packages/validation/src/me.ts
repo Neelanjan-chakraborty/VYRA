@@ -39,6 +39,11 @@ export const profileUpdateSchema = z
     /** Push notifications for new messages / connection requests. */
     notifyMessages: z.boolean(),
     notifyRequests: z.boolean(),
+    /** "hidden" leaves the sender's name out of notifications. */
+    notifyPreview: z.enum(['name', 'hidden']),
+    /** Defaults for new conversations. */
+    defaultReadReceipts: z.boolean(),
+    defaultSharesTyping: z.boolean(),
   })
   .partial();
 export type ProfileUpdate = z.input<typeof profileUpdateSchema>;
@@ -165,6 +170,9 @@ export const meSchema = z.object({
       isDiscoverable: z.boolean(),
       notifyMessages: z.boolean(),
       notifyRequests: z.boolean(),
+      notifyPreview: z.enum(['name', 'hidden']),
+      defaultReadReceipts: z.boolean(),
+      defaultSharesTyping: z.boolean(),
     })
     .nullable(),
   photos: z.array(photoSchema),

@@ -21,6 +21,13 @@ import {
   type ConversationList,
   type ConversationSettings,
   conversationSettingsUpdateSchema,
+  editMessageSchema,
+  forwardMessageSchema,
+  type PinnedList,
+  reactionInputSchema,
+  scheduleMessageSchema,
+  type ScheduledList,
+  type ScheduledMessageView,
   type ConversationSummary,
   markReadSchema,
   MESSAGE_PHOTO_MAX_BYTES,
@@ -37,6 +44,7 @@ import type { Request } from 'express';
 import { z } from 'zod';
 import { getRequestId } from '../../common/request-id.middleware.js';
 import { type AuthContext, CurrentUser } from '../auth/auth.decorators.js';
+import { MessageActionsService } from './message-actions.service.js';
 import { MessageMediaService } from './message-media.service.js';
 import { MessagingService } from './messaging.service.js';
 import { WingmanService } from './wingman.service.js';
@@ -58,6 +66,7 @@ export class MessagingController {
     private readonly notifications: NotificationService,
     private readonly mediaMessages: MessageMediaService,
     private readonly wingman: WingmanService,
+    private readonly actions: MessageActionsService,
   ) {}
 
   @Get('conversations')
@@ -172,6 +181,101 @@ export class MessagingController {
     @Param('action', { schema: planAction }) action: z.infer<typeof planAction>,
   ): Promise<MessageView> {
     return this.messaging.respondToPlan(user.userId, messageId, action);
+  }
+
+  @Put('messages/:id/reaction')
+  @Throttle({ default: { limit: 60, ttl: 60_000 } })
+  @ApiOperation({ summary: 'React to a message (one reaction per person; replaces yours)' })
+  react(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+    @Body({ schema: reactionInputSchema }) body: z.output<typeof reactionInputSchema>,
+  ): Promise<MessageView> {
+    return this.actions.react(user.userId, messageId, body.emoji);
+  }
+
+  @Delete('messages/:id/reaction')
+  unreact(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+  ): Promise<MessageView> {
+    return this.actions.unreact(user.userId, messageId);
+  }
+
+  @Post('messages/:id/pin')
+  @HttpCode(200)
+  @ApiOperation({ summary: 'Pin a message for both people (up to three)' })
+  pin(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+  ): Promise<MessageView> {
+    return this.actions.pin(user.userId, messageId);
+  }
+
+  @Delete('messages/:id/pin')
+  unpin(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+  ): Promise<MessageView> {
+    return this.actions.unpin(user.userId, messageId);
+  }
+
+  @Get('conversations/:id/pinned')
+  pinned(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) conversationId: string,
+  ): Promise<PinnedList> {
+    return this.actions.pinned(user.userId, conversationId);
+  }
+
+  @Patch('messages/:id')
+  @ApiOperation({ summary: 'Edit your own text within 15 minutes of sending' })
+  edit(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+    @Body({ schema: editMessageSchema }) body: z.output<typeof editMessageSchema>,
+  ): Promise<MessageView> {
+    return this.actions.edit(user.userId, messageId, body.body);
+  }
+
+  @Post('messages/:id/forward')
+  @HttpCode(200)
+  @Throttle({ default: { limit: 10, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Forward your own text to your other conversations. Media never' })
+  forward(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) messageId: string,
+    @Body({ schema: forwardMessageSchema }) body: z.output<typeof forwardMessageSchema>,
+  ): Promise<{ forwarded: number }> {
+    return this.actions.forward(user.userId, messageId, body.conversationIds);
+  }
+
+  @Post('conversations/:id/scheduled')
+  @Throttle({ default: { limit: 20, ttl: 60_000 } })
+  @ApiOperation({ summary: 'Schedule a text message up to seven days ahead' })
+  schedule(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) conversationId: string,
+    @Body({ schema: scheduleMessageSchema }) body: z.output<typeof scheduleMessageSchema>,
+  ): Promise<ScheduledMessageView> {
+    return this.actions.schedule(user.userId, conversationId, body.body, body.sendAt);
+  }
+
+  @Get('conversations/:id/scheduled')
+  scheduled(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) conversationId: string,
+  ): Promise<ScheduledList> {
+    return this.actions.scheduled(user.userId, conversationId);
+  }
+
+  @Delete('scheduled/:id')
+  @HttpCode(204)
+  async cancelScheduled(
+    @CurrentUser() user: AuthContext,
+    @Param('id', { schema: id }) scheduledId: string,
+  ): Promise<void> {
+    await this.actions.cancel(user.userId, scheduledId);
   }
 
   @Put('me/push-devices')

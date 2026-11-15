@@ -154,6 +154,15 @@ describe('Messaging (e2e)', () => {
       (await http().get('/v1/conversations').set(user.auth).expect(200)).body,
     ).conversations;
 
+  const settings = (user: TestUser, conversationId: string, body: object) =>
+    http().patch(`/v1/conversations/${conversationId}/settings`).set(user.auth).send(body);
+
+  const schedule = (user: TestUser, conversationId: string, body: string, inMs: number) =>
+    http()
+      .post(`/v1/conversations/${conversationId}/scheduled`)
+      .set(user.auth)
+      .send({ body, sendAt: new Date(Date.now() + inMs).toISOString() });
+
   describe('conversations', () => {
     it('opens with the connection, for both people only', async () => {
       const { a, b, conversationId } = await connected();
@@ -489,5 +498,264 @@ describe('Messaging (e2e)', () => {
       await new Promise((r) => setTimeout(r, 300));
       expect(await realtime.isOnline(a.id)).toBe(false);
     });
+  });
+  describe('replies, reactions, pins, edits and forwarding', () => {
+    it('quotes the message replied to, and falls back when it is removed', async () => {
+      const { a, b, conversationId } = await connected();
+      const original = await send(a, conversationId, 'dinner on friday?').expect(201);
+      const reply = await http()
+        .post(`/v1/conversations/${conversationId}/messages`)
+        .set(b.auth)
+        .send({ kind: 'text', clientId: randomUUID(), body: 'yes!', replyToId: original.body.id })
+        .expect(201);
+      expect(messageSchema.parse(reply.body).replyTo).toEqual({
+        id: original.body.id,
+        mine: false,
+        preview: 'dinner on friday?',
+      });
+      const elsewhere = await connected();
+      await http()
+        .post(`/v1/conversations/${elsewhere.conversationId}/messages`)
+        .set(elsewhere.a.auth)
+        .send({ kind: 'text', clientId: randomUUID(), body: 'x', replyToId: original.body.id })
+        .expect(404);
+
+      await http().delete(`/v1/messages/${original.body.id}`).set(a.auth).expect(204);
+      const [latest] = (await page(b, conversationId)).messages;
+      expect(latest?.replyTo).toMatchObject({ preview: 'Message removed' });
+    });
+
+    it('keeps one reaction per person from the fixed set, for participants only', async () => {
+      const { a, b, conversationId } = await connected();
+      const outsider = await person();
+      const sent = await send(a, conversationId, 'guess what').expect(201);
+      const react = (user: TestUser, emoji: string) =>
+        http().put(`/v1/messages/${sent.body.id}/reaction`).set(user.auth).send({ emoji });
+      await react(b, '🔥').expect(200);
+      await react(b, '😂').expect(200);
+      await react(a, '😂').expect(200);
+      await react(b, '🍕').expect(422);
+      await react(outsider, '❤️').expect(404);
+      const [mine] = (await page(a, conversationId)).messages;
+      expect(mine?.reactions).toEqual([{ emoji: '😂', count: 2, mine: true }]);
+      const cleared = await http()
+        .delete(`/v1/messages/${sent.body.id}/reaction`)
+        .set(b.auth)
+        .expect(200);
+      expect(messageSchema.parse(cleared.body).reactions).toEqual([
+        { emoji: '😂', count: 1, mine: false },
+      ]);
+    });
+
+    it('pins up to three messages for both people', async () => {
+      const { a, b, conversationId } = await connected();
+      const ids: string[] = [];
+      for (let i = 0; i < 4; i += 1)
+        ids.push((await send(a, conversationId, `pin ${i}`).expect(201)).body.id);
+      for (const messageId of ids.slice(0, 3))
+        await http().post(`/v1/messages/${messageId}/pin`).set(b.auth).expect(200);
+      await http().post(`/v1/messages/${ids[3]}/pin`).set(a.auth).expect(409);
+      const pinned = await http()
+        .get(`/v1/conversations/${conversationId}/pinned`)
+        .set(a.auth)
+        .expect(200);
+      expect(pinned.body.messages.map((m: { body: string }) => m.body).toSorted()).toEqual([
+        'pin 0',
+        'pin 1',
+        'pin 2',
+      ]);
+      await http().delete(`/v1/messages/${ids[0]}/pin`).set(a.auth).expect(200);
+      await http().post(`/v1/messages/${ids[3]}/pin`).set(a.auth).expect(200);
+      expect((await page(b, conversationId)).messages[0]).toMatchObject({ pinned: true });
+    });
+
+    it('edits your own text within the window, and says so', async () => {
+      const { a, b, conversationId } = await connected();
+      const sent = await send(a, conversationId, 'see you at 7').expect(201);
+      expect(messageSchema.parse(sent.body).editable).toBe(true);
+      await http()
+        .patch(`/v1/messages/${sent.body.id}`)
+        .set(b.auth)
+        .send({ body: 'no' })
+        .expect(404);
+      const edited = await http()
+        .patch(`/v1/messages/${sent.body.id}`)
+        .set(a.auth)
+        .send({ body: 'see you at 8' })
+        .expect(200);
+      expect(edited.body).toMatchObject({ body: 'see you at 8', edited: true });
+      expect((await page(b, conversationId)).messages[0]).toMatchObject({
+        body: 'see you at 8',
+        edited: true,
+        editable: false,
+      });
+      await prisma.message.update({
+        where: { id: sent.body.id },
+        data: { createdAt: new Date(Date.now() - 16 * 60_000) },
+      });
+      await http()
+        .patch(`/v1/messages/${sent.body.id}`)
+        .set(a.auth)
+        .send({ body: 'too late' })
+        .expect(409);
+    });
+
+    it('forwards only your own text, only to your own conversations', async () => {
+      const first = await connected();
+      const { a } = first;
+      const other = await person();
+      const asked = await http()
+        .post('/v1/connections/requests')
+        .set(a.auth)
+        .send({ recipientId: other.id })
+        .expect(201);
+      await http()
+        .post(`/v1/connections/requests/${asked.body.requestId}/accept`)
+        .set(other.auth)
+        .expect(200);
+      const second = (await list(other))[0]?.id;
+      if (!second) throw new Error('no second conversation');
+      const stranger = await connected();
+
+      const mine = await send(a, first.conversationId, 'a thought worth sharing').expect(201);
+      const theirs = await send(first.b, first.conversationId, 'private words').expect(201);
+      await http()
+        .post(`/v1/messages/${theirs.body.id}/forward`)
+        .set(a.auth)
+        .send({ conversationIds: [second] })
+        .expect(422);
+      await http()
+        .post(`/v1/messages/${mine.body.id}/forward`)
+        .set(a.auth)
+        .send({ conversationIds: [stranger.conversationId] })
+        .expect(404);
+      await http()
+        .post(`/v1/messages/${mine.body.id}/forward`)
+        .set(a.auth)
+        .send({ conversationIds: [second] })
+        .expect(200, { forwarded: 1 });
+      expect((await page(other, second)).messages[0]).toMatchObject({
+        body: 'a thought worth sharing',
+        forwarded: true,
+        mine: false,
+      });
+    });
+
+    it('restricts quietly: no pushes, read receipts or typing reach them', async () => {
+      const { a, b, conversationId } = await connected();
+      const token = `ExponentPushToken[${randomUUID()}]`;
+      await http().put('/v1/me/push-devices').set(b.auth).send({ token, platform: 'android' });
+      await settings(b, conversationId, { restricted: true, theme: 'dusk' })
+        .expect(200)
+        .expect((r) => expect(r.body).toMatchObject({ restricted: true, theme: 'dusk' }));
+      const sent = await send(a, conversationId, 'hey?').expect(201);
+      expect(push.sent.filter((m) => m.token === token)).toHaveLength(0);
+      await http()
+        .post(`/v1/conversations/${conversationId}/read`)
+        .set(b.auth)
+        .send({ upTo: sent.body.id })
+        .expect(204);
+      expect((await page(a, conversationId)).messages[0]?.read).toBe(false);
+      // a is never told, and their own settings are unchanged.
+      expect(
+        (await http().get(`/v1/conversations/${conversationId}`).set(a.auth)).body.settings,
+      ).toMatchObject({ restricted: false, theme: 'default' });
+
+      const [socketA, socketB] = [await signedIn(sockets, a), await signedIn(sockets, b)];
+      socketB.send({ t: 'typing', c: conversationId });
+      expect(await nextEvent(socketA, SOCKET_EVENTS.typing, 800)).toBeNull();
+      socketA.send({ t: 'typing', c: conversationId });
+      expect(await nextEvent(socketB, SOCKET_EVENTS.typing)).toEqual({ conversationId });
+    });
+
+    it('starts new conversations from privacy defaults, and can hide who a push is from', async () => {
+      const [a, b] = [await person(), await person()];
+      await http()
+        .patch('/v1/me/profile')
+        .set(b.auth)
+        .send({ defaultReadReceipts: false, defaultSharesTyping: false, notifyPreview: 'hidden' })
+        .expect(200)
+        .expect((r) =>
+          expect(r.body.profile).toMatchObject({
+            defaultReadReceipts: false,
+            notifyPreview: 'hidden',
+          }),
+        );
+      const token = `ExponentPushToken[${randomUUID()}]`;
+      await http().put('/v1/me/push-devices').set(b.auth).send({ token, platform: 'ios' });
+      const asked = await http()
+        .post('/v1/connections/requests')
+        .set(a.auth)
+        .send({ recipientId: b.id })
+        .expect(201);
+      expect(push.sent.filter((m) => m.token === token).map((m) => m.body)).toEqual([
+        'New connection request',
+      ]);
+      await http()
+        .post(`/v1/connections/requests/${asked.body.requestId}/accept`)
+        .set(b.auth)
+        .expect(200);
+      const conversationId = (await list(b))[0]?.id ?? '';
+      const summary = await http().get(`/v1/conversations/${conversationId}`).set(b.auth);
+      expect(summary.body.settings).toMatchObject({
+        sendsReadReceipts: false,
+        sharesTyping: false,
+      });
+      const summaryA = await http().get(`/v1/conversations/${conversationId}`).set(a.auth);
+      expect(summaryA.body.settings).toMatchObject({ sendsReadReceipts: true, sharesTyping: true });
+    });
+  });
+
+  describe('scheduled messages', () => {
+    it('sends at the chosen time, and can be listed and cancelled before then', async () => {
+      const { a, b, conversationId } = await connected();
+      await schedule(a, conversationId, 'past', -1000).expect(422);
+      await schedule(a, conversationId, 'too far', 8 * 86_400_000).expect(422);
+      const soon = await schedule(a, conversationId, 'good morning ☀️', 1500).expect(201);
+      const later = await schedule(a, conversationId, 'never mind', 60_000).expect(201);
+      const listed = await http()
+        .get(`/v1/conversations/${conversationId}/scheduled`)
+        .set(a.auth)
+        .expect(200);
+      expect(listed.body.scheduled.map((s: { id: string }) => s.id)).toEqual([
+        soon.body.id,
+        later.body.id,
+      ]);
+      // Only the sender knows about them.
+      expect(
+        (await http().get(`/v1/conversations/${conversationId}/scheduled`).set(b.auth)).body
+          .scheduled,
+      ).toEqual([]);
+      await http().delete(`/v1/scheduled/${later.body.id}`).set(b.auth).expect(404);
+      await http().delete(`/v1/scheduled/${later.body.id}`).set(a.auth).expect(204);
+
+      expect((await page(b, conversationId)).messages[0]?.body).not.toBe('good morning ☀️');
+      const deadline = Date.now() + 10_000;
+      let latest = (await page(b, conversationId)).messages[0];
+      while (latest?.body !== 'good morning ☀️' && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 250));
+        latest = (await page(b, conversationId)).messages[0];
+      }
+      expect(latest).toMatchObject({ body: 'good morning ☀️', mine: false });
+      const row = await prisma.scheduledMessage.findUniqueOrThrow({ where: { id: soon.body.id } });
+      expect(row).toMatchObject({ status: 'SENT', messageId: latest?.id });
+      expect(
+        (await prisma.scheduledMessage.findUniqueOrThrow({ where: { id: later.body.id } })).status,
+      ).toBe('CANCELLED');
+    }, 20_000);
+
+    it('does not send once the connection has ended', async () => {
+      const { a, b, conversationId } = await connected();
+      const queued = await schedule(a, conversationId, 'late hello', 1000).expect(201);
+      await http().post(`/v1/blocks/${a.id}`).set(b.auth).expect(204);
+      const deadline = Date.now() + 10_000;
+      let row = await prisma.scheduledMessage.findUniqueOrThrow({ where: { id: queued.body.id } });
+      while (row.status === 'PENDING' && Date.now() < deadline) {
+        await new Promise((r) => setTimeout(r, 250));
+        row = await prisma.scheduledMessage.findUniqueOrThrow({ where: { id: queued.body.id } });
+      }
+      expect(row.status).toBe('FAILED');
+      expect(await prisma.message.count({ where: { conversationId, body: 'late hello' } })).toBe(0);
+    }, 20_000);
   });
 });

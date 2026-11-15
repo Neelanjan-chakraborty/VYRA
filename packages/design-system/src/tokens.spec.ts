@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { color, contrastRatio, duration, resolveDuration, space } from './index.js';
+import { chatThemes, color, contrastRatio, duration, resolveDuration, space } from './index.js';
 
 describe('colour contrast (WCAG AA)', () => {
   const backgrounds = [color.background, color.surface, color.surfaceRaised];
@@ -21,6 +21,10 @@ describe('colour contrast (WCAG AA)', () => {
 
   it('ivory text on the chemistry fill is readable', () => {
     expect(contrastRatio(color.textPrimary, color.chemistry)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it.each(Object.entries(chatThemes))('chat theme %s keeps bubble text readable', (_, theme) => {
+    expect(contrastRatio(theme.mineText, theme.mine)).toBeGreaterThanOrEqual(4.5);
   });
 
   it('rejects malformed colours', () => {

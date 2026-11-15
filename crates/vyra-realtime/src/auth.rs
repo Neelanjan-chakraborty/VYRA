@@ -70,7 +70,7 @@ pub async fn typing_recipient(
          join conversations c on c.id = me.conversation_id
          join matches m on m.id = c.match_id
          join users ou on ou.id = other.user_id
-         where me.conversation_id = $1 and me.user_id = $2 and me.shares_typing
+         where me.conversation_id = $1 and me.user_id = $2 and me.shares_typing and not me.restricted
            and m.ended_at is null
            and ou.deleted_at is null and ou.status::text in ('ACTIVE', 'PAUSED')
            and not exists (

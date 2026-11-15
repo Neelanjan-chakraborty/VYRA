@@ -70,17 +70,19 @@ model User {
   conversationMemberships ConversationParticipant[]
   messages                Message[]
 
-  feedbackGiven     UserFeedback[]    @relation("FeedbackAuthor")
-  feedbackAbout     UserFeedback[]    @relation("FeedbackTarget")
-  reportsFiled      SafetyReport[]    @relation("ReportAuthor")
-  reportsAgainst    SafetyReport[]    @relation("ReportSubject")
-  reportsResolved   SafetyReport[]    @relation("ReportResolver")
-  blocksCreated     BlockedUser[]     @relation("Blocker")
-  blocksReceived    BlockedUser[]     @relation("Blocked")
-  moderationEvents  ModerationEvent[] @relation("ModerationSubject")
-  moderationActions ModerationEvent[] @relation("ModerationActor")
+  feedbackGiven     UserFeedback[]     @relation("FeedbackAuthor")
+  feedbackAbout     UserFeedback[]     @relation("FeedbackTarget")
+  reportsFiled      SafetyReport[]     @relation("ReportAuthor")
+  reportsAgainst    SafetyReport[]     @relation("ReportSubject")
+  reportsResolved   SafetyReport[]     @relation("ReportResolver")
+  blocksCreated     BlockedUser[]      @relation("Blocker")
+  blocksReceived    BlockedUser[]      @relation("Blocked")
+  moderationEvents  ModerationEvent[]  @relation("ModerationSubject")
+  moderationActions ModerationEvent[]  @relation("ModerationActor")
   auditLogs         AuditLog[]
   pushDevices       PushDevice[]
+  reactions         MessageReaction[]
+  scheduledMessages ScheduledMessage[]
 
   @@index([status])
   @@map("users")
@@ -191,6 +193,11 @@ model UserProfile {
   /// Push notifications for new messages and for connection requests.
   notifyMessages        Boolean          @default(true) @map("notify_messages")
   notifyRequests        Boolean          @default(true) @map("notify_requests")
+  /// Notification text: "name" ("New message from Asha") or "hidden" ("New message").
+  notifyPreview         String           @default("name") @map("notify_preview") @db.VarChar(10)
+  /// Defaults for new conversations; each conversation can override them.
+  defaultReadReceipts   Boolean          @default(true) @map("default_read_receipts")
+  defaultSharesTyping   Boolean          @default(true) @map("default_shares_typing")
   createdAt             DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt             DateTime         @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -673,6 +680,7 @@ model Conversation {
   match        Match                     @relation(fields: [matchId], references: [id], onDelete: Cascade)
   participants ConversationParticipant[]
   messages     Message[]
+  scheduled    ScheduledMessage[]
 
   @@index([lastMessageAt])
   @@map("conversations")
@@ -689,6 +697,11 @@ model ConversationParticipant {
   /// Whether the other person sees when this person is typing.
   sharesTyping          Boolean   @default(true) @map("shares_typing")
   mutedAt               DateTime? @map("muted_at") @db.Timestamptz(3)
+  /// This person restricted the other: no notifications from them, and no read
+  /// receipts or typing sent to them. The other person isn't told.
+  restricted            Boolean   @default(false)
+  /// Chat theme preset this person sees (design-system key).
+  theme                 String    @default("default") @db.VarChar(20)
 
   conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -734,16 +747,67 @@ model Message {
   mediaHeight     Int?                   @map("media_height")
   /// Set when the recipient reports the message; it is then hidden from them.
   reportedAt      DateTime?              @map("reported_at") @db.Timestamptz(3)
+  /// The message this one replies to (same conversation).
+  replyToId       String?                @map("reply_to_id") @db.Uuid
+  /// TEXT only: last edit (within 15 minutes of sending). Earlier text isn't kept.
+  editedAt        DateTime?              @map("edited_at") @db.Timestamptz(3)
+  /// Pinned for both people (at most 3 per conversation).
+  pinnedAt        DateTime?              @map("pinned_at") @db.Timestamptz(3)
+  /// Forwarded by its sender from another of their conversations.
+  forwarded       Boolean                @default(false)
   createdAt       DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
   deletedAt       DateTime?              @map("deleted_at") @db.Timestamptz(3)
 
-  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender       User?        @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User?             @relation(fields: [senderId], references: [id], onDelete: SetNull)
+  replyTo      Message?          @relation("Replies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies      Message[]         @relation("Replies")
+  reactions    MessageReaction[]
 
   @@unique([conversationId, clientId])
   @@index([conversationId, createdAt])
   @@index([conversationId, createdAt(sort: Desc), id(sort: Desc)], map: "messages_conversation_created_desc_idx")
   @@map("messages")
+}
+
+/// One reaction per person per message, from a fixed set of emoji.
+model MessageReaction {
+  messageId String   @map("message_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  emoji     String   @db.VarChar(16)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([messageId, userId])
+  @@map("message_reactions")
+}
+
+enum ScheduledMessageStatus {
+  PENDING
+  SENT
+  CANCELLED
+  FAILED
+}
+
+/// Text written now, sent later (at most 7 days ahead).
+model ScheduledMessage {
+  id             String                 @id @default(uuid()) @db.Uuid
+  conversationId String                 @map("conversation_id") @db.Uuid
+  senderId       String                 @map("sender_id") @db.Uuid
+  body           String                 @db.VarChar(4000)
+  sendAt         DateTime               @map("send_at") @db.Timestamptz(3)
+  status         ScheduledMessageStatus @default(PENDING)
+  /// The message it became, once sent.
+  messageId      String?                @map("message_id") @db.Uuid
+  createdAt      DateTime               @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([senderId, status])
+  @@map("scheduled_messages")
 }
 
 enum PushPlatform {

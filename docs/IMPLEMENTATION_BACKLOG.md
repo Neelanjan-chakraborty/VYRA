@@ -74,6 +74,17 @@ ChatGPT export import and Gemini Takeout import (isolated worker, archive limits
 approval UI, raw deletion) · BestPic · TrendSync · Astrology (deterministic ephemeris
 library) · advanced scenarios.
 
+## Chat features (product owner's list)
+
+Phase A ✅: replies, reactions, pins, edits (15 min), forwarding (own text only), scheduled
+messages, chat themes, restrict, privacy defaults, hidden notification previews.
+
+Next: B — video messages, view once, timed media and text, disappearing messages, blur,
+recipient watermark, media consent, private vault · C — screen-capture protection, screenshot
+notes, locked conversations, secure cache · D — Deep Talk, shared-interest prompts, insights,
+translation, availability overlap, date check-ins, temporary location · E — spam and abuse
+rules. Not this round: group chats, calls, end-to-end encryption.
+
 ## Milestone 8 — Production readiness
 
 Admin console (`apps/admin`, role-restricted, audited) · security review and fixes · load

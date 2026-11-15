@@ -17,6 +17,12 @@ const TEXT: Readonly<Record<NotificationKind, (name: string) => string>> = {
   connected: (name) => `You and ${name} are connected`,
 };
 
+const HIDDEN: Readonly<Record<NotificationKind, string>> = {
+  message: 'New message',
+  request: 'New connection request',
+  connected: 'You have a new connection',
+};
+
 /**
  * Push notifications. Says who, never what: message text, notes and photos
  * never leave in a notification. Nothing is sent while the person has the
@@ -39,7 +45,9 @@ export class NotificationService {
           where: { id: userId },
           select: {
             status: true,
-            profile: { select: { notifyMessages: true, notifyRequests: true } },
+            profile: {
+              select: { notifyMessages: true, notifyRequests: true, notifyPreview: true },
+            },
             pushDevices: { select: { token: true } },
           },
         }),
@@ -64,7 +72,11 @@ export class NotificationService {
       if (!wanted || recipient.pushDevices.length === 0) return;
       if (await this.realtime.isOnline(userId)) return;
 
-      const body = TEXT[notification.kind](sender?.displayName || 'Someone');
+      // "Hidden" previews don't even say who: just that something arrived.
+      const body =
+        recipient.profile?.notifyPreview === 'hidden'
+          ? HIDDEN[notification.kind]
+          : TEXT[notification.kind](sender?.displayName || 'Someone');
       const result = await this.provider.send(
         recipient.pushDevices.map(({ token }) => ({
           token,

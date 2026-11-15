@@ -1,6 +1,6 @@
 # Implementation status
 
-Last updated: 15 November 2026, after Milestone 7 part 1 (Rust engine, learning, realtime gateway, compression).
+Last updated: 15 November 2026, after chat features phase A (replies, reactions, pins, edits, forwarding, scheduled messages, themes, restrict, privacy defaults).
 
 ## Summary
 
@@ -140,6 +140,15 @@ delete their account.
   TextField, OtpInput, SelectRow, Tag, Stepper, Toggle, BottomSheet, FormScreen, notices.
 - **Foundation** (Milestone 1): monorepo, validated configuration, 32-table schema, health
   probes, rate limiting, error envelope, design tokens, CI workflow.
+
+**New — chat features, phase A.** In a conversation you can long-press a message to react
+(six emoji, one each), reply with a quote, pin it for both of you (up to three, shown in a bar
+at the top), edit your own text for 15 minutes ("Edited"), forward your own text to up to five
+other conversations, or remove/report as before. "Send later" schedules a message up to a week
+ahead and lists what's waiting, with cancel. Conversation settings add a theme (five design-system
+presets, only you see it) and Restrict. You → Notifications can hide who a notification is from;
+You → Message privacy sets read-receipt and typing defaults for new conversations. Phases B–E
+(ephemeral media and video, device protection, relationship tools, abuse rules) are next.
 
 ## What is deliberately not there
 

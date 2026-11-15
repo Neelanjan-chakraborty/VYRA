@@ -2,7 +2,7 @@ import { color, MIN_TOUCH_TARGET, radius, space, typography } from '@vyra/design
 import { MESSAGE_BODY_MAX, type MessageView } from '@vyra/validation';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentRef, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -23,8 +23,11 @@ import { useBlock, useEndConnection, useRelationship } from '@/features/discover
 import { PersonAvatar } from '@/features/discovery/person-avatar';
 import {
   AddSheet,
+  ForwardSheet,
   MessageActionsSheet,
+  PinnedSheet,
   PlanSheet,
+  ScheduleSheet,
   SettingsSheet,
   WingmanSheet,
 } from '@/features/messaging/conversation-sheets';
@@ -33,9 +36,13 @@ import {
   newClientId,
   useConversation,
   useConversationSettings,
+  useEditMessage,
   useMarkRead,
   useMessages,
+  usePin,
+  usePinned,
   usePlanResponse,
+  useReaction,
   useRemoveMessage,
   useReportMessage,
   useSendPhoto,
@@ -48,7 +55,8 @@ import { errorMessage } from '@/lib/api';
 import { prepareImageForUpload } from '@/lib/prepare-image';
 import { noBrowserFocusRing } from '@/lib/web-style';
 
-type Sheet = 'add' | 'plan' | 'wingman' | 'settings' | 'end' | 'block' | null;
+type Sheet =
+  'add' | 'plan' | 'wingman' | 'settings' | 'schedule' | 'pinned' | 'end' | 'block' | null;
 
 const TYPING_SIGNAL_MS = 2000;
 
@@ -71,6 +79,10 @@ export default function ConversationScreen() {
   const remove = useRemoveMessage(id);
   const report = useReportMessage(id);
   const plan = usePlanResponse(id);
+  const react = useReaction(id);
+  const pin = usePin(id);
+  const edit = useEditMessage(id);
+  const pinned = usePinned(id, !gone);
   const end = useEndConnection();
   const block = useBlock();
   const recorder = useVoiceRecorder();
@@ -80,6 +92,10 @@ export default function ConversationScreen() {
   const [aiAssisted, setAiAssisted] = useState(false);
   const [sheet, setSheet] = useState<Sheet>(null);
   const [actionsFor, setActionsFor] = useState<MessageView | null>(null);
+  const [replyTo, setReplyTo] = useState<MessageView | null>(null);
+  const [editing, setEditing] = useState<MessageView | null>(null);
+  const [forwarding, setForwarding] = useState<MessageView | null>(null);
+  const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
   const lastTyping = useRef(0);
   const lastRead = useRef<string | null>(null);
 
@@ -107,9 +123,18 @@ export default function ConversationScreen() {
 
   const name = summary?.person.displayName ?? '';
   const readOnly = summary?.readOnly ?? false;
-  const error = [sendText, sendPhoto, sendVoice, remove, report, plan, settings].find(
-    (m) => m.isError,
-  )?.error;
+  const error = [
+    sendText,
+    sendPhoto,
+    sendVoice,
+    remove,
+    report,
+    plan,
+    settings,
+    react,
+    pin,
+    edit,
+  ].find((m) => m.isError)?.error;
 
   function onChangeDraft(text: string) {
     setDraft(text);
@@ -123,9 +148,46 @@ export default function ConversationScreen() {
   function send() {
     const body = draft.trim();
     if (!body) return;
-    sendText.mutate({ body, clientId: newClientId(), aiAssisted });
+    if (editing) {
+      edit.mutate({ messageId: editing.id, body });
+      setEditing(null);
+    } else {
+      sendText.mutate({
+        body,
+        clientId: newClientId(),
+        aiAssisted,
+        ...(replyTo
+          ? {
+              replyToId: replyTo.id,
+              replyTo: { id: replyTo.id, mine: replyTo.mine, preview: replyTo.body ?? '' },
+            }
+          : {}),
+      });
+      setReplyTo(null);
+    }
     setDraft('');
     setAiAssisted(false);
+  }
+
+  function startReply(message: MessageView) {
+    setActionsFor(null);
+    setEditing(null);
+    setReplyTo(message);
+    inputRef.current?.focus();
+  }
+
+  function startEdit(message: MessageView) {
+    setActionsFor(null);
+    setReplyTo(null);
+    setEditing(message);
+    setDraft(message.body ?? '');
+    inputRef.current?.focus();
+  }
+
+  function stopComposing() {
+    if (editing) setDraft('');
+    setEditing(null);
+    setReplyTo(null);
   }
 
   async function pickPhoto() {
@@ -166,6 +228,9 @@ export default function ConversationScreen() {
   }
 
   const matchId = relationship.data?.matchId ?? null;
+  const theme = summary.settings.theme;
+  const pinnedMessages = pinned.data?.messages ?? [];
+  const firstPinned = pinnedMessages[0];
 
   return (
     <KeyboardAvoidingView
@@ -222,6 +287,27 @@ export default function ConversationScreen() {
         </Pressable>
       </View>
 
+      {firstPinned ? (
+        <Pressable
+          role="button"
+          aria-label={`${pinnedMessages.length} pinned. Show pinned messages`}
+          onPress={() => setSheet('pinned')}
+          style={styles.pinnedBar}
+        >
+          <Text variant="eyebrow" tone="chemistryText">
+            Pinned{pinnedMessages.length > 1 ? ` · ${pinnedMessages.length}` : ''}
+          </Text>
+          <Text variant="caption" numberOfLines={1} style={styles.grow}>
+            {firstPinned.body ??
+              (firstPinned.kind === 'image'
+                ? 'Photo'
+                : firstPinned.kind === 'voice'
+                  ? 'Voice note'
+                  : 'Date idea')}
+          </Text>
+        </Pressable>
+      ) : null}
+
       <FlatList
         inverted
         data={list}
@@ -235,6 +321,8 @@ export default function ConversationScreen() {
             canAct={!readOnly}
             onActions={setActionsFor}
             onPlan={(message, action) => plan.mutate({ messageId: message.id, action })}
+            onReact={(message, emoji) => react.mutate({ messageId: message.id, emoji })}
+            theme={theme}
           />
         )}
         onEndReached={() => {
@@ -276,6 +364,28 @@ export default function ConversationScreen() {
                 Microphone access is off. Turn it on in your device settings to send voice notes.
               </Text>
             ) : null}
+            {replyTo || editing ? (
+              <View style={styles.contextBar}>
+                <View style={styles.grow}>
+                  <Text variant="caption" tone="chemistryText">
+                    {editing
+                      ? 'Editing your message'
+                      : `Replying to ${replyTo?.mine ? 'yourself' : name}`}
+                  </Text>
+                  {replyTo ? (
+                    <Text variant="caption" tone="textSecondary" numberOfLines={1}>
+                      {replyTo.body ??
+                        (replyTo.kind === 'image'
+                          ? 'Photo'
+                          : replyTo.kind === 'voice'
+                            ? 'Voice note'
+                            : 'Date idea')}
+                    </Text>
+                  ) : null}
+                </View>
+                <Button label="Cancel" variant="quiet" onPress={stopComposing} />
+              </View>
+            ) : null}
             {aiAssisted ? (
               <Text variant="caption" tone="textSecondary">
                 Wingman’s idea — make it yours before sending.
@@ -298,6 +408,7 @@ export default function ConversationScreen() {
                 </Svg>
               </Pressable>
               <TextInput
+                ref={inputRef}
                 value={draft}
                 onChangeText={onChangeDraft}
                 placeholder="Write a message"
@@ -309,7 +420,7 @@ export default function ConversationScreen() {
                 style={[styles.input, noBrowserFocusRing]}
               />
               <Button
-                label="Send"
+                label={editing ? 'Save' : 'Send'}
                 disabled={draft.trim().length === 0}
                 onPress={send}
                 style={styles.send}
@@ -331,6 +442,29 @@ export default function ConversationScreen() {
         onVoice={() => void startVoice()}
         onPlan={() => setSheet('plan')}
         onWingman={() => setSheet('wingman')}
+        onSchedule={() => setSheet('schedule')}
+      />
+      <ScheduleSheet
+        conversationId={id}
+        visible={sheet === 'schedule'}
+        draft={draft}
+        onClose={() => setSheet(null)}
+        onScheduled={() => {
+          setDraft('');
+          setSheet(null);
+        }}
+      />
+      <PinnedSheet
+        conversationId={id}
+        visible={sheet === 'pinned'}
+        otherName={name}
+        canAct={!readOnly}
+        onClose={() => setSheet(null)}
+      />
+      <ForwardSheet
+        message={forwarding}
+        fromConversationId={id}
+        onClose={() => setForwarding(null)}
       />
       <PlanSheet conversationId={id} visible={sheet === 'plan'} onClose={() => setSheet(null)} />
       <WingmanSheet
@@ -357,7 +491,23 @@ export default function ConversationScreen() {
       />
       <MessageActionsSheet
         message={actionsFor}
+        canAct={!readOnly}
         onClose={() => setActionsFor(null)}
+        onReact={(message, emoji) =>
+          react.mutate({ messageId: message.id, emoji }, { onSuccess: () => setActionsFor(null) })
+        }
+        onReply={startReply}
+        onPin={(message) =>
+          pin.mutate(
+            { messageId: message.id, pinned: !message.pinned },
+            { onSuccess: () => setActionsFor(null) },
+          )
+        }
+        onEdit={startEdit}
+        onForward={(message) => {
+          setActionsFor(null);
+          setForwarding(message);
+        }}
         onRemove={(message) => remove.mutate(message.id, { onSuccess: () => setActionsFor(null) })}
         onReport={(message, reason) =>
           report.mutate(
@@ -487,4 +637,22 @@ const styles = StyleSheet.create({
   recordingDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: color.danger },
   grow: { flex: 1 },
   sheetIntro: { marginBottom: space.l },
+  pinnedBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s,
+    minHeight: MIN_TOUCH_TARGET,
+    paddingHorizontal: space.l,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: color.border,
+    backgroundColor: color.surface,
+  },
+  contextBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.s,
+    paddingLeft: space.m,
+    borderLeftWidth: 2,
+    borderLeftColor: color.accent,
+  },
 });

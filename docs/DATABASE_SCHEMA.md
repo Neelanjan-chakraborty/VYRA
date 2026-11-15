@@ -16,17 +16,17 @@ only in SQL). How to change it: the `database-migrations` skill.
 
 ## Tables
 
-| Area          | Tables                                                                                                         |
-| ------------- | -------------------------------------------------------------------------------------------------------------- |
-| Identity      | `users`, `otp_challenges`, `auth_sessions`, `user_consents`                                                    |
-| Profile       | `user_profiles`, `user_photos`, `interests`, `user_interests`, `relationship_intents`, `discovery_preferences` |
-| Persona       | `personas`, `persona_versions`, `persona_evidence`, `vyra_vector.persona_embeddings`, `ai_imports`             |
-| Compatibility | `compatibility_weight_sets`, `compatibility_scores`, `compatibility_scenarios`                                 |
-| Discovery     | `discovery_events`, `saved_profiles`, `connection_requests`, `matches`                                         |
-| Messaging     | `conversations`, `conversation_participants`, `messages`, `push_devices`                                       |
-| Optional      | `trends`, `astrology_profiles`                                                                                 |
-| Commercial    | `subscriptions`, `user_feedback`                                                                               |
-| Safety        | `safety_reports`, `blocked_users`, `moderation_events`, `audit_logs`                                           |
+| Area          | Tables                                                                                                              |
+| ------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Identity      | `users`, `otp_challenges`, `auth_sessions`, `user_consents`                                                         |
+| Profile       | `user_profiles`, `user_photos`, `interests`, `user_interests`, `relationship_intents`, `discovery_preferences`      |
+| Persona       | `personas`, `persona_versions`, `persona_evidence`, `vyra_vector.persona_embeddings`, `ai_imports`                  |
+| Compatibility | `compatibility_weight_sets`, `compatibility_scores`, `compatibility_scenarios`                                      |
+| Discovery     | `discovery_events`, `saved_profiles`, `connection_requests`, `matches`                                              |
+| Messaging     | `conversations`, `conversation_participants`, `messages`, `message_reactions`, `scheduled_messages`, `push_devices` |
+| Optional      | `trends`, `astrology_profiles`                                                                                      |
+| Commercial    | `subscriptions`, `user_feedback`                                                                                    |
+| Safety        | `safety_reports`, `blocked_users`, `moderation_events`, `audit_logs`                                                |
 
 Tables added beyond the original entity list, and why: `otp_challenges` and `auth_sessions`
 (authentication needs them), `user_consents` (consent ledger), `interests` (normalises
@@ -115,3 +115,15 @@ within the disclosed window.
 | Deleted account personal data | Purged within 30 days                         |
 | Discovery events              | 18 months, then aggregated                    |
 | Audit logs and safety reports | Per legal requirement; reviewed before launch |
+
+### Chat core (migration `chat_core`)
+
+- `messages`: `reply_to_id` (self FK, `SET NULL`; CHECK not itself), `edited_at` (CHECK text
+  only), `pinned_at` (partial index per conversation), `forwarded`.
+- `message_reactions`: primary key `(message_id, user_id)` — one reaction per person per
+  message; `emoji` from a fixed set validated by the API.
+- `scheduled_messages`: `body`, `send_at`, `status` (`PENDING` / `SENT` / `CANCELLED` /
+  `FAILED`), `message_id` once sent; partial index on pending rows.
+- `conversation_participants`: `restricted`, `theme` (CHECK format).
+- `user_profiles`: `notify_preview` (CHECK `name` / `hidden`), `default_read_receipts`,
+  `default_shares_typing` (copied into new conversations).

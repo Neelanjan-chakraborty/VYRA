@@ -8,6 +8,10 @@ import {
   messagePageSchema,
   messageSchema,
   type MessageView,
+  pinnedListSchema,
+  type Reaction,
+  scheduledListSchema,
+  scheduledMessageSchema,
   type WingmanPurpose,
   wingmanSuggestionsSchema,
 } from '@vyra/validation';
@@ -89,6 +93,12 @@ function pendingMessage(
     plan: null,
     event: null,
     read: false,
+    replyTo: null,
+    reactions: [],
+    edited: false,
+    pinned: false,
+    forwarded: false,
+    editable: false,
     createdAt: new Date().toISOString(),
     ...fields,
   };
@@ -96,14 +106,26 @@ function pendingMessage(
 
 export function useSendText(conversationId: string) {
   return useMutation({
-    mutationFn: (input: { body: string; clientId: string; aiAssisted?: boolean }) =>
+    mutationFn: ({
+      replyTo: _quoted,
+      ...input
+    }: {
+      body: string;
+      clientId: string;
+      aiAssisted?: boolean;
+      replyToId?: string;
+      replyTo?: MessageView['replyTo'];
+    }) =>
       api(`/conversations/${conversationId}/messages`, {
         method: 'POST',
         body: { kind: 'text', ...input },
         schema: messageSchema,
       }),
-    onMutate: ({ body, clientId }) =>
-      addOptimistic(conversationId, pendingMessage(conversationId, clientId, { body })),
+    onMutate: ({ body, clientId, replyTo }) =>
+      addOptimistic(
+        conversationId,
+        pendingMessage(conversationId, clientId, { body, replyTo: replyTo ?? null }),
+      ),
     onSettled: () => refreshConversation(conversationId),
   });
 }
@@ -234,5 +256,94 @@ export function useWingman(conversationId: string) {
         body: { purpose },
         schema: wingmanSuggestionsSchema,
       }),
+  });
+}
+
+export function useReaction(conversationId: string) {
+  return useMutation({
+    mutationFn: ({ messageId, emoji }: { messageId: string; emoji: Reaction | null }) =>
+      api(`/messages/${messageId}/reaction`, {
+        method: emoji ? 'PUT' : 'DELETE',
+        ...(emoji ? { body: { emoji } } : {}),
+        schema: messageSchema,
+      }),
+    onSettled: () => refreshConversation(conversationId),
+  });
+}
+
+export const pinnedKey = (id: string) => ['pinned', id] as const;
+
+export function usePinned(conversationId: string, enabled = true) {
+  return useQuery({
+    queryKey: pinnedKey(conversationId),
+    enabled,
+    queryFn: () => api(`/conversations/${conversationId}/pinned`, { schema: pinnedListSchema }),
+    staleTime: 60_000,
+  });
+}
+
+export function usePin(conversationId: string) {
+  return useMutation({
+    mutationFn: ({ messageId, pinned }: { messageId: string; pinned: boolean }) =>
+      api(`/messages/${messageId}/pin`, {
+        method: pinned ? 'POST' : 'DELETE',
+        schema: messageSchema,
+      }),
+    onSettled: () => {
+      refreshConversation(conversationId);
+      void queryClient.invalidateQueries({ queryKey: pinnedKey(conversationId) });
+    },
+  });
+}
+
+export function useEditMessage(conversationId: string) {
+  return useMutation({
+    mutationFn: ({ messageId, body }: { messageId: string; body: string }) =>
+      api(`/messages/${messageId}`, { method: 'PATCH', body: { body }, schema: messageSchema }),
+    onSettled: () => refreshConversation(conversationId),
+  });
+}
+
+export function useForward() {
+  return useMutation({
+    mutationFn: ({
+      messageId,
+      conversationIds,
+    }: {
+      messageId: string;
+      conversationIds: string[];
+    }) => api(`/messages/${messageId}/forward`, { method: 'POST', body: { conversationIds } }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY }),
+  });
+}
+
+export const scheduledKey = (id: string) => ['scheduled', id] as const;
+
+export function useScheduled(conversationId: string, enabled = true) {
+  return useQuery({
+    queryKey: scheduledKey(conversationId),
+    enabled,
+    queryFn: () =>
+      api(`/conversations/${conversationId}/scheduled`, { schema: scheduledListSchema }),
+    refetchInterval: 60_000,
+  });
+}
+
+export function useScheduleMessage(conversationId: string) {
+  return useMutation({
+    mutationFn: (input: { body: string; sendAt: string }) =>
+      api(`/conversations/${conversationId}/scheduled`, {
+        method: 'POST',
+        body: input,
+        schema: scheduledMessageSchema,
+      }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: scheduledKey(conversationId) }),
+  });
+}
+
+export function useCancelScheduled(conversationId: string) {
+  return useMutation({
+    mutationFn: (scheduledId: string) => api(`/scheduled/${scheduledId}`, { method: 'DELETE' }),
+    onSettled: () => void queryClient.invalidateQueries({ queryKey: scheduledKey(conversationId) }),
   });
 }

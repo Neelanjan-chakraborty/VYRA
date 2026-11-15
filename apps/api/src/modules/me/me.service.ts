@@ -99,6 +99,9 @@ export class MeService {
         isDiscoverable: profile.isDiscoverable,
         notifyMessages: profile.notifyMessages,
         notifyRequests: profile.notifyRequests,
+        notifyPreview: profile.notifyPreview === 'hidden' ? 'hidden' : 'name',
+        defaultReadReceipts: profile.defaultReadReceipts,
+        defaultSharesTyping: profile.defaultSharesTyping,
       },
       photos,
       relationshipIntents: user.relationshipIntents.map((intent) => ({

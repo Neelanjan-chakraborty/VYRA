@@ -247,6 +247,24 @@ took seconds per upload.
 **D-065 · Media caching follows who is looking.** Owner URLs: `max-age=600, immutable`; other
 people's: 60 s, so moderation, blocks and reports reach their devices within a minute.
 
+**D-066 · Chat additions stay server-enforced and small** (chat features, phase A). Reactions
+come from a fixed set of six, one per person per message. Pins are shared and capped at three.
+Edits are allowed for 15 minutes and keep no history — the message just says "Edited".
+Forwarding is limited to your own text: someone else's words and every photo or voice note stay
+in the conversation they were sent to. Scheduled messages are BullMQ delayed jobs keyed by the
+schedule id (which is also the message's `clientId`, so a retried job never sends twice), sent
+only while the connection is still open. Themes are design-system presets, per person, and only
+the person who picked one sees it.
+
+**D-067 · Restrict is quiet, one-sided and reversible.** The restricted person still sees the
+conversation, but gets no pushes from you and never sees your read receipts or typing (the
+gateway checks the same flag). They aren't told. Restriction is the gentler step before blocking.
+
+**D-068 · Privacy defaults are copied, not linked.** New conversations take the person's
+read-receipt and typing defaults when they open. Changing a default doesn't touch existing
+conversations, so earlier choices made in a conversation are never overridden. "Hidden"
+notification previews leave out the sender's name as well as the content.
+
 ## Open (need the product owner)
 
 | #   | Question                                               | Needed by     | Default if unanswered                                                    |
