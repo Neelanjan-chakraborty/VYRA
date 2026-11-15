@@ -201,7 +201,7 @@ describe('parseAssistantReply', () => {
         planningStyle: { value: 'unknown', confidence: 'low', why: '' },
       }),
     );
-    if (typeof parsed === 'string') throw new Error(parsed);
+    if ('error' in parsed) throw new Error(parsed.error);
     expect(Object.fromEntries(parsed.answers)).toEqual({
       socialEnergy: { value: 0.75, confidence: 'high', why: 'Often plans group dinners' },
       communicationStyle: {
@@ -218,7 +218,7 @@ describe('parseAssistantReply', () => {
     const parsed = parseAssistantReply(
       `{"vyra_questionnaire":"1","answers":{"socialEnergy":{"value":2}}}`,
     );
-    expect(typeof parsed !== 'string' && parsed.answers.get('socialEnergy')?.value).toBe(0.25);
+    expect(!('error' in parsed) && parsed.answers.get('socialEnergy')?.value).toBe(0.25);
   });
 
   it.each([
@@ -231,7 +231,7 @@ describe('parseAssistantReply', () => {
     ['wrong shape', '```json\n{"hello":"world"}\n```', 'wrong_shape'],
     ['wrong version', reply({}, '99'), 'wrong_version'],
   ])('reports %s', (_name, text, error) => {
-    expect(parseAssistantReply(text)).toBe(error);
+    expect(parseAssistantReply(text)).toMatchObject({ error });
   });
 
   it('drops unasked, sensitive, out-of-range and malformed answers', () => {
@@ -244,7 +244,7 @@ describe('parseAssistantReply', () => {
         adventureOrientation: 'five',
       }),
     );
-    if (typeof parsed === 'string') throw new Error(parsed);
+    if ('error' in parsed) throw new Error(parsed.error);
     expect(parsed.answers.size).toBe(0);
     expect(parsed.rejected.toSorted()).toEqual([
       'adventureOrientation',
@@ -267,7 +267,7 @@ describe('parseAssistantReply', () => {
           role: 'ADMIN',
         }),
     );
-    if (typeof parsed === 'string') throw new Error(parsed);
+    if ('error' in parsed) throw new Error(parsed.error);
     expect([...parsed.answers.keys()]).toEqual(['socialEnergy']);
     expect(parsed.rejected).toEqual(['role']);
   });
@@ -276,7 +276,7 @@ describe('parseAssistantReply', () => {
     const text =
       reply({ socialEnergy: { value: 1 } }) + '\n' + reply({ socialEnergy: { value: 5 } });
     const parsed = parseAssistantReply(text);
-    expect(typeof parsed !== 'string' && parsed.answers.get('socialEnergy')?.value).toBe(0);
+    expect(!('error' in parsed) && parsed.answers.get('socialEnergy')?.value).toBe(0);
   });
 
   it('balanced-brace extraction ignores braces inside strings', () => {

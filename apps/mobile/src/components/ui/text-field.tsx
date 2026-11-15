@@ -10,9 +10,19 @@ interface TextFieldProps extends Omit<TextInputProps, 'style'> {
   readonly hint?: string;
   /** Shown inside the field before the value, e.g. a currency or dial prefix. */
   readonly prefix?: string;
+  /** Multiline only: how many lines tall the field starts. */
+  readonly lines?: number;
 }
 
-export function TextField({ label, error, hint, prefix, multiline, ...input }: TextFieldProps) {
+export function TextField({
+  label,
+  error,
+  hint,
+  prefix,
+  multiline,
+  lines,
+  ...input
+}: TextFieldProps) {
   const [focused, setFocused] = useState(false);
   const borderColor = error ? color.danger : focused ? color.textPrimary : color.border;
   return (
@@ -41,7 +51,11 @@ export function TextField({ label, error, hint, prefix, multiline, ...input }: T
             setFocused(false);
             input.onBlur?.(event);
           }}
-          style={[styles.input, multiline && styles.inputMultiline]}
+          style={[
+            styles.input,
+            multiline && styles.inputMultiline,
+            multiline && lines ? { minHeight: lines * 24 } : null,
+          ]}
         />
       </View>
       {error ? (

@@ -167,7 +167,9 @@ export function AskAiScreen({ mode }: { readonly mode: 'onboarding' | 'settings'
         value={reply}
         onChangeText={setReply}
         multiline
+        lines={10}
         maxLength={QUESTIONNAIRE_REPLY_MAX_CHARS}
+        hint={`${reply.length.toLocaleString()} of ${QUESTIONNAIRE_REPLY_MAX_CHARS.toLocaleString()} characters. Paste the assistant’s whole reply.`}
         autoCapitalize="none"
         autoCorrect={false}
       />

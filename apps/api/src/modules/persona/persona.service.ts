@@ -49,7 +49,10 @@ const GENERATION_COOLDOWN_MS = 60_000;
 const PARSE_MESSAGES: Record<ReflectionParseError, string> = {
   no_json:
     'We couldn’t find the answers in that text. Paste the assistant’s whole reply, including the code block with its answers.',
-  invalid_json: 'The reply looks cut off. Copy the assistant’s whole reply and try again.',
+  cut_off:
+    'The reply stops partway: its answers aren’t finished. Ask your assistant to send the answers again, then copy the whole reply.',
+  invalid_json:
+    'We found the answers but couldn’t read them as written. Ask your assistant to send just the code block again, then copy that.',
   wrong_shape:
     'That reply isn’t in the format the questionnaire asks for. Copy the prompt again and send it to your assistant.',
   wrong_version:
@@ -205,10 +208,13 @@ export class PersonaService {
       throw new ConflictException('Allow VYRA to read your assistant’s answers first.');
     }
     const parsed = parseAssistantReply(reply);
-    if (typeof parsed === 'string') {
+    if ('error' in parsed) {
       throw new UnprocessableEntityException({
-        message: PARSE_MESSAGES[parsed],
-        details: [{ path: 'reply', message: parsed }],
+        message:
+          parsed.near && parsed.error === 'invalid_json'
+            ? `${PARSE_MESSAGES.invalid_json} It goes wrong near: ${parsed.near}`
+            : PARSE_MESSAGES[parsed.error],
+        details: [{ path: 'reply', message: parsed.error }],
       });
     }
     if (parsed.answers.size === 0) {
