@@ -16,7 +16,7 @@ export function rng(seed) {
 
 const pick = (r, list) => list[Math.floor(r() * list.length)];
 const some = (r, list, max) => {
-  const shuffled = [...list].sort(() => r() - 0.5);
+  const shuffled = list.toSorted(() => r() - 0.5);
   return shuffled.slice(0, 1 + Math.floor(r() * Math.min(max, list.length)));
 };
 
