@@ -206,8 +206,8 @@ states are all present. New type tokens (`titleSmall`, `message`, `messageStrong
 | `pnpm rust:check`                 | Pass — fmt, clippy `-D warnings`, 13 Rust tests (engine 8 incl. learning 6, parity 2 over 2 000 pairs + 60 rankings, gateway 3)                                                                                                       |
 | Benchmarks                        | `scripts/bench-engine.mjs`, `cargo bench -p vyra-engine`, `scripts/bench-realtime.mjs` — numbers above                                                                                                                                |
 
-**Chat redesign check (15 Nov 2026, local machine).** `pnpm format:check`, `pnpm lint`,
-`pnpm --filter @vyra/mobile typecheck`, `pnpm --filter @vyra/mobile test` (14),
+**Chat redesign check (15–16 Nov 2026, local machine).** `pnpm format:check`, `pnpm lint`,
+`pnpm --filter @vyra/mobile typecheck`, `pnpm --filter @vyra/mobile test` (17),
 `pnpm --filter @vyra/design-system test` (16) and `expo export --platform web` passed. The
 exported web build was inspected at 390×844 and 320×700 against mocked API data for the thread,
 empty, error, add sheet, message actions, reply/emoji composer and date-idea states; screenshots

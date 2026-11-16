@@ -10,7 +10,6 @@ const PAGE = (username: string | null): string => {
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-<meta http-equiv="refresh" content="0;url=${target}">
 <title>VYRA</title>
 <style>
   body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;
@@ -22,7 +21,7 @@ const PAGE = (username: string | null): string => {
     text-decoration:none;font-weight:600}
 </style></head><body><main>
 <h1>${heading}</h1>
-<p>This link opens a profile in the VYRA app. If nothing happened, tap the button. You need VYRA installed.</p>
+<p>This link opens a profile in the VYRA app. Tap the button to open it. You need VYRA installed.</p>
 <a href="${target}">Open in VYRA</a>
 </main></body></html>`;
 };
