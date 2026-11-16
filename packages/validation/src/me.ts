@@ -207,3 +207,9 @@ export const meSchema = z.object({
 export type Me = z.infer<typeof meSchema>;
 
 export const deleteAccountSchema = z.object({ confirm: z.literal('DELETE') });
+
+/** Things the app can tell the server about itself, to diagnose problems on phones nobody can plug in. */
+export const clientEventSchema = z.object({
+  event: z.enum(['push_registration_crash']),
+});
+export type ClientEvent = z.infer<typeof clientEventSchema>;

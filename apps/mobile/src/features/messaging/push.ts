@@ -4,6 +4,9 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef } from 'react';
 import { Platform } from 'react-native';
 import { api } from '@/lib/api';
+import { crashedLastTime, markFinished, markStarted } from '@/lib/crash-guard';
+
+const PUSH_GUARD = 'push-registration';
 
 /**
  * Registers this phone for push notifications. Asked only once someone has a
@@ -15,14 +18,29 @@ async function register(): Promise<void> {
   const projectId: unknown =
     Constants.expoConfig?.extra?.['eas']?.projectId ?? Constants.easConfig?.projectId;
   if (typeof projectId !== 'string') return;
-  let { status } = await Notifications.getPermissionsAsync();
-  if (status !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;
-  if (status !== 'granted') return;
-  const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-  await api('/me/push-devices', {
-    method: 'PUT',
-    body: { token, platform: Platform.OS === 'ios' ? 'ios' : 'android' },
-  });
+  // Getting a push token calls into the phone's push service, which on some
+  // devices can crash the whole app. If the last attempt never finished, leave
+  // push off (and say so) rather than crash on every launch.
+  if (await crashedLastTime(PUSH_GUARD)) {
+    await api('/me/client-events', {
+      method: 'POST',
+      body: { event: 'push_registration_crash' },
+    }).catch(() => undefined);
+    return;
+  }
+  await markStarted(PUSH_GUARD);
+  try {
+    let { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') status = (await Notifications.requestPermissionsAsync()).status;
+    if (status !== 'granted') return;
+    const token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+    await api('/me/push-devices', {
+      method: 'PUT',
+      body: { token, platform: Platform.OS === 'ios' ? 'ios' : 'android' },
+    });
+  } finally {
+    await markFinished(PUSH_GUARD);
+  }
 }
 
 export function usePushNotifications(enabled: boolean): void {
